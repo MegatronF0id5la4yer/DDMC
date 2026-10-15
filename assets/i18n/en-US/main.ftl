@@ -241,6 +241,7 @@ player-next = Next track
 player-fullscreen = Fullscreen
 player-fullscreen-leave = Leave fullscreen
 fullscreen-artwork = Artwork
+fullscreen-video = Video
 
 # filters
 filter-history = Filter listening history

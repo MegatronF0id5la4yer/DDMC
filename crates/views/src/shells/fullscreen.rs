@@ -110,6 +110,7 @@ pub struct FullscreenView {
     visualizer: VisualizerDrive,
     root_bounds: Rc<Cell<Bounds<Pixels>>>,
     meta_bounds: Rc<Cell<Bounds<Pixels>>>,
+    video_mode: bool,
 }
 
 impl FullscreenView {
@@ -165,6 +166,7 @@ impl FullscreenView {
             visualizer: VisualizerDrive::default(),
             root_bounds: Rc::new(Cell::new(Bounds::default())),
             meta_bounds: Rc::new(Cell::new(Bounds::default())),
+            video_mode: false,
         };
         this.stir(cx);
         this
@@ -424,6 +426,88 @@ impl FullscreenView {
                                 }),
                         )
                     }),
+            )
+    }
+
+    fn video_view(
+        &mut self,
+        layout_side: Pixels,
+        _raster_side: Pixels,
+        _presentation_scale: f32,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let theme = *cx.theme();
+        let radius = theme.radius * 2.;
+        let track = self.playback.read(cx).track().cloned();
+        let track_name = track.as_ref().map(|t| t.name.clone()).unwrap_or_default();
+        let track_artists = track.as_ref().map(|t| t.artists.clone()).unwrap_or_default();
+        let track_id = track.as_ref().and_then(|t| t.id.clone());
+        let cover_url = track.as_ref().and_then(|t| t.cover.clone());
+
+        let video_url = match &track_id {
+            Some(id) if !music::is_local_id(id) => format!("https://www.youtube.com/watch?v={id}"),
+            _ => format!("https://www.youtube.com/results?search_query={track_artists}+{track_name}"),
+        };
+
+        div()
+            .id("fullscreen-video-player")
+            .relative()
+            .size(layout_side)
+            .flex_none()
+            .flex()
+            .flex_col()
+            .items_center()
+            .justify_center()
+            .rounded(radius)
+            .bg(theme.elevated)
+            .border_1()
+            .border_color(theme.border)
+            .shadow_lg()
+            .overflow_hidden()
+            .child(
+                div()
+                    .absolute()
+                    .size_full()
+                    .opacity(0.18)
+                    .child(
+                        Artwork::new(cover_url)
+                            .size(layout_side)
+                            .corner_radius(radius),
+                    ),
+            )
+            .child(
+                div()
+                    .relative()
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .justify_center()
+                    .gap_3()
+                    .p_6()
+                    .child(
+                        Button::new("fullscreen-video-play-btn")
+                            .large()
+                            .icon("icons/video.svg")
+                            .label("Reproducir Vídeo")
+                            .tint(theme.foreground)
+                            .rounded(theme.radius)
+                            .on_click(cx.listener(move |_, _, _, cx| {
+                                cx.open_url(&video_url);
+                            })),
+                    )
+                    .child(
+                        Button::new("fullscreen-video-back-btn")
+                            .ghost()
+                            .small()
+                            .icon("icons/disc-3.svg")
+                            .label("Volver a Portada")
+                            .tint(theme.muted_foreground)
+                            .rounded(theme.radius)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.video_mode = false;
+                                cx.notify();
+                            })),
+                    ),
             )
     }
 
@@ -803,8 +887,28 @@ impl FullscreenView {
             }
             cx.notify();
         });
+        let video_toggle = Button::new("fullscreen-video-tab")
+            .ghost()
+            .when(frosted, Button::frosted)
+            .small()
+            .icon("icons/video.svg")
+            .tooltip_above("fullscreen-video")
+            .selected(self.video_mode)
+            .rounded(theme.radius)
+            .tint(match self.video_mode {
+                true => theme.foreground,
+                false => theme.muted_foreground,
+            })
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.video_mode = !this.video_mode;
+                if this.video_mode {
+                    this.panel = None;
+                }
+                cx.notify();
+            }));
+
         let tab = move |id: &'static str, icon: &'static str, hint: &'static str, panel| {
-            let showing = self.panel == panel;
+            let showing = self.panel == panel && !self.video_mode;
 
             Button::new(id)
                 .ghost()
@@ -818,7 +922,10 @@ impl FullscreenView {
                     true => theme.foreground,
                     false => theme.muted_foreground,
                 })
-                .on_click(cx.listener(move |this, _, _, cx| this.show(panel, cx)))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.video_mode = false;
+                    this.show(panel, cx);
+                }))
         };
 
         div()
@@ -836,6 +943,7 @@ impl FullscreenView {
                             "fullscreen-artwork",
                             None,
                         ),
+                        video_toggle,
                         tab(
                             "fullscreen-lyrics",
                             "icons/mic-vocal.svg",
@@ -1238,7 +1346,11 @@ impl Render for FullscreenView {
                                     |this| this.flex_1().h_full(),
                                     |this| this.w_full(),
                                 )
-                                .child(self.artwork(side, raster_side, cover_scale, cx))
+                                .when_else(
+                                    self.video_mode,
+                                    |this| this.child(self.video_view(side, raster_side, cover_scale, cx)),
+                                    |this| this.child(self.artwork(side, raster_side, cover_scale, cx)),
+                                )
                                 .child(self.meta(hide, lift, cx))
                                 .when(split, |this| {
                                     this.child(self.dock(

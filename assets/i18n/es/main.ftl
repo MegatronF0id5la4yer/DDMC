@@ -230,6 +230,7 @@ player-next = Pista siguiente
 player-fullscreen = Pantalla completa
 player-fullscreen-leave = Salir de pantalla completa
 fullscreen-artwork = Portada
+fullscreen-video = Vídeo
 
 # filters
 filter-history = Filtrar el historial de reproducción

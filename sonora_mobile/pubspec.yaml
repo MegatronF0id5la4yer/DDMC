@@ -1,0 +1,56 @@
+name: sonora_mobile
+description: "Sonora Mobile - A native music and video streaming client with real-time audio visualizer"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.2
+
+  # Audio & Media Playback
+  just_audio: ^0.9.40
+  audio_service: ^0.18.15
+  audio_session: ^0.1.21
+
+  # Video Playback
+  video_player: ^2.9.2
+  chewie: ^1.8.5
+
+  # YouTube Streaming & Extraction
+  youtube_explode_dart: ^2.2.1
+
+  # Networking & HTTP
+  http: ^1.2.2
+
+  # UI, Icons & Animations
+  flutter_svg: ^2.0.10+1
+  cached_network_image: ^3.4.1
+  google_fonts: ^6.2.1
+  palette_generator: ^0.3.3+3
+
+  # Local Storage & Permissions
+  shared_preferences: ^2.3.2
+  permission_handler: ^11.3.1
+  on_audio_query: ^2.9.0
+  path_provider: ^2.1.4
+
+  # Utilities
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/
