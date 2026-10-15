@@ -64,3 +64,4 @@ class LyricsService {
     return result;
   }
 }
+

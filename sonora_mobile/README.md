@@ -48,3 +48,4 @@ flutter build apk --release
 flutter build apk --split-per-abi
 ```
 El archivo generado se ubicará en: `sonora_mobile/build/app/outputs/flutter-apk/app-release.apk`.
+

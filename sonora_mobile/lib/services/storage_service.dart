@@ -46,3 +46,4 @@ class StorageService {
     await prefs.setString(_keyVisualizerStyle, style);
   }
 }
+

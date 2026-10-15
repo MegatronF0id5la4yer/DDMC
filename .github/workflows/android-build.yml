@@ -39,3 +39,4 @@ jobs:
         with:
           name: sonora-android-release
           path: sonora_mobile/build/app/outputs/flutter-apk/app-release.apk
+

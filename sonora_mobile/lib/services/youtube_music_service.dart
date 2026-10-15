@@ -104,3 +104,4 @@ class YouTubeMusicService {
     _yt.close();
   }
 }
+

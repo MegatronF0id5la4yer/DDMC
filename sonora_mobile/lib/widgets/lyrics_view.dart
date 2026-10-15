@@ -102,3 +102,4 @@ class _LyricsViewState extends State<LyricsView> {
     );
   }
 }
+

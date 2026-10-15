@@ -29,3 +29,4 @@ class LyricLine {
     return LyricLine(timestamp: duration, text: text);
   }
 }
+

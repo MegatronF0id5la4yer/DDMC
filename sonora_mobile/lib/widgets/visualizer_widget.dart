@@ -144,3 +144,4 @@ class _VisualizerPainter extends CustomPainter {
     return true; // Continuously animates with incoming audio frames
   }
 }
+

@@ -52,3 +52,4 @@ class LibraryProvider extends ChangeNotifier {
     return _favorites.any((t) => t.id == trackId);
   }
 }
+
