@@ -61,12 +61,31 @@ class PlaybackService : MediaSessionService() {
         const val CHANNEL_ID = "ddmc_playback"
         const val NOTIFICATION_ID = 1001
         const val ACTION_FAVORITE = "ACTION_FAVORITE"
+        @Volatile var activeSession: MediaSession? = null
+
+        fun updateFavoriteButton(isFav: Boolean) {
+            val s = activeSession ?: return
+            val favRes = if (isFav) R.drawable.ic_heart_filled else R.drawable.ic_heart
+            val favCmd = SessionCommand(ACTION_FAVORITE, Bundle.EMPTY)
+            val favBtn = CommandButton.Builder()
+                .setDisplayName("Favorito")
+                .setIconResId(favRes)
+                .setSessionCommand(favCmd)
+                .build()
+            try {
+                s.setCustomLayout(ImmutableList.of(favBtn))
+            } catch (_: Exception) {}
+        }
     }
 
     private val widgetListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) = SonoraWidgetProvider.updateAllWidgets(this@PlaybackService)
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) =
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val key = mediaItem?.mediaId ?: ""
+            val isFav = if (key.isNotEmpty()) SonoraStore.getBool(this@PlaybackService, "fav_$key", false) else false
+            updateFavoriteButton(isFav)
             SonoraWidgetProvider.updateAllWidgets(this@PlaybackService)
+        }
     }
 
     override fun onCreate() {
@@ -79,10 +98,12 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val curKey = player.currentMediaItem?.mediaId ?: ""
+        val initFav = if (curKey.isNotEmpty()) SonoraStore.getBool(this, "fav_$curKey", false) else false
         val favCmd = SessionCommand(ACTION_FAVORITE, Bundle.EMPTY)
         val favBtn = CommandButton.Builder()
             .setDisplayName("Favorito")
-            .setIconResId(R.drawable.ic_heart_filled)
+            .setIconResId(if (initFav) R.drawable.ic_heart_filled else R.drawable.ic_heart)
             .setSessionCommand(favCmd)
             .build()
 
@@ -112,7 +133,9 @@ class PlaybackService : MediaSessionService() {
                     val key = cur?.mediaId ?: ""
                     if (key.isNotEmpty()) {
                         val isFav = SonoraStore.getBool(this@PlaybackService, "fav_$key", false)
-                        SonoraStore.putBool(this@PlaybackService, "fav_$key", !isFav)
+                        val newFav = !isFav
+                        SonoraStore.putBool(this@PlaybackService, "fav_$key", newFav)
+                        updateFavoriteButton(newFav)
                         SonoraWidgetProvider.updateAllWidgets(this@PlaybackService)
                     }
                     return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -124,13 +147,15 @@ class PlaybackService : MediaSessionService() {
         session = MediaSession.Builder(this, player)
             .setSessionActivity(open)
             .setCallback(callback)
-            .build()
+            .build().also { activeSession = it }
 
         val notifProvider = DefaultMediaNotificationProvider.Builder(this)
             .setChannelId(CHANNEL_ID)
             .setChannelName(R.string.notif_channel_name)
             .setNotificationId(NOTIFICATION_ID)
-            .build()
+            .build().apply {
+                setSmallIcon(R.drawable.ic_music)
+            }
         setMediaNotificationProvider(notifProvider)
 
         player.addListener(widgetListener)
@@ -166,6 +191,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         PlayerHolder.peek()?.removeListener(widgetListener)
+        activeSession = null
         session?.release()
         session = null
         super.onDestroy()

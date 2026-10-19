@@ -847,6 +847,14 @@ class MainActivity : AppCompatActivity(), RowHost {
                 countedKey = null
                 clearAbLoop(silent = true)
                 val t = tracks[idx]
+                if (t.coverBitmap == null) {
+                    ensureTrackArtwork(t)
+                    if (t.coverBitmap != null) {
+                        try {
+                            exoPlayer.replaceMediaItem(idx, toMediaItem(t))
+                        } catch (_: Exception) {}
+                    }
+                }
                 if (t.trimStartMs > 0 && exoPlayer.currentPosition < t.trimStartMs &&
                     reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
                 ) exoPlayer.seekTo(t.trimStartMs)
@@ -1011,6 +1019,10 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         exoPlayer = PlayerHolder.get(this)
         try { startService(Intent(this, PlaybackService::class.java)) } catch (_: Exception) {}
+        try {
+            val sToken = androidx.media3.session.SessionToken(this, android.content.ComponentName(this, PlaybackService::class.java))
+            androidx.media3.session.MediaController.Builder(this, sToken).buildAsync()
+        } catch (_: Exception) {}
         applyPlayerSettings()
         exoPlayer.addListener(playerListener)
         AudioFx.ensure(this, exoPlayer.audioSessionId)
@@ -5560,6 +5572,40 @@ class MainActivity : AppCompatActivity(), RowHost {
     // ==========================================================
     // PLAYBACK & QUEUE ENGINE
     // ==========================================================
+    private fun getArtworkCacheFile(t: TrackItem): File {
+        val dir = File(cacheDir, "artwork")
+        if (!dir.exists()) dir.mkdirs()
+        val safeKey = (t.key.hashCode().toLong() and 0xFFFFFFFFL).toString()
+        return File(dir, "cover_$safeKey.jpg")
+    }
+
+    private fun getArtworkUriForTrack(t: TrackItem): Uri? {
+        val file = getArtworkCacheFile(t)
+        if (file.exists() && file.length() > 0) {
+            return Uri.parse("content://${packageName}/?path=" + Uri.encode(file.absolutePath))
+        }
+        if (!t.coverUrl.isNullOrEmpty() && (t.coverUrl!!.startsWith("http://") || t.coverUrl!!.startsWith("https://"))) {
+            return Uri.parse(t.coverUrl)
+        }
+        return null
+    }
+
+    private fun ensureTrackArtwork(t: TrackItem) {
+        val bmp = t.coverBitmap ?: GifImageSupport.resolveTrackCoverBitmap(this, t)
+        if (bmp != null) {
+            t.coverBitmap = bmp
+            val file = getArtworkCacheFile(t)
+            if (!file.exists() || file.length() == 0L) {
+                try {
+                    file.parentFile?.mkdirs()
+                    java.io.FileOutputStream(file).use { out ->
+                        bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     private fun toMediaItem(t: TrackItem): MediaItem {
         val uri = when {
             isVideoMode && t.videoUrl.isNotEmpty() -> Uri.parse(t.videoUrl)
@@ -5571,7 +5617,24 @@ class MainActivity : AppCompatActivity(), RowHost {
             .setArtist(t.artist)
             .setAlbumTitle(t.album)
             .setSubtitle(t.quality)
-            .apply { t.coverUrl?.let { setArtworkUri(Uri.parse(it)) } }
+            .apply {
+                val bmp = t.coverBitmap ?: SonoraWidgetProvider.activeCoverBitmap
+                if (bmp != null) {
+                    try {
+                        val stream = java.io.ByteArrayOutputStream()
+                        val scaled = if (bmp.width > 720 || bmp.height > 720) {
+                            val r = minOf(720f / bmp.width, 720f / bmp.height)
+                            Bitmap.createScaledBitmap(bmp, (bmp.width * r).toInt().coerceAtLeast(1), (bmp.height * r).toInt().coerceAtLeast(1), true)
+                        } else bmp
+                        scaled.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+                        setArtworkData(stream.toByteArray(), MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                    } catch (_: Exception) {}
+                }
+                val artUri = getArtworkUriForTrack(t)
+                if (artUri != null) {
+                    setArtworkUri(artUri)
+                }
+            }
             .build()
         return MediaItem.Builder()
             .setMediaId(t.key)
@@ -5622,6 +5685,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         tracks.addAll(list)
         currentTrackIndex = idx
         val target = tracks[idx]
+        ensureTrackArtwork(target)
         val initPos = if (startPosMs >= 0L) startPosMs else target.trimStartMs
 
         if (sig != loadedSig || exoPlayer.mediaItemCount != tracks.size) {
@@ -5629,6 +5693,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             exoPlayer.setMediaItems(tracks.map { toMediaItem(it) }, idx, initPos)
             exoPlayer.prepare()
         } else if (exoPlayer.currentMediaItemIndex != idx) {
+            try { exoPlayer.replaceMediaItem(idx, toMediaItem(target)) } catch (_: Exception) {}
             exoPlayer.seekTo(idx, initPos)
             exoPlayer.prepare()
         } else if (startPosMs >= 0L) {
@@ -5672,7 +5737,23 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         val onCoverBitmapReady: (Bitmap?) -> Unit = { bmp ->
             if (bmp != null) {
+                t.coverBitmap = bmp
                 SonoraWidgetProvider.activeCoverBitmap = bmp
+                val file = getArtworkCacheFile(t)
+                if (!file.exists() || file.length() == 0L) {
+                    try {
+                        file.parentFile?.mkdirs()
+                        java.io.FileOutputStream(file).use { out ->
+                            bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                        }
+                    } catch (_: Exception) {}
+                }
+                val curIdx = exoPlayer.currentMediaItemIndex
+                if (curIdx == currentTrackIndex && curIdx in tracks.indices) {
+                    try {
+                        exoPlayer.replaceMediaItem(curIdx, toMediaItem(t))
+                    } catch (_: Exception) {}
+                }
                 if (ThemeEngine.isAdaptive(this)) {
                     if (ThemeEngine.adaptFromBitmap(this, bmp)) {
                         applyAccentLive()
@@ -5740,8 +5821,23 @@ class MainActivity : AppCompatActivity(), RowHost {
             runOnUiThread {
                 if (tracks.getOrNull(currentTrackIndex)?.key != targetKey) return@runOnUiThread
                 if (resolvedBmp != null) {
-                    if (t.coverBitmap == null) t.coverBitmap = resolvedBmp
+                    t.coverBitmap = resolvedBmp
                     SonoraWidgetProvider.activeCoverBitmap = resolvedBmp
+                    val file = getArtworkCacheFile(t)
+                    if (!file.exists() || file.length() == 0L) {
+                        try {
+                            file.parentFile?.mkdirs()
+                            java.io.FileOutputStream(file).use { out ->
+                                resolvedBmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    val curIdx = exoPlayer.currentMediaItemIndex
+                    if (curIdx == currentTrackIndex && curIdx in tracks.indices) {
+                        try {
+                            exoPlayer.replaceMediaItem(curIdx, toMediaItem(t))
+                        } catch (_: Exception) {}
+                    }
                     val isAnimUrl = t.coverUrl?.lowercase()?.let { it.contains(".gif") || it.contains(".webp") } == true
                     if (!isAnimUrl) {
                         coverImage.setImageBitmap(resolvedBmp)

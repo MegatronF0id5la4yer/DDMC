@@ -33,6 +33,12 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <provider
+            android:name=".ArtworkProvider"
+            android:authorities="${applicationId}"
+            android:exported="true"
+            android:grantUriPermissions="true" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

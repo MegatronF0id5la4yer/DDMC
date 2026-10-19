@@ -393,41 +393,12 @@ class SonoraWidgetProvider : AppWidgetProvider() {
         }
 
         fun updateSystemCustomNotification(context: Context) {
-            if (!SonoraWidgetPrefs.getSystemCustomNotifEnabled(context)) return
-            val player = PlayerHolder.peek() ?: return
-            if (player.mediaItemCount == 0) return
             try {
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                nm.cancel(DDMC_NOTIF_ID)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    val ch = NotificationChannel(
-                        DDMC_NOTIF_CHANNEL_ID,
-                        "DDMC Panel de Reproducción",
-                        NotificationManager.IMPORTANCE_LOW
-                    ).apply {
-                        description = "Panel de notificaciones personalizable de Doki Doki Music Club"
-                        setShowBadge(false)
-                    }
-                    nm.createNotificationChannel(ch)
+                    nm.deleteNotificationChannel(DDMC_NOTIF_CHANNEL_ID)
                 }
-                val views = buildRemoteViews(context)
-                val openIntent = PendingIntent.getActivity(
-                    context, 0, Intent(context, MainActivity::class.java),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                val md = player.mediaMetadata
-                val notif = NotificationCompat.Builder(context, DDMC_NOTIF_CHANNEL_ID)
-                    .setSmallIcon(android.R.drawable.ic_media_play)
-                    .setContentTitle(md.title ?: "Doki Doki Music Club")
-                    .setContentText(md.artist ?: "DDMC")
-                    .setCustomContentView(views)
-                    .setCustomBigContentView(views)
-                    .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-                    .setContentIntent(openIntent)
-                    .setOngoing(player.isPlaying)
-                    .setSilent(true)
-                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                    .build()
-                nm.notify(DDMC_NOTIF_ID, notif)
             } catch (_: Exception) {}
         }
     }
