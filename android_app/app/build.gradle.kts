@@ -46,7 +46,11 @@ dependencies {
     // Media3 / ExoPlayer for Audio and Video Playback
     implementation("androidx.media3:media3-exoplayer:1.2.1")
     implementation("androidx.media3:media3-ui:1.2.1")
+    implementation("androidx.media3:media3-session:1.2.1")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
 
-    // Coil for album artwork
+    // Coil for album artwork + native animated GIF support
     implementation("io.coil-kt:coil:2.5.0")
+    implementation("io.coil-kt:coil-gif:2.5.0")
 }
+
