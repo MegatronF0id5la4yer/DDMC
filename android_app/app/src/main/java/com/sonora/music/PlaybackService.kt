@@ -34,9 +34,25 @@ import com.google.common.util.concurrent.ListenableFuture
 object PlayerHolder {
     @Volatile
     private var player: ExoPlayer? = null
+    val audioProcessor = SonoraAudioProcessor()
 
     fun get(context: Context): ExoPlayer = player ?: synchronized(this) {
-        player ?: ExoPlayer.Builder(context.applicationContext)
+        if (player != null) return player!!
+        SonoraAudioEngine.init(context.applicationContext)
+        val renderersFactory = object : androidx.media3.exoplayer.DefaultRenderersFactory(context.applicationContext) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): androidx.media3.exoplayer.audio.AudioSink? {
+                return androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(audioProcessor))
+                    .build()
+            }
+        }
+        ExoPlayer.Builder(context.applicationContext, renderersFactory)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -82,6 +98,7 @@ class PlaybackService : MediaSessionService() {
         override fun onIsPlayingChanged(isPlaying: Boolean) = SonoraWidgetProvider.updateAllWidgets(this@PlaybackService)
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             val key = mediaItem?.mediaId ?: ""
+            SonoraAudioEngine.loadTrackOverrides(this@PlaybackService, key)
             val isFav = if (key.isNotEmpty()) SonoraStore.getBool(this@PlaybackService, "fav_$key", false) else false
             updateFavoriteButton(isFav)
             SonoraWidgetProvider.updateAllWidgets(this@PlaybackService)

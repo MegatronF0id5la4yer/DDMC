@@ -18,6 +18,10 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.media.MediaPlayer
+import android.graphics.SurfaceTexture
+import android.view.Surface
+import android.view.TextureView
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -665,6 +669,9 @@ fun ImageView.bindCover(t: TrackItem?, px: Int, onBitmapReady: ((Bitmap) -> Unit
 class CoverView(context: Context, private val sizeDp: Int, private val radiusDp: Int = 10) : FrameLayout(context) {
     private val placeholder = ImageView(context)
     val image = ImageView(context)
+    private var videoTexture: TextureView? = null
+    private var videoPlayer: MediaPlayer? = null
+    private var activeVideoUri: String? = null
 
     init {
         layoutParams = ViewGroup.LayoutParams(context.dp(sizeDp), context.dp(sizeDp))
@@ -683,10 +690,75 @@ class CoverView(context: Context, private val sizeDp: Int, private val radiusDp:
         addView(image, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
-    fun bind(t: TrackItem?, onBitmapReady: ((Bitmap) -> Unit)? = null) =
-        image.bindCover(t, context.dp(sizeDp) * 2, onBitmapReady)
+    fun bind(t: TrackItem?, onBitmapReady: ((Bitmap) -> Unit)? = null) {
+        val videoUri = if (t != null) SonoraStore.getString(context, "cover_video_${t.key}", "") else ""
+        if (videoUri.isNotEmpty()) {
+            bindVideo(videoUri)
+        } else {
+            stopVideo()
+            image.bindCover(t, context.dp(sizeDp) * 2, onBitmapReady)
+        }
+    }
+
+    fun bindVideo(uriString: String?) {
+        if (uriString.isNullOrEmpty()) {
+            stopVideo()
+            return
+        }
+        activeVideoUri = uriString
+        if (videoTexture == null) {
+            videoTexture = TextureView(context).apply {
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+                surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                    override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
+                        startLoopingVideo(Surface(st))
+                    }
+                    override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
+                    override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                        stopVideo()
+                        return true
+                    }
+                    override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+                }
+            }
+            addView(videoTexture)
+        }
+        videoTexture?.visibility = View.VISIBLE
+        image.visibility = View.GONE
+        if (videoTexture?.isAvailable == true) {
+            startLoopingVideo(Surface(videoTexture!!.surfaceTexture))
+        }
+    }
+
+    private fun startLoopingVideo(surface: Surface) {
+        val uriStr = activeVideoUri ?: return
+        try {
+            videoPlayer?.release()
+            videoPlayer = MediaPlayer().apply {
+                setSurface(surface)
+                setDataSource(context, Uri.parse(uriStr))
+                isLooping = true
+                setVolume(0f, 0f) // Strictly muted
+                setOnPreparedListener { it.start() }
+                prepareAsync()
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun stopVideo() {
+        videoPlayer?.release()
+        videoPlayer = null
+        videoTexture?.visibility = View.GONE
+        image.visibility = View.VISIBLE
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        stopVideo()
+    }
 
     fun bindUrl(url: String?) {
+        stopVideo()
         GifImageSupport.ensure(context)
         image.scaleType = ImageView.ScaleType.FIT_CENTER
         if (url.isNullOrEmpty()) {

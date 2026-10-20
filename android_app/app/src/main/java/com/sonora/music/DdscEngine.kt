@@ -433,24 +433,8 @@ object DdscEngine {
 
     /** Plays a character voice/sound effect from `assets/sounds/{character}/` when poked, petted, or performing actions. */
     fun playCharacterSound(context: Context, dokiId: String) {
-        val skin = getSkin(dokiId)
-        try {
-            val files = context.assets.list("sounds/${skin.soundFolder}")?.filter {
-                it.endsWith(".mp3", true) || it.endsWith(".wav", true) || it.endsWith(".ogg", true)
-            } ?: emptyList()
-            if (files.isEmpty()) return
-            val pick = files.random()
-            soundPlayer?.release()
-            val afd = context.assets.openFd("sounds/${skin.soundFolder}/$pick")
-            val mp = MediaPlayer()
-            mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-            afd.close()
-            mp.setVolume(0.75f, 0.75f)
-            mp.setOnCompletionListener { it.release() }
-            mp.prepare()
-            mp.start()
-            soundPlayer = mp
-        } catch (_: Exception) {}
+        // Silenced per user request: no doki voice audio
+        return
     }
 
     /**
@@ -835,7 +819,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
             invalidate()
         }
 
-    var isVoiceMuted: Boolean = false
+    var isVoiceMuted: Boolean = true
         set(value) {
             field = value
             if (value) {
@@ -849,10 +833,8 @@ class DokiStageSpriteView(context: Context) : View(context) {
         get() = activeEmotion == "shimeji" || activeDokiId == "bocchi" || activeDokiId == "konata"
 
     fun say(text: String, durationMs: Long = 3000L) {
-        if (isVoiceMuted) return
-        speechText = text
-        speechUntilMs = System.currentTimeMillis() + durationMs
-        invalidate()
+        // Silenced per user request: no speech bubbles / quotes
+        return
     }
 
     fun triggerCustomAction(action: DdscEngine.CustomActionDef? = null) {
@@ -1087,6 +1069,19 @@ class DokiStageSpriteView(context: Context) : View(context) {
             if (isChibiMode) {
                 shimejiState = ShimejiState.ANGRY
                 stateTicks = 80
+            } else {
+                val outfit = DdscEngine.resolveOutfitSet(activeDokiId, activePose)
+                val reactionSprites = if (outfit.molesta.isNotEmpty()) outfit.molesta else outfit.feliz
+                if (reactionSprites.isNotEmpty()) {
+                    val chosen = reactionSprites.random()
+                    val folder = outfit.folder.ifEmpty { "$activeDokiId $activePose" }
+                    customLockedPath = "$folder/$chosen"
+                    postDelayed({
+                        customLockedPath = null
+                        postInvalidateOnAnimation()
+                    }, 2800L)
+                }
+                breathPhase += 0.8f
             }
             say(skin.quotesAngry.random(), 3200L)
             spawnParticles("💢", 4)
@@ -1095,6 +1090,19 @@ class DokiStageSpriteView(context: Context) : View(context) {
                 shimejiState = ShimejiState.HAPPY_JUMP
                 stateTicks = 36
                 velY = -context.dpf(5.5f)
+            } else {
+                val outfit = DdscEngine.resolveOutfitSet(activeDokiId, activePose)
+                val pool = (outfit.feliz + outfit.pensando + outfit.examen).filter { s: String -> s.isNotEmpty() }
+                if (pool.isNotEmpty()) {
+                    val chosen = pool.random()
+                    val folder = outfit.folder.ifEmpty { "$activeDokiId $activePose" }
+                    customLockedPath = "$folder/$chosen"
+                    postDelayed({
+                        customLockedPath = null
+                        postInvalidateOnAnimation()
+                    }, 2800L)
+                }
+                breathPhase += 0.6f
             }
             say(skin.quotesPoke.random(), 2800L)
             spawnParticles("✨", 3)
@@ -1533,13 +1541,15 @@ class DokiStageSpriteView(context: Context) : View(context) {
         posY = top + drawH * 0.22f
 
         val swayDeg = if (reducedMotion) 0f else sin(breathPhase) * 0.58f
+        val beatBounce = if (reducedMotion || !isMusicPlaying) 0f else (audioEnergy * context.dpf(10f)).coerceIn(0f, context.dpf(15f))
         val bounceScaleY = if (reducedMotion) 1.0f else {
-            1.0f + sin(breathPhase * 1.4f) * 0.007f + (if (isMusicPlaying) audioEnergy * 0.020f else 0f)
+            1.0f + sin(breathPhase * 1.4f) * 0.007f + (if (isMusicPlaying) audioEnergy * 0.035f else 0f)
         }
         val bounceScaleX = 1.0f - (bounceScaleY - 1.0f) * 0.35f
 
         canvas.save()
         if (!reducedMotion) {
+            canvas.translate(0f, -beatBounce)
             canvas.rotate(swayDeg, w / 2f, h)
             canvas.scale(bounceScaleX, bounceScaleY, w / 2f, h)
         }

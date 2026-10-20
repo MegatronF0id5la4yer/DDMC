@@ -159,6 +159,30 @@
         </LinearLayout>
     </RelativeLayout>
 
+    <!-- Musicolet-style Timestamp Row -->
+    <RelativeLayout
+        android:id="@+id/widget_time_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp">
+        <TextView
+            android:id="@+id/widget_time_elapsed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:text="00:00"
+            android:textColor="#CBD5E1"
+            android:textSize="9.5sp" />
+        <TextView
+            android:id="@+id/widget_time_total"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:text="00:00"
+            android:textColor="#94A3B8"
+            android:textSize="9.5sp" />
+    </RelativeLayout>
+
     <!-- Progress Bar -->
     <ProgressBar
         android:id="@+id/widget_progress"

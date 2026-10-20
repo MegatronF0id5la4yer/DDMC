@@ -50,6 +50,7 @@ object ThemeEngine {
     const val SURF_AMOLED = "amoled"
     const val SURF_OBSIDIAN = "obsidian"
     const val SURF_TINTED = "tinted"
+    const val SURF_LIQUID_GLASS = "liquid_glass"
 
     private const val K_SOURCE = "estudio_theme_source_v4"
     private const val K_ACCENT = "theme_accent"
@@ -59,7 +60,7 @@ object ThemeEngine {
 
     // Default is dynamic cover extraction + reactive gradient surface
     fun source(c: Context) = SonoraStore.getString(c, K_SOURCE, SRC_COVER)
-    fun surface(c: Context) = SonoraStore.getString(c, K_SURFACE, SURF_TINTED)
+    fun surface(c: Context) = SonoraStore.getString(c, K_SURFACE, SURF_LIQUID_GLASS)
     fun fixedHex(c: Context) = SonoraStore.getString(c, K_ACCENT, "#38BDF8")
     fun isAdaptive(c: Context) = source(c) == SRC_COVER
 
@@ -157,6 +158,15 @@ object ThemeEngine {
         Pal.GRAD_DARKEST = if (isMonochrome) "#07080C" else toHex(Color.HSVToColor(floatArrayOf(h1, (s1 * 0.78f).coerceIn(0.32f, 0.68f), 0.11f)))
 
         when (surface(c)) {
+            SURF_LIQUID_GLASS -> {
+                // Liquid Glass / Frosted Acrylic Interface:
+                Pal.BG_TOP = toHex(Color.HSVToColor(floatArrayOf(h1, (s1 * 0.70f).coerceIn(0.26f, 0.62f), 0.30f)))
+                Pal.BG_MID = toHex(Color.HSVToColor(floatArrayOf(h2, (s2 * 0.65f).coerceIn(0.22f, 0.54f), 0.17f)))
+                Pal.BG_BOTTOM = "#0A0B14"
+                Pal.BG = Pal.BG_MID
+                Pal.SURFACE = "#25FFFFFF"
+                Pal.SURFACE_HI = "#38FFFFFF"
+            }
             SURF_AMOLED -> {
                 Pal.BG = "#07090F"
                 Pal.BG_TOP = toHex(Color.HSVToColor(floatArrayOf(h1, (s1 * 0.70f).coerceIn(0.30f, 0.62f), 0.24f)))
@@ -530,6 +540,7 @@ object ThemeEngine {
             surfRowHolder.removeAllViews()
             val (hs, row) = chipRow()
             val cur = surface(c)
+            row.addView(chip("Liquid Glass / Acrílico", cur == SURF_LIQUID_GLASS) { setSurface(c, SURF_LIQUID_GLASS); rebuildAll() })
             row.addView(chip("Degradado Reactivo", cur == SURF_TINTED) { setSurface(c, SURF_TINTED); rebuildAll() })
             row.addView(chip("Obsidiana", cur == SURF_OBSIDIAN) { setSurface(c, SURF_OBSIDIAN); rebuildAll() })
             row.addView(chip("AMOLED", cur == SURF_AMOLED) { setSurface(c, SURF_AMOLED); rebuildAll() })

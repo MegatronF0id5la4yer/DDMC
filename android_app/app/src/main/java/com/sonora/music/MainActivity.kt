@@ -13,6 +13,9 @@ import android.content.res.Configuration
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
 import android.media.MediaMetadataRetriever
+import android.media.MediaPlayer
+import android.view.Surface
+import android.view.TextureView
 import android.media.audiofx.Visualizer
 import android.net.Uri
 import android.os.Build
@@ -23,6 +26,7 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.text.InputType
 import android.view.GestureDetector
+import android.view.ScaleGestureDetector
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -624,6 +628,13 @@ class MainActivity : AppCompatActivity(), RowHost {
     private lateinit var exoPlayer: ExoPlayer
     private var audioVisualizer: Visualizer? = null
 
+    // Looping silent cover video & Nav position
+    private var stageCoverVideoPlayer: MediaPlayer? = null
+    private var stageCoverVideoView: TextureView? = null
+    private var currentCoverVideoUri: String? = null
+    private val navItemContainers = mutableListOf<LinearLayout>()
+    private var currentNavPosition: String = "bottom"
+
     // ---- unified stage block & visibility toggles ----
     private var showStageCover = true
     private var isStageCoverExpanded = true
@@ -955,6 +966,27 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
     }
 
+    private val videoCoverPickerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.data ?: return@registerForActivityResult
+            try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+            val t = tracks.getOrNull(currentTrackIndex)
+            if (t != null) {
+                SonoraStore.putString(this, "cover_video_${t.key}", uri.toString())
+            }
+            SonoraStore.putString(this, "cover_video_active", uri.toString())
+            updateStageCoverVideo(uri.toString())
+            Toast.makeText(this, "Video en bucle aplicado como portada", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val musicoletZipPickerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.data ?: return@registerForActivityResult
+            executeMusicoletImport(uri)
+        }
+    }
+
     private val gifCoverPickerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val uri = result.data?.data ?: return@registerForActivityResult
@@ -1096,6 +1128,8 @@ class MainActivity : AppCompatActivity(), RowHost {
 
     override fun onDestroy() {
         super.onDestroy()
+        stageCoverVideoPlayer?.release()
+        stageCoverVideoPlayer = null
         exoPlayer.removeListener(playerListener)
         if (::playerView.isInitialized) playerView.player = null
         releaseVisualizer()
@@ -1195,6 +1229,8 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         topHeader = buildHeader()
         bottomNavBar = buildNav()
+        val savedNavPos = SonoraStore.getString(this, "tab_bar_position", "bottom")
+        applyNavBarPosition(savedNavPos)
         miniPlayerRoot = buildMiniPlayer()
 
         mainContentFrame = FrameLayout(this).apply {
@@ -1397,16 +1433,1174 @@ class MainActivity : AppCompatActivity(), RowHost {
         )
     }
 
+    fun updateStageCoverVideo(uriString: String?) {
+        if (uriString.isNullOrEmpty()) {
+            stageCoverVideoPlayer?.stop()
+            stageCoverVideoPlayer?.release()
+            stageCoverVideoPlayer = null
+            stageCoverVideoView?.let { it.visibility = View.GONE }
+            if (::stageExpandedCoverImage.isInitialized) {
+                stageExpandedCoverImage.visibility = View.VISIBLE
+            }
+            return
+        }
+        currentCoverVideoUri = uriString
+        if (!::stageExpandedCoverCard.isInitialized) return
+
+        if (stageCoverVideoView == null) {
+            stageCoverVideoView = TextureView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    Gravity.CENTER
+                )
+                surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                    override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
+                        startLoopingVideo(Surface(st), currentCoverVideoUri)
+                    }
+                    override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
+                    override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                        stageCoverVideoPlayer?.release()
+                        stageCoverVideoPlayer = null
+                        return true
+                    }
+                    override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+                }
+            }
+            stageExpandedCoverCard.addView(stageCoverVideoView)
+        }
+        stageCoverVideoView?.let { it.visibility = View.VISIBLE }
+        stageExpandedCoverImage.visibility = View.GONE
+        stageCoverVideoView?.let { v ->
+            if (v.isAvailable && v.surfaceTexture != null) {
+                val surface = Surface(v.surfaceTexture)
+                startLoopingVideo(surface, uriString)
+            }
+        }
+    }
+
+    private fun startLoopingVideo(surface: Surface, uriString: String?) {
+        if (uriString == null) return
+        try {
+            stageCoverVideoPlayer?.release()
+            stageCoverVideoPlayer = MediaPlayer().apply {
+                setSurface(surface)
+                setDataSource(this@MainActivity, Uri.parse(uriString))
+                isLooping = true
+                setVolume(0f, 0f) // Muted silent video
+                setOnPreparedListener { it.start() }
+                prepareAsync()
+            }
+        } catch (_: Exception) {
+            stageCoverVideoView?.let { it.visibility = View.GONE }
+            stageExpandedCoverImage.visibility = View.VISIBLE
+        }
+    }
+
+    fun applyNavBarPosition(pos: String) {
+        currentNavPosition = pos
+        SonoraStore.putString(this, "tab_bar_position", pos)
+
+        if (!::bottomNavBar.isInitialized || !::mainContentFrame.isInitialized || !::topHeader.isInitialized) return
+
+        val insetsBottom = window.decorView.rootWindowInsets?.getInsets(android.view.WindowInsets.Type.systemBars())?.bottom ?: 0
+
+        val navLp = RelativeLayout.LayoutParams(
+            if (pos == "left" || pos == "right") dp(66) else RelativeLayout.LayoutParams.MATCH_PARENT,
+            if (pos == "left" || pos == "right") RelativeLayout.LayoutParams.MATCH_PARENT else RelativeLayout.LayoutParams.WRAP_CONTENT
+        )
+
+        val contentLp = RelativeLayout.LayoutParams(
+            RelativeLayout.LayoutParams.MATCH_PARENT,
+            RelativeLayout.LayoutParams.MATCH_PARENT
+        )
+
+        when (pos) {
+            "top" -> {
+                bottomNavBar.orientation = LinearLayout.HORIZONTAL
+                bottomNavBar.setPadding(dp(6), dp(4), dp(6), dp(4))
+                navLp.addRule(RelativeLayout.BELOW, topHeader.id)
+                contentLp.addRule(RelativeLayout.BELOW, bottomNavBar.id)
+                contentLp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                for (item in navItemContainers) {
+                    item.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                }
+            }
+            "left" -> {
+                bottomNavBar.orientation = LinearLayout.VERTICAL
+                bottomNavBar.setPadding(dp(2), dp(8), dp(2), dp(8) + insetsBottom)
+                navLp.addRule(RelativeLayout.ALIGN_PARENT_LEFT)
+                navLp.addRule(RelativeLayout.BELOW, topHeader.id)
+                navLp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                contentLp.addRule(RelativeLayout.RIGHT_OF, bottomNavBar.id)
+                contentLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
+                contentLp.addRule(RelativeLayout.BELOW, topHeader.id)
+                contentLp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                for (item in navItemContainers) {
+                    item.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+                }
+            }
+            "right" -> {
+                bottomNavBar.orientation = LinearLayout.VERTICAL
+                bottomNavBar.setPadding(dp(2), dp(8), dp(2), dp(8) + insetsBottom)
+                navLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
+                navLp.addRule(RelativeLayout.BELOW, topHeader.id)
+                navLp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                contentLp.addRule(RelativeLayout.LEFT_OF, bottomNavBar.id)
+                contentLp.addRule(RelativeLayout.ALIGN_PARENT_LEFT)
+                contentLp.addRule(RelativeLayout.BELOW, topHeader.id)
+                contentLp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                for (item in navItemContainers) {
+                    item.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+                }
+            }
+            else -> { // "bottom"
+                bottomNavBar.orientation = LinearLayout.HORIZONTAL
+                bottomNavBar.setPadding(dp(6), dp(4), dp(6), dp(6) + insetsBottom)
+                navLp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                contentLp.addRule(RelativeLayout.BELOW, topHeader.id)
+                contentLp.addRule(RelativeLayout.ABOVE, bottomNavBar.id)
+                for (item in navItemContainers) {
+                    item.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                }
+            }
+        }
+
+        bottomNavBar.layoutParams = navLp
+        mainContentFrame.layoutParams = contentLp
+        bottomNavBar.requestLayout()
+        mainContentFrame.requestLayout()
+    }
+
+    fun showTabBarPositionDialog() {
+        val options = arrayOf(
+            "Abajo (Predeterminado)",
+            "Arriba",
+            "Izquierda (Barra lateral)",
+            "Derecha (Barra lateral)"
+        )
+        val posKeys = arrayOf("bottom", "top", "left", "right")
+        val currentIdx = posKeys.indexOf(currentNavPosition).coerceAtLeast(0)
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Posición de Pestañas")
+            .setSingleChoiceItems(options, currentIdx) { d, which ->
+                val choice = posKeys[which]
+                applyNavBarPosition(choice)
+                d.dismiss()
+                Toast.makeText(this, "Pestañas ubicadas: ${options[which]}", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    fun applyVizSlot(slot: Int) {
+        val mode = SonoraStore.getInt(this, "viz_slot_${slot}_mode", when(slot) { 1 -> 0; 2 -> 1; 3 -> 2; else -> 0 })
+        val h = SonoraStore.getInt(this, "viz_slot_${slot}_h", when(slot) { 1 -> 76; 2 -> 96; 3 -> 68; else -> 140 })
+        visualizerStripView.visualMode = mode
+        vizDeckCard.layoutParams.height = dp(h)
+        vizDeckCard.requestLayout()
+        SonoraStore.putInt(this, "active_viz_slot", slot)
+        Toast.makeText(this, "Cargada Ranura $slot", Toast.LENGTH_SHORT).show()
+    }
+
+    fun saveCurrentToVizSlot(slot: Int) {
+        val currentMode = visualizerStripView.visualMode
+        val currentHeight = (vizDeckCard.height / resources.displayMetrics.density).toInt().coerceAtLeast(40)
+        SonoraStore.putInt(this, "viz_slot_${slot}_mode", currentMode)
+        SonoraStore.putInt(this, "viz_slot_${slot}_h", currentHeight)
+        SonoraStore.putInt(this, "active_viz_slot", slot)
+        Toast.makeText(this, "Guardado en Ranura $slot", Toast.LENGTH_SHORT).show()
+    }
+
+    private var vizHudBadge: TextView? = null
+
+    fun showVizHudBadge(textMsg: String) {
+        runOnUiThread {
+            if (vizHudBadge == null && ::mainRootLayout.isInitialized) {
+                vizHudBadge = TextView(this).apply {
+                    textSize = 12.5f
+                    setTextColor(Color.WHITE)
+                    setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                    setPadding(dp(14), dp(8), dp(14), dp(8))
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor("#E61E1B2E"))
+                        cornerRadius = dpf(18f)
+                        setStroke(dp(1), Color.parseColor(Pal.ACCENT))
+                    }
+                    elevation = dpf(8f)
+                    val lp = RelativeLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        addRule(RelativeLayout.CENTER_HORIZONTAL)
+                        addRule(RelativeLayout.ALIGN_PARENT_TOP)
+                        topMargin = dp(64)
+                    }
+                    layoutParams = lp
+                }
+                mainRootLayout.addView(vizHudBadge)
+            }
+            vizHudBadge?.text = textMsg
+            vizHudBadge?.visibility = View.VISIBLE
+            vizHudBadge?.alpha = 1.0f
+            vizHudBadge?.animate()?.cancel()
+            vizHudBadge?.animate()
+                ?.alpha(0f)
+                ?.setDuration(350)
+                ?.setStartDelay(1200)
+                ?.withEndAction { vizHudBadge?.visibility = View.GONE }
+                ?.start()
+        }
+    }
+
+    private fun attachVizTouchControls(card: FrameLayout, vizView: VisualizerView) {
+        var startRawY = 0f
+        var startRawX = 0f
+        var initialHeight = 0
+        var isLongPressResize = false
+        val longPressHandler = Handler(Looper.getMainLooper())
+
+        val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                val curH = card.layoutParams.height.takeIf { it > 0 } ?: dp(76)
+                val newH = (curH * detector.scaleFactor).toInt().coerceIn(dp(30), dp(320))
+                card.layoutParams.height = newH
+                card.requestLayout()
+                val dpVal = (newH / resources.displayMetrics.density).toInt()
+                showVizHudBadge("Visualizador: ${dpVal}dp")
+                SonoraStore.putInt(this@MainActivity, "player_viz_height_dp", dpVal)
+                return true
+            }
+        })
+
+        val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                vizView.visualMode = (vizView.visualMode + 1) % VisualizerView.MODE_NAMES.size
+                showVizHudBadge(VisualizerView.MODE_NAMES[vizView.visualMode])
+                vizView.invalidate()
+                return true
+            }
+
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if (e1 == null) return false
+                val dx = e2.x - e1.x
+                val dy = e2.y - e1.y
+                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > dp(30)) {
+                    if (dx > 0) {
+                        vizView.visualMode = if (vizView.visualMode > 0) vizView.visualMode - 1 else VisualizerView.MODE_NAMES.size - 1
+                    } else {
+                        vizView.visualMode = (vizView.visualMode + 1) % VisualizerView.MODE_NAMES.size
+                    }
+                    showVizHudBadge(VisualizerView.MODE_NAMES[vizView.visualMode])
+                    vizView.invalidate()
+                    return true
+                }
+                return false
+            }
+        })
+
+        val longPressRunnable = Runnable {
+            isLongPressResize = true
+            card.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            showVizHudBadge("Visualizador: Arrastra ↑ agrandar, ↓ achicar")
+        }
+
+        card.setOnTouchListener { v, event ->
+            scaleDetector.onTouchEvent(event)
+            if (scaleDetector.isInProgress) {
+                longPressHandler.removeCallbacks(longPressRunnable)
+                isLongPressResize = false
+                return@setOnTouchListener true
+            }
+
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startRawY = event.rawY
+                    startRawX = event.rawX
+                    initialHeight = card.layoutParams.height.takeIf { it > 0 } ?: dp(76)
+                    isLongPressResize = false
+                    longPressHandler.postDelayed(longPressRunnable, 320)
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dy = event.rawY - startRawY
+                    val dx = event.rawX - startRawX
+                    if (!isLongPressResize && (Math.abs(dy) > dp(8) || Math.abs(dx) > dp(8))) {
+                        longPressHandler.removeCallbacks(longPressRunnable)
+                    }
+                    if (isLongPressResize) {
+                        val newH = (initialHeight - dy.toInt()).coerceIn(dp(30), dp(320))
+                        card.layoutParams.height = newH
+                        card.requestLayout()
+                        val dpVal = (newH / resources.displayMetrics.density).toInt()
+                        showVizHudBadge("Visualizador: ${dpVal}dp")
+                        return@setOnTouchListener true
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    longPressHandler.removeCallbacks(longPressRunnable)
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
+                    if (isLongPressResize) {
+                        isLongPressResize = false
+                        val curH = card.layoutParams.height
+                        val dpVal = (curH / resources.displayMetrics.density).toInt()
+                        SonoraStore.putInt(this, "player_viz_height_dp", dpVal)
+                        showVizHudBadge("Visualizador: ${dpVal}dp (Guardado)")
+                        v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        return@setOnTouchListener true
+                    }
+                }
+            }
+            gestureDetector.onTouchEvent(event)
+            true
+        }
+    }
+
+    private fun attachDokiTouchControls(dokiCol: FrameLayout, spriteView: DokiStageSpriteView) {
+        var startRawY = 0f
+        var startRawX = 0f
+        var initialScale = 1.0f
+        var initialTx = 0f
+        var isLongPressResize = false
+        val longPressHandler = Handler(Looper.getMainLooper())
+
+        val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                val newScale = (spriteView.dokiScale * detector.scaleFactor).coerceIn(0.4f, 2.5f)
+                spriteView.dokiScale = newScale
+                val pct = (newScale * 100).toInt()
+                showVizHudBadge("Doki: $pct%")
+                SonoraStore.putInt(this@MainActivity, "player_doki_scale_pct", pct)
+                return true
+            }
+        })
+
+        val longPressRunnable = Runnable {
+            isLongPressResize = true
+            dokiCol.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            showVizHudBadge("Doki: Arrastra ↑ agrandar, ↓ achicar")
+        }
+
+        dokiCol.setOnTouchListener { v, event ->
+            scaleDetector.onTouchEvent(event)
+            if (scaleDetector.isInProgress) {
+                longPressHandler.removeCallbacks(longPressRunnable)
+                isLongPressResize = false
+                return@setOnTouchListener true
+            }
+
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startRawY = event.rawY
+                    startRawX = event.rawX
+                    initialScale = spriteView.dokiScale
+                    initialTx = spriteView.translationX
+                    isLongPressResize = false
+                    longPressHandler.postDelayed(longPressRunnable, 320)
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dy = event.rawY - startRawY
+                    val dx = event.rawX - startRawX
+                    if (!isLongPressResize && (Math.abs(dy) > dp(8) || Math.abs(dx) > dp(8))) {
+                        longPressHandler.removeCallbacks(longPressRunnable)
+                    }
+                    if (isLongPressResize) {
+                        val scaleDelta = -dy / dpf(220f)
+                        val newScale = (initialScale + scaleDelta).coerceIn(0.4f, 2.5f)
+                        spriteView.dokiScale = newScale
+                        spriteView.translationX = initialTx + dx
+                        val pct = (newScale * 100).toInt()
+                        showVizHudBadge("Doki: $pct%")
+                        return@setOnTouchListener true
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    longPressHandler.removeCallbacks(longPressRunnable)
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
+                    if (isLongPressResize) {
+                        isLongPressResize = false
+                        val pct = (spriteView.dokiScale * 100).toInt()
+                        SonoraStore.putInt(this, "player_doki_scale_pct", pct)
+                        SonoraStore.putFloat(this, "layout_doki_tx", spriteView.translationX)
+                        showVizHudBadge("Doki: $pct% (Guardado)")
+                        v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        return@setOnTouchListener true
+                    }
+                }
+            }
+            spriteView.dispatchTouchEvent(event)
+            true
+        }
+    }
+
+    private fun attachCoverTouchControls(card: FrameLayout, coverImg: ImageView) {
+        var startRawY = 0f
+        var startRawX = 0f
+        var initialHeight = 0
+        var isLongPressResize = false
+        val longPressHandler = Handler(Looper.getMainLooper())
+
+        val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                val curH = card.layoutParams.height.takeIf { it > 0 } ?: dp(228)
+                val newH = (curH * detector.scaleFactor).toInt().coerceIn(dp(120), dp(450))
+                card.layoutParams.height = newH
+                card.requestLayout()
+                val dpVal = (newH / resources.displayMetrics.density).toInt()
+                showVizHudBadge("Portada: ${dpVal}dp")
+                SonoraStore.putInt(this@MainActivity, "player_cover_height_dp", dpVal)
+                return true
+            }
+        })
+
+        val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                showGifCoverOptionsSheet()
+                return true
+            }
+
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if (e1 == null) return false
+                val diffX = e2.x - e1.x
+                val diffY = e2.y - e1.y
+                val absX = Math.abs(diffX)
+                val absY = Math.abs(diffY)
+
+                if (absX > absY && absX > dp(35)) {
+                    if (diffX < 0) {
+                        playNext()
+                        showVizHudBadge("Siguiente pista →")
+                    } else {
+                        playPrevious()
+                        showVizHudBadge("← Pista anterior")
+                    }
+                    return true
+                } else if (absY > absX && absY > dp(35)) {
+                    if (diffY < 0) {
+                        // SWIPE UP -> QUEUE!
+                        showQueueSheet()
+                        showVizHudBadge("Cola de Reproducción")
+                    } else {
+                        // SWIPE DOWN -> TRACK INFO
+                        tracks.getOrNull(currentTrackIndex)?.let { showTrackDetails(it) } ?: toastNoTrack()
+                    }
+                    return true
+                }
+                return false
+            }
+
+            override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
+                if (e1 == null) return false
+                val totalDy = e1.y - e2.y
+                if (totalDy > dp(70) && Math.abs(totalDy) > Math.abs(e1.x - e2.x) * 1.5f) {
+                    showQueueSheet()
+                    showVizHudBadge("Cola de Reproducción")
+                    return true
+                }
+                return false
+            }
+        })
+
+        val longPressRunnable = Runnable {
+            isLongPressResize = true
+            card.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            showVizHudBadge("Portada: Arrastra ↑ agrandar, ↓ achicar")
+        }
+
+        card.setOnTouchListener { v, event ->
+            scaleDetector.onTouchEvent(event)
+            if (scaleDetector.isInProgress) {
+                longPressHandler.removeCallbacks(longPressRunnable)
+                isLongPressResize = false
+                return@setOnTouchListener true
+            }
+
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startRawY = event.rawY
+                    startRawX = event.rawX
+                    initialHeight = card.layoutParams.height.takeIf { it > 0 } ?: dp(228)
+                    isLongPressResize = false
+                    longPressHandler.postDelayed(longPressRunnable, 320)
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dy = event.rawY - startRawY
+                    val dx = event.rawX - startRawX
+                    if (!isLongPressResize && (Math.abs(dy) > dp(8) || Math.abs(dx) > dp(8))) {
+                        longPressHandler.removeCallbacks(longPressRunnable)
+                    }
+                    if (isLongPressResize) {
+                        val newH = (initialHeight - dy.toInt()).coerceIn(dp(120), dp(450))
+                        card.layoutParams.height = newH
+                        card.requestLayout()
+                        val dpVal = (newH / resources.displayMetrics.density).toInt()
+                        showVizHudBadge("Portada: ${dpVal}dp")
+                        return@setOnTouchListener true
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    longPressHandler.removeCallbacks(longPressRunnable)
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
+                    if (isLongPressResize) {
+                        isLongPressResize = false
+                        val curH = card.layoutParams.height
+                        val dpVal = (curH / resources.displayMetrics.density).toInt()
+                        SonoraStore.putInt(this, "player_cover_height_dp", dpVal)
+                        showVizHudBadge("Portada: ${dpVal}dp (Guardado)")
+                        v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        return@setOnTouchListener true
+                    }
+                }
+            }
+            gestureDetector.onTouchEvent(event)
+            true
+        }
+    }
+
+    private fun attachQueueSwipeUpGesture(view: View) {
+        val gd = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if (e1 == null) return false
+                val diffX = e2.x - e1.x
+                val diffY = e2.y - e1.y
+                if (Math.abs(diffY) > Math.abs(diffX) && diffY < -dp(35)) {
+                    showQueueSheet()
+                    showVizHudBadge("Cola de Reproducción")
+                    return true
+                } else if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > dp(35)) {
+                    if (diffX < 0) {
+                        playNext()
+                        showVizHudBadge("Siguiente pista →")
+                    } else {
+                        playPrevious()
+                        showVizHudBadge("← Pista anterior")
+                    }
+                    return true
+                }
+                return false
+            }
+
+            override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
+                if (e1 == null) return false
+                val totalDy = e1.y - e2.y
+                if (totalDy > dp(65) && Math.abs(totalDy) > Math.abs(e1.x - e2.x) * 1.5f) {
+                    showQueueSheet()
+                    showVizHudBadge("Cola de Reproducción")
+                    return true
+                }
+                return false
+            }
+        })
+        view.setOnTouchListener { v, ev ->
+            gd.onTouchEvent(ev)
+            false
+        }
+    }
+
+    fun showTutorialSheet() {
+        showSheet(fullHeight = true) { root, dialog ->
+            root.addView(sheetTitle("Guía y Tutorial Completo", "Aprende todos los gestos y funciones de Sonora"))
+
+            val intro = TextView(this).apply {
+                text = "Bienvenido a Sonora DDMC. Aquí tienes el resumen visual y rápido de todas las funciones táctiles y ajustes profesionales organizados por categorías."
+                setTextColor(Color.parseColor(Pal.SUB))
+                textSize = 12.5f
+                setPadding(0, dp(2), 0, dp(12))
+            }
+            root.addView(intro)
+
+            fun makeTutorialCard(title: String, iconRes: Int, bullets: List<String>) {
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(14), dp(12), dp(14), dp(12))
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor("#CC1A152E"))
+                        cornerRadius = dpf(16f)
+                        setStroke(dp(1), Color.parseColor("#2EFFFFFF"))
+                    }
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        bottomMargin = dp(10)
+                    }
+                }
+                val header = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(0, 0, 0, dp(8))
+                }
+                val icon = ImageView(this).apply {
+                    setImageResource(iconRes)
+                    setColorFilter(Color.parseColor(Pal.ACCENT))
+                    layoutParams = LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(8) }
+                }
+                val titleTv = TextView(this).apply {
+                    text = title
+                    textSize = 14f
+                    setTextColor(Color.WHITE)
+                    setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                }
+                header.addView(icon)
+                header.addView(titleTv)
+                card.addView(header)
+
+                for (b in bullets) {
+                    val row = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        setPadding(0, dp(2), 0, dp(2))
+                    }
+                    val bulletDot = TextView(this).apply {
+                        text = "• "
+                        setTextColor(Color.parseColor(Pal.ACCENT))
+                        textSize = 12.5f
+                    }
+                    val textTv = TextView(this).apply {
+                        text = b
+                        setTextColor(Color.parseColor(Pal.SUB))
+                        textSize = 12.5f
+                        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                    }
+                    row.addView(bulletDot)
+                    row.addView(textTv)
+                    card.addView(row)
+                }
+                root.addView(card)
+            }
+
+            makeTutorialCard("Gestos Táctiles en Pantalla", R.drawable.ic_waveform, listOf(
+                "Deslizar hacia arriba (Swipe Up): Abre la cola de reproducción en cualquier momento.",
+                "Deslizar hacia abajo (Swipe Down): Muestra detalles y etiquetas de la pista.",
+                "Deslizar izquierda / derecha: Cambia a la siguiente o anterior canción.",
+                "Doble toque: Salta 10s atrás (izquierda) o adelante (derecha)."
+            ))
+
+            makeTutorialCard("Redimensionar y Mover Libremente", R.drawable.ic_widgets, listOf(
+                "Mantener presionado (Long Press): Toca y mantén presionado el visualizador, portada o doki. Tras una vibración, arrastra tu dedo hacia arriba para agrandar o hacia abajo para achicar.",
+                "Arrastre libre: Al mantener presionado la Doki, arrastra horizontalmente para colocarla en la posición deseada.",
+                "Pellizco táctil (Pinch): Usa dos dedos sobre cualquier elemento para ajustar su tamaño de forma continua.",
+                "Guardado automático: Al soltar el dedo, la nueva dimensión y posición se guardan al instante."
+            ))
+
+            makeTutorialCard("Formas del Visualizador (Sin Presets)", R.drawable.ic_sliders, listOf(
+                "Deslizar sobre el visualizador: Desliza horizontalmente con tu dedo directamente sobre el visualizador para alternar libremente entre las 7 formas (Espejo, Neón, Radial, Cascada, Híbrido, etc.).",
+                "Tocar una vez: Cambia a la siguiente forma con confirmación visual sutil.",
+                "Ranuras opcionales: Guarda tus configuraciones preferidas en el panel de diseño si deseas recordarlas."
+            ))
+
+            makeTutorialCard("Compañeras Doki Silenciosas", R.drawable.ic_sparkles, listOf(
+                "Totalmente silenciosas: Sin voces molestas. Al tocar la Doki reaccionará con una animación sutil de emoción y rebote con el ritmo musical.",
+                "Cambio rápido: Toca el icono de destellos en la barra superior para cambiar tu compañera (Monika, Sayori, Natsuki, Yuri, Bocchi, Konata) en un toque."
+            ))
+
+            makeTutorialCard("Audio Pro & Modificador por Pista", R.drawable.ic_disc, listOf(
+                "Audio exclusivo de pista: Modifica el refuerzo de bajos y ganancia de una canción específica sin alterar el ecualizador de las demás.",
+                "Conmutador Mono: Mezcla canales estéreo a mono real de 16-bit PCM.",
+                "Balance Izquierda / Derecha: Desplaza el canal auditivo con precisión."
+            ))
+
+            makeTutorialCard("Importación Musicolet", R.drawable.ic_download, listOf(
+                "Descifrado de respaldo: Lee archivos musicolet.zip en tu carpeta Descargas, descifra las listas con Blowfish y las importa automáticamente a tus listas de Sonora."
+            ))
+
+            val closeBtn = Pill(this, "Entendido, Comenzar", R.drawable.ic_check, 40).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = dp(6)
+                    bottomMargin = dp(12)
+                }
+                setOnClickListener { dialog.dismiss() }
+            }
+            root.addView(closeBtn)
+        }
+    }
+
+    fun showVizSlotsSheet() {
+        showSheet { root, dialog ->
+            root.addView(sheetTitle("Ranuras de Visualización", "Alterna y guarda estilos visuales"))
+            val slotsBox = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(8), 0, dp(12))
+            }
+            for (slot in 1..4) {
+                val mode = SonoraStore.getInt(this, "viz_slot_${slot}_mode", when(slot) { 1 -> 0; 2 -> 1; 3 -> 2; else -> 0 })
+                val h = SonoraStore.getInt(this, "viz_slot_${slot}_h", when(slot) { 1 -> 76; 2 -> 96; 3 -> 68; else -> 140 })
+                val modeName = when(mode) { 0 -> "Espejo Pro"; 1 -> "Barras Neón"; 2 -> "Onda Circular"; 3 -> "Espectrograma"; else -> "Líneas" }
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(12), dp(10), dp(12), dp(10))
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor(Pal.SURFACE_HI))
+                        cornerRadius = dpf(12f)
+                    }
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        bottomMargin = dp(8)
+                    }
+                }
+                val info = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                val title = TextView(this).apply {
+                    text = "Ranura $slot: $modeName"
+                    textSize = 14f
+                    setTextColor(Color.WHITE)
+                    setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                }
+                val sub = TextView(this).apply {
+                    text = "Altura: ${h}dp"
+                    textSize = 12f
+                    setTextColor(Color.parseColor(Pal.MUTED))
+                }
+                info.addView(title); info.addView(sub)
+                val loadBtn = Pill(this, "Cargar", R.drawable.ic_check, 32).apply {
+                    setOnClickListener {
+                        applyVizSlot(slot)
+                        dialog.dismiss()
+                    }
+                }
+                val saveBtn = Pill(this, "Guardar", R.drawable.ic_pencil, 32).apply {
+                    setOnClickListener {
+                        saveCurrentToVizSlot(slot)
+                        dialog.dismiss()
+                    }
+                }
+                row.addView(info)
+                row.addView(loadBtn)
+                row.addView(saveBtn)
+                slotsBox.addView(row)
+            }
+            root.addView(slotsBox)
+        }
+    }
+
+    fun showPlayerLayoutCustomizerSheet() {
+        showSheet(fullHeight = true) { root, dialog ->
+            root.addView(sheetTitle("Personalizar Reproductor", "Deslizadores continuos y gestos touch directos"))
+
+            val hintCard = TextView(this).apply {
+                text = "TIP TOUCH: En la pantalla principal puedes mantener presionado cualquier elemento (Portada, Visualizador, Doki) y mover tu dedo hacia arriba para agrandar o hacia abajo para achicar."
+                setTextColor(Color.parseColor(Pal.SUB))
+                textSize = 12f
+                setPadding(dp(12), dp(8), dp(12), dp(12))
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor(Pal.SURFACE_HI))
+                    cornerRadius = dpf(12f)
+                }
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(12)
+                }
+            }
+            root.addView(hintCard)
+
+            val coverCurH = SonoraStore.getInt(this, "player_cover_height_dp", 228)
+            val coverLabel = TextView(this).apply {
+                text = "Altura de Portada: ${coverCurH}dp"
+                setTextColor(Color.WHITE)
+                textSize = 13f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+            }
+            root.addView(coverLabel)
+            val coverSb = SeekBar(this).apply {
+                max = 330 // 120 to 450
+                progress = (coverCurH - 120).coerceIn(0, 330)
+                progressTintList = ColorStateList.valueOf(Color.parseColor(Pal.ACCENT))
+                thumbTintList = ColorStateList.valueOf(Color.WHITE)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                        val h = 120 + p
+                        coverLabel.text = "Altura de Portada: ${h}dp"
+                        SonoraStore.putInt(this@MainActivity, "player_cover_height_dp", h)
+                        stageExpandedCoverCard.layoutParams.height = dp(h)
+                        stageExpandedCoverCard.requestLayout()
+                    }
+                    override fun onStartTrackingTouch(sb: SeekBar?) {}
+                    override fun onStopTrackingTouch(sb: SeekBar?) {}
+                })
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(12)
+                }
+            }
+            root.addView(coverSb)
+
+            val vizCurH = SonoraStore.getInt(this, "player_viz_height_dp", 76)
+            val vizLabel = TextView(this).apply {
+                text = "Altura del Visualizador: ${vizCurH}dp"
+                setTextColor(Color.WHITE)
+                textSize = 13f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+            }
+            root.addView(vizLabel)
+            val vizSb = SeekBar(this).apply {
+                max = 280 // 30 to 310
+                progress = (vizCurH - 30).coerceIn(0, 280)
+                progressTintList = ColorStateList.valueOf(Color.parseColor(Pal.ACCENT))
+                thumbTintList = ColorStateList.valueOf(Color.WHITE)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                        val h = 30 + p
+                        vizLabel.text = "Altura del Visualizador: ${h}dp"
+                        SonoraStore.putInt(this@MainActivity, "player_viz_height_dp", h)
+                        vizDeckCard.layoutParams.height = dp(h)
+                        vizDeckCard.requestLayout()
+                    }
+                    override fun onStartTrackingTouch(sb: SeekBar?) {}
+                    override fun onStopTrackingTouch(sb: SeekBar?) {}
+                })
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(12)
+                }
+            }
+            root.addView(vizSb)
+
+            val dokiCurScale = SonoraStore.getInt(this, "player_doki_scale_pct", 100)
+            val dokiLabel = TextView(this).apply {
+                text = "Escala de Doki: $dokiCurScale%"
+                setTextColor(Color.WHITE)
+                textSize = 13f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+            }
+            root.addView(dokiLabel)
+            val dokiSb = SeekBar(this).apply {
+                max = 200 // 40% to 240%
+                progress = (dokiCurScale - 40).coerceIn(0, 200)
+                progressTintList = ColorStateList.valueOf(Color.parseColor(Pal.ACCENT))
+                thumbTintList = ColorStateList.valueOf(Color.WHITE)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                        val pct = 40 + p
+                        dokiLabel.text = "Escala de Doki: $pct%"
+                        SonoraStore.putInt(this@MainActivity, "player_doki_scale_pct", pct)
+                        dokiSpriteView.dokiScale = pct / 100f
+                    }
+                    override fun onStartTrackingTouch(sb: SeekBar?) {}
+                    override fun onStopTrackingTouch(sb: SeekBar?) {}
+                })
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(14)
+                }
+            }
+            root.addView(dokiSb)
+
+            val resetBtn = Pill(this, "Restablecer Dimensiones", R.drawable.ic_trash, 38).apply {
+                setOnClickListener {
+                    SonoraStore.putInt(this@MainActivity, "player_cover_height_dp", 228)
+                    SonoraStore.putInt(this@MainActivity, "player_viz_height_dp", 76)
+                    SonoraStore.putInt(this@MainActivity, "player_doki_scale_pct", 100)
+                    SonoraStore.putFloat(this@MainActivity, "layout_doki_tx", 0f)
+                    stageExpandedCoverCard.layoutParams.height = dp(228)
+                    stageExpandedCoverCard.requestLayout()
+                    vizDeckCard.layoutParams.height = dp(76)
+                    vizDeckCard.requestLayout()
+                    dokiSpriteView.dokiScale = 1.0f
+                    dokiSpriteView.translationX = 0f
+                    Toast.makeText(this@MainActivity, "Tamaños restablecidos", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                }
+            }
+            root.addView(resetBtn)
+
+            root.addView(Pill(this, "Ranuras de Visualización", R.drawable.ic_sliders, 38).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = dp(8)
+                    bottomMargin = dp(8)
+                }
+                setOnClickListener {
+                    dialog.dismiss()
+                    showVizSlotsSheet()
+                }
+            })
+
+            root.addView(Pill(this, "Posición de Pestañas", R.drawable.ic_sliders, 38).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(8)
+                }
+                setOnClickListener {
+                    dialog.dismiss()
+                    showTabBarPositionDialog()
+                }
+            })
+        }
+    }
+
+    fun showTrackAudioCustomizerDialog(t: TrackItem) {
+        val curBass = SonoraStore.getInt(this, "track_bass_${t.key}", 0)
+        val curGain = SonoraStore.getFloat(this, "track_gain_${t.key}", 1.0f)
+
+        showSheet { root, dialog ->
+            root.addView(sheetTitle("Audio de Esta Pista", "${t.title} - ${t.artist}"))
+
+            val bassLabel = TextView(this).apply {
+                val db = (curBass / 100.0).let { String.format("%.1f dB", it) }
+                text = "Refuerzo de Bajos: $db"
+                setTextColor(Color.WHITE)
+                textSize = 13.5f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                setPadding(0, dp(8), 0, dp(4))
+            }
+            root.addView(bassLabel)
+
+            val bassRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, 0, 0, dp(12))
+            }
+            listOf(-300 to "-3 dB", 0 to "Plano", 300 to "+3 dB", 600 to "+6 dB", 900 to "+9 dB").forEach { (mb, lbl) ->
+                bassRow.addView(Pill(this, lbl, R.drawable.ic_disc, 30).apply {
+                    setActive(curBass == mb)
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(4) }
+                    setOnClickListener {
+                        SonoraAudioEngine.setTrackBass(this@MainActivity, t.key, mb)
+                        Toast.makeText(this@MainActivity, "Bajos de pista: $lbl", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                        showTrackAudioCustomizerDialog(t)
+                    }
+                })
+            }
+            root.addView(bassRow)
+
+            val gainLabel = TextView(this).apply {
+                val pct = (curGain * 100).toInt()
+                text = "Ganancia de Pista: $pct%"
+                setTextColor(Color.WHITE)
+                textSize = 13.5f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                setPadding(0, dp(4), 0, dp(4))
+            }
+            root.addView(gainLabel)
+
+            val gainRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, 0, 0, dp(12))
+            }
+            listOf(0.8f to "80%", 1.0f to "100%", 1.15f to "115%", 1.3f to "130%").forEach { (g, lbl) ->
+                gainRow.addView(Pill(this, lbl, R.drawable.ic_waveform, 30).apply {
+                    setActive(Math.abs(curGain - g) < 0.05f)
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(4) }
+                    setOnClickListener {
+                        SonoraAudioEngine.setTrackGain(this@MainActivity, t.key, g)
+                        Toast.makeText(this@MainActivity, "Ganancia de pista: $lbl", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                        showTrackAudioCustomizerDialog(t)
+                    }
+                })
+            }
+            root.addView(gainRow)
+
+            val resetBtn = Pill(this, "Restablecer a Valores Globales", R.drawable.ic_trash, 36).apply {
+                setOnClickListener {
+                    SonoraAudioEngine.setTrackBass(this@MainActivity, t.key, 0)
+                    SonoraAudioEngine.setTrackGain(this@MainActivity, t.key, 1.0f)
+                    Toast.makeText(this@MainActivity, "Audio de pista restablecido", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                }
+            }
+            root.addView(resetBtn)
+        }
+    }
+
+    fun showQuickDokiSwitcherSheet() {
+        showSheet(fullHeight = true) { root, dialog ->
+            root.addView(sheetTitle("Cambiar Doki", "Selecciona tu compañera en un solo toque"))
+
+            val grid = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(8), 0, dp(12))
+            }
+
+            val dokis = listOf(
+                Triple("natsuki", "Natsuki (Chibi Shimeji)", "shimeji"),
+                Triple("sayori", "Sayori (Chibi Shimeji)", "shimeji"),
+                Triple("monika", "Monika (Chibi Shimeji)", "shimeji"),
+                Triple("yuri", "Yuri (Chibi Shimeji)", "shimeji"),
+                Triple("monika", "Monika HD (Presidenta)", "casual"),
+                Triple("sayori", "Sayori HD (Casual)", "casual"),
+                Triple("natsuki", "Natsuki HD (Manga)", "casual"),
+                Triple("yuri", "Yuri HD (Lectora)", "casual"),
+                Triple("bocchi", "Bocchi the Rock!", "shimeji"),
+                Triple("konata", "Konata Izumi", "shimeji")
+            )
+
+            for (d in dokis) {
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(12), dp(10), dp(12), dp(10))
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor(Pal.SURFACE_HI))
+                        cornerRadius = dpf(14f)
+                    }
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        bottomMargin = dp(8)
+                    }
+                    isClickable = true
+                    setOnClickListener {
+                        selectedDokiId = d.first
+                        selectedDokiPose = "casual"
+                        selectedDokiExpr = d.third
+                        val dokiPrefs = getSharedPreferences("doki_prefs", Context.MODE_PRIVATE)
+                        dokiPrefs.edit()
+                            .putString("doki_id", selectedDokiId)
+                            .putString("doki_pose", selectedDokiPose)
+                            .putString("doki_expr_v2", selectedDokiExpr)
+                            .apply()
+                        dokiSpriteView.setDoki(selectedDokiId, selectedDokiPose, selectedDokiExpr)
+                        updateDokiViews()
+                        dialog.dismiss()
+                        Toast.makeText(this@MainActivity, "${d.second} activada", Toast.LENGTH_SHORT).show()
+                    }
+                    addPressFeedback(0.96f)
+                }
+                val icon = ImageView(this).apply {
+                    setImageResource(if (d.third == "shimeji") R.drawable.ic_sparkles else R.drawable.ic_album)
+                    layoutParams = LinearLayout.LayoutParams(dp(32), dp(32)).apply { marginEnd = dp(12) }
+                    setColorFilter(Color.parseColor(Pal.ACCENT))
+                }
+                val tv = TextView(this).apply {
+                    text = d.second
+                    textSize = 14f
+                    setTextColor(Color.WHITE)
+                    setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                val arrow = ImageView(this).apply {
+                    setImageResource(R.drawable.ic_check)
+                    layoutParams = LinearLayout.LayoutParams(dp(20), dp(20))
+                    setColorFilter(Color.parseColor(Pal.MUTED))
+                }
+                row.addView(icon); row.addView(tv); row.addView(arrow)
+                grid.addView(row)
+            }
+            root.addView(grid)
+        }
+    }
+
+    fun showMusicoletImportDialog() {
+        val foundFiles = MusicoletImporter.findPotentialBackupFiles()
+
+        showSheet { root, dialog ->
+            root.addView(sheetTitle("Importar de Musicolet", "Importa tus listas de reproducción (.mpl) y favoritos"))
+
+            if (foundFiles.isNotEmpty()) {
+                val foundBox = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(0, dp(6), 0, dp(10))
+                }
+                val subtitle = TextView(this).apply {
+                    text = "Copias de seguridad encontradas en Descargas:"
+                    setTextColor(Color.WHITE)
+                    textSize = 12.5f
+                    setPadding(0, dp(4), 0, dp(6))
+                }
+                foundBox.addView(subtitle)
+
+                for (f in foundFiles) {
+                    val sizeKb = f.length() / 1024
+                    val item = Pill(this, "${f.name} (${sizeKb} KB)", R.drawable.ic_download, 40).apply {
+                        setActive(true)
+                        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                            bottomMargin = dp(8)
+                        }
+                        setOnClickListener {
+                            dialog.dismiss()
+                            executeMusicoletImportFile(f)
+                        }
+                    }
+                    foundBox.addView(item)
+                }
+                root.addView(foundBox)
+            }
+
+            root.addView(Pill(this, "Examinar otro archivo ZIP de Musicolet", R.drawable.ic_folder, 40).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(8)
+                }
+                setOnClickListener {
+                    dialog.dismiss()
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "application/zip"
+                        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"))
+                    }
+                    musicoletZipPickerLauncher.launch(intent)
+                }
+            })
+        }
+    }
+
+    private fun executeMusicoletImportFile(f: File) {
+        val progressDialog = android.app.ProgressDialog(this).apply {
+            setMessage("Descifrando listas de Musicolet con Blowfish...")
+            setCancelable(false)
+            show()
+        }
+        Thread {
+            try {
+                val res = MusicoletImporter.importBackupFile(this, f, localTracksList)
+                runOnUiThread {
+                    progressDialog.dismiss()
+                    Toast.makeText(
+                        this,
+                        "Importadas ${res.playlistsCreated} listas (${res.totalTracksInPlaylists} pistas) y ${res.favoritesMarked} favoritos",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    refreshPlaylists()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    progressDialog.dismiss()
+                    Toast.makeText(this, "Error al descifrar zip: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun executeMusicoletImport(uri: Uri) {
+        val progressDialog = android.app.ProgressDialog(this).apply {
+            setMessage("Descifrando listas de Musicolet con Blowfish...")
+            setCancelable(false)
+            show()
+        }
+        Thread {
+            try {
+                val res = MusicoletImporter.importBackupUri(this, uri, localTracksList)
+                runOnUiThread {
+                    progressDialog.dismiss()
+                    Toast.makeText(
+                        this,
+                        "Importadas ${res.playlistsCreated} listas (${res.totalTracksInPlaylists} pistas) y ${res.favoritesMarked} favoritos",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    refreshPlaylists()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    progressDialog.dismiss()
+                    Toast.makeText(this, "Error al descifrar zip: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
     private fun buildNav(): LinearLayout {
         val nav = LinearLayout(this).apply {
             id = View.generateViewId()
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.parseColor("#F00A0A0F"))
+            val glassBg = GradientDrawable().apply {
+                setColor(Color.parseColor("#CC120E22")) // Liquid Acrylic Glass
+                cornerRadius = dpf(20f)
+                setStroke(dp(1), Color.parseColor("#38FFFFFF")) // Luminous glass rim
+            }
+            background = glassBg
             setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = RelativeLayout.LayoutParams(
+            val lp = RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT
-            ).apply { addRule(RelativeLayout.ALIGN_PARENT_BOTTOM) }
+            ).apply {
+                addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                setMargins(dp(8), 0, dp(8), dp(6))
+            }
+            layoutParams = lp
+            elevation = dpf(8f)
         }
         val icons = listOf(
             R.drawable.ic_home, R.drawable.ic_folder, R.drawable.ic_list_music,
@@ -1440,6 +2634,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             item.addView(plate)
             item.addView(label)
             navIcons.add(icon); navLabels.add(label); navPlates.add(plate)
+            navItemContainers.add(item)
             nav.addView(item)
         }
         return nav
@@ -1787,6 +2982,50 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
             root.addView(expandStageBtn)
 
+            // Looping video cover
+            root.addView(Pill(
+                this,
+                "Elegir Video en Bucle (Sin Audio)",
+                R.drawable.ic_video,
+                40
+            ).apply {
+                setActive(true)
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dp(8) }
+                setOnClickListener {
+                    dialog.dismiss()
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "video/*"
+                    }
+                    videoCoverPickerLauncher.launch(intent)
+                }
+            })
+
+            val curTrackVideo = SonoraStore.getString(this, "cover_video_${t.key}", "")
+            if (!curTrackVideo.isNullOrEmpty()) {
+                root.addView(Pill(
+                    this,
+                    "Quitar Video en Bucle",
+                    R.drawable.ic_trash,
+                    36
+                ).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = dp(8) }
+                    setOnClickListener {
+                        dialog.dismiss()
+                        SonoraStore.putString(this@MainActivity, "cover_video_${t.key}", "")
+                        updateStageCoverVideo(null)
+                        bindNowPlaying()
+                        Toast.makeText(this@MainActivity, "Video de portada eliminado", Toast.LENGTH_SHORT).show()
+                    }
+                })
+            }
+
             // 3. Pick any photo/animated format from device (GIF, WebP, PNG, JPG, HEIC, AVIF, BMP, ICO)
             root.addView(Pill(
                 this,
@@ -2018,10 +3257,11 @@ class MainActivity : AppCompatActivity(), RowHost {
             stageExpandedCoverCard.visibility = if (showBigCover) View.VISIBLE else View.GONE
             if (showBigCover) {
                 val expandOnly = !showStageLyrics && !showStageDoki && !showStageViz
+                val customCoverH = SonoraStore.getInt(this, "player_cover_height_dp", 228)
                 val targetHeightDp = when {
                     isLandscapeMode -> if (stageMediaXL) 195 else 150
                     stageMediaXL -> 320
-                    else -> 228
+                    else -> customCoverH
                 }
                 stageExpandedCoverCard.layoutParams = if (expandOnly) {
                     LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply {
@@ -2125,13 +3365,15 @@ class MainActivity : AppCompatActivity(), RowHost {
                 stageLyricsScroll.layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
                 )
-                val vizH = if (isLandscapeMode) dp(64) else dp(76)
+                val savedVizH = SonoraStore.getInt(this, "player_viz_height_dp", if (isLandscapeMode) 64 else 76)
+                val vizH = dp(savedVizH)
                 vizDeckCard.layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, vizH
                 ).apply {
                     topMargin = dp(4)
                     bottomMargin = dp(8)
                 }
+                vizDeckCard.translationX = SonoraStore.getFloat(this, "layout_viz_tx", 0f)
             }
         }
 
@@ -2295,6 +3537,12 @@ class MainActivity : AppCompatActivity(), RowHost {
             addView(toggleLyricsBtn)
             addView(toggleDokiBtn)
             addView(toggleVizBtn)
+            addView(makeToggleIconBtn(R.drawable.ic_widgets) { showPlayerLayoutCustomizerSheet() })
+            addView(makeToggleIconBtn(R.drawable.ic_sliders) { showVizSlotsSheet() })
+            addView(makeToggleIconBtn(R.drawable.ic_disc) { tracks.getOrNull(currentTrackIndex)?.let { showTrackAudioCustomizerDialog(it) } ?: toastNoTrack() })
+            addView(makeToggleIconBtn(R.drawable.ic_sparkles) { showQuickDokiSwitcherSheet() })
+            addView(makeToggleIconBtn(R.drawable.ic_download) { showMusicoletImportDialog() })
+            addView(makeToggleIconBtn(R.drawable.ic_sliders) { showTabBarPositionDialog() })
         }
         toggleChipsScroll.addView(chipsContainer)
         portraitViewSelectorsRow.addView(toggleChipsScroll)
@@ -2499,6 +3747,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             setPadding(dp(8), dp(6), dp(8), dp(6))
         }
         vizDeckCard.addView(visualizerStripView)
+        // Slots removed from middle to keep screen clean and spacious
         lyricsRightCol.addView(vizDeckCard)
 
         stageColumnsRow.addView(dokiLeftCol)
@@ -2511,6 +3760,9 @@ class MainActivity : AppCompatActivity(), RowHost {
         portraitInnerBox.addView(unifiedStageBlock)
 
         // Attach gesture navigation to the stage
+        attachCoverTouchControls(stageExpandedCoverCard, stageExpandedCoverImage)
+        attachDokiTouchControls(dokiLeftCol, dokiSpriteView)
+        attachVizTouchControls(vizDeckCard, visualizerStripView)
         attachPlayerGestures(unifiedStageBlock)
         attachPlayerGestures(stageLyricsScroll)
 
@@ -2607,6 +3859,8 @@ class MainActivity : AppCompatActivity(), RowHost {
         titleRow.addView(metaBox)
         titleRow.addView(favBtn)
         portraitLowerControlsBox.addView(titleRow)
+        attachQueueSwipeUpGesture(titleRow)
+        attachQueueSwipeUpGesture(portraitLowerControlsBox)
 
         // ---- Badges: MP3 · Local, BPM, Provider ----
         val badgesRow = LinearLayout(this).apply {
@@ -5269,6 +6523,8 @@ class MainActivity : AppCompatActivity(), RowHost {
             SheetItem(R.drawable.ic_scissors, "Recortar inicio y final (Audio Trimmer)"),
             SheetItem(R.drawable.ic_album, "Ver álbum: ${track.album}"),
             SheetItem(R.drawable.ic_user, "Ver artista: ${track.artist}"),
+            SheetItem(R.drawable.ic_disc, "Audio de esta pista (Bajos y Ganancia)"),
+            SheetItem(R.drawable.ic_video, "Elegir Video como Portada"),
             SheetItem(R.drawable.ic_share, "Compartir pista"),
             SheetItem(R.drawable.ic_info, "Información completa de la pista (24 campos)")
         )
@@ -5321,8 +6577,16 @@ class MainActivity : AppCompatActivity(), RowHost {
                         refreshLibrary(scrollTop = true)
                     }
                 }
-                12 -> shareTrack(track)
-                13 -> showTrackDetails(track)
+                12 -> showTrackAudioCustomizerDialog(track)
+                13 -> {
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "video/*"
+                    }
+                    videoCoverPickerLauncher.launch(intent)
+                }
+                14 -> shareTrack(track)
+                15 -> showTrackDetails(track)
             }
         }
     }
@@ -5516,51 +6780,57 @@ class MainActivity : AppCompatActivity(), RowHost {
 
     private fun showGlobalMenu() {
         val items = listOf(
-            SheetItem(R.drawable.ic_sliders, "Panel de Notificaciones en Vivo (GIF + Video + Doki)"),
-            SheetItem(R.drawable.ic_download, "Recibir Actualización desde PC o Git (MegatronF0id5l4yer/DDMC)"),
-            SheetItem(R.drawable.ic_album, "Portada Completa Sin Recortes (GIF / Video / Cualquier Tamaño)"),
-            SheetItem(R.drawable.ic_palette, "Personalizar Tema y Colores (Reactivo, Fijo, Material You)"),
-            SheetItem(R.drawable.ic_sliders, "Ajustes completos (10 categorías Musicolet + Namida)"),
-            SheetItem(R.drawable.ic_refresh, "Escáner de biblioteca avanzado (Scan)"),
-            SheetItem(R.drawable.ic_sparkles, "Auto-completar carátulas HD de toda la biblioteca"),
-            SheetItem(R.drawable.ic_download, "Crear copia de seguridad ahora (Backup)"),
-            SheetItem(R.drawable.ic_folder, "Abrir archivo de audio / vídeo"),
-            SheetItem(R.drawable.ic_list_plus, "Importar lista .M3U / .M3U8"),
-            SheetItem(R.drawable.ic_timer, "Temporizador de apagado"),
-            SheetItem(R.drawable.ic_bolt, "Velocidad y Tono (Nightcore / Slowed)"),
-            SheetItem(R.drawable.ic_user, "Cambiar Doki Chibi Shimeji y Comportamientos (PinkChan)"),
-            SheetItem(R.drawable.ic_trash, "Limpiar historial y estadísticas", danger = true)
+            SheetItem(R.drawable.ic_info, "Guía & Tutorial Completo"),
+            SheetItem(R.drawable.ic_palette, "Temas & Liquid Glass"),
+            SheetItem(R.drawable.ic_widgets, "Tamaños & Posiciones Touch"),
+            SheetItem(R.drawable.ic_sliders, "Panel de Notificación"),
+            SheetItem(R.drawable.ic_download, "Importar desde Musicolet"),
+            SheetItem(R.drawable.ic_album, "Portada & Video"),
+            SheetItem(R.drawable.ic_sliders, "Ajustes del Sistema"),
+            SheetItem(R.drawable.ic_refresh, "Escanear Música"),
+            SheetItem(R.drawable.ic_sparkles, "Carátulas HD"),
+            SheetItem(R.drawable.ic_download, "Copia de Seguridad"),
+            SheetItem(R.drawable.ic_folder, "Abrir Archivo"),
+            SheetItem(R.drawable.ic_list_plus, "Importar Lista M3U"),
+            SheetItem(R.drawable.ic_timer, "Temporizador"),
+            SheetItem(R.drawable.ic_bolt, "Velocidad & Tono"),
+            SheetItem(R.drawable.ic_user, "Compañeras Doki"),
+            SheetItem(R.drawable.ic_download, "Actualizar desde PC"),
+            SheetItem(R.drawable.ic_trash, "Limpiar Historial", danger = true)
         )
-        showActionSheet("Doki Doki Music Club (DDMC)", "${localTracksList.size} pistas locales indexadas", items) { which ->
+        showActionSheet("Opciones de Sonora", "${localTracksList.size} canciones en biblioteca", items) { which ->
             when (which) {
-                0 -> showLiveNotificationPanelSheet()
-                1 -> showOtaUpdaterSheet()
-                2 -> showGifCoverOptionsSheet()
-                3 -> showThemeCustomizerSheet()
-                4 -> openFullSettings()
-                5 -> {
+                0 -> showTutorialSheet()
+                1 -> showThemeCustomizerSheet()
+                2 -> showPlayerLayoutCustomizerSheet()
+                3 -> showLiveNotificationPanelSheet()
+                4 -> showMusicoletImportDialog()
+                5 -> showGifCoverOptionsSheet()
+                6 -> openFullSettings()
+                7 -> {
                     val folderCount = localTracksList.map { it.provider }.distinct().size
                     MusicoletModals.showScannerModal(this, localTracksList.size, folderCount) {
                         performStorageScan(showToast = true)
                     }
                 }
-                6 -> batchEnrichLibrary()
-                7 -> {
+                8 -> batchEnrichLibrary()
+                9 -> {
                     val f = SonoraStore.createBackupFile(this)
                     Toast.makeText(this, "Copia de seguridad creada: ${f.name}", Toast.LENGTH_LONG).show()
                 }
-                8 -> openSystemFilePicker()
-                9 -> {
+                10 -> openSystemFilePicker()
+                11 -> {
                     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "*/*"
                     }
                     m3uPickerLauncher.launch(intent)
                 }
-                10 -> showSleepTimerSheet()
-                11 -> showSpeedSheet()
-                12 -> showDokiAvatarPicker()
-                13 -> {
+                12 -> showSleepTimerSheet()
+                13 -> showSpeedSheet()
+                14 -> showQuickDokiSwitcherSheet()
+                15 -> showOtaUpdaterSheet()
+                16 -> {
                     SonoraStore.clearHistory(this)
                     refreshLibrary()
                     Toast.makeText(this, "Historial limpiado", Toast.LENGTH_SHORT).show()
@@ -5770,11 +7040,18 @@ class MainActivity : AppCompatActivity(), RowHost {
             coverImage.bindCover(t, 384, onCoverBitmapReady)
             ambientGlowImage.bindCover(t, 240)
 
-            if (::stageExpandedCoverImage.isInitialized) {
-                stageExpandedCoverImage.scaleType = ImageView.ScaleType.FIT_CENTER
-                stageExpandedCoverImage.setPadding(0, 0, 0, 0)
-                stageExpandedCoverImage.clearColorFilter()
-                stageExpandedCoverImage.bindCover(t, 640, onCoverBitmapReady)
+            val tVideo = SonoraStore.getString(this, "cover_video_${t.key}", "")
+            val activeVideoCover = if (tVideo.isNotEmpty()) tVideo else SonoraStore.getString(this, "cover_video_active", "")
+            if (activeVideoCover.isNotEmpty()) {
+                updateStageCoverVideo(activeVideoCover)
+            } else {
+                updateStageCoverVideo(null)
+                if (::stageExpandedCoverImage.isInitialized) {
+                    stageExpandedCoverImage.scaleType = ImageView.ScaleType.FIT_CENTER
+                    stageExpandedCoverImage.setPadding(0, 0, 0, 0)
+                    stageExpandedCoverImage.clearColorFilter()
+                    stageExpandedCoverImage.bindCover(t, 640, onCoverBitmapReady)
+                }
             }
 
             if (::portraitMetaCoverThumb.isInitialized) {

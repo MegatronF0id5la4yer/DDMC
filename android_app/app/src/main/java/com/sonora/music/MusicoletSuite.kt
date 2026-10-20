@@ -822,7 +822,7 @@ object MusicoletEqualizerBuilder {
             }
             setOnClickListener {
                 isMono = false
-                SonoraStore.putBool(activity, "audio_mono", false)
+                SonoraAudioEngine.setMono(activity, false)
                 updateStereoMonoUi()
             }
         }
@@ -835,7 +835,7 @@ object MusicoletEqualizerBuilder {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             setOnClickListener {
                 isMono = true
-                SonoraStore.putBool(activity, "audio_mono", true)
+                SonoraAudioEngine.setMono(activity, true)
                 updateStereoMonoUi()
             }
         }
@@ -859,7 +859,7 @@ object MusicoletEqualizerBuilder {
                 "Izq:$l, Der:$r"
             }
         ) { pan, _ ->
-            SonoraStore.putFloat(activity, "audio_balance_pan", pan)
+            SonoraAudioEngine.setBalance(activity, pan)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, dp(activity, 170), 1f)
         }
@@ -2937,6 +2937,25 @@ object MusicoletSettingsCenter {
                     Toast.LENGTH_LONG
                 ).show()
                 refreshBackupsList()
+            }
+
+            addActionCard(
+                body,
+                "Importar de Musicolet (.zip)",
+                "Descifra y restaura listas de reproducción (.mpl) y canciones favoritas desde Descargas o almacenamiento.",
+                "#38BDF8"
+            ) {
+                if (activity is MainActivity) {
+                    activity.showMusicoletImportDialog()
+                } else {
+                    val found = MusicoletImporter.findPotentialBackupFiles()
+                    if (found.isNotEmpty()) {
+                        val res = MusicoletImporter.importBackupFile(activity, found.first(), emptyList())
+                        Toast.makeText(activity, "Importadas ${res.playlistsCreated} listas y ${res.favoritesMarked} favoritos de Musicolet", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(activity, "No se encontró musicolet.zip en Descargas", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
 
             addSectionHeader(body, "Copia de seguridad automática (Automatische Sicherung)")

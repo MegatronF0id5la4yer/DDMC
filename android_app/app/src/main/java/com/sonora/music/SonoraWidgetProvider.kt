@@ -113,7 +113,7 @@ object SonoraWidgetPrefs {
         sp(context).edit().putBoolean("showProgress", show).apply()
 
     fun getShowFastSeek(context: Context): Boolean =
-        sp(context).getBoolean("showFastSeek", false)
+        sp(context).getBoolean("showFastSeek", true)
 
     fun setShowFastSeek(context: Context, show: Boolean) =
         sp(context).edit().putBoolean("showFastSeek", show).apply()
@@ -323,6 +323,8 @@ class SonoraWidgetProvider : AppWidgetProvider() {
             val pos = player?.currentPosition ?: 0L
             val prog = if (dur > 0) ((pos * 1000L) / dur).toInt().coerceIn(0, 1000) else 0
             views.setProgressBar(R.id.widget_progress, 1000, prog, false)
+            views.setTextViewText(R.id.widget_time_elapsed, formatClock(pos))
+            views.setTextViewText(R.id.widget_time_total, formatClock(dur))
 
             views.setViewVisibility(R.id.widget_cover, if (showCover) View.VISIBLE else View.GONE)
             views.setViewVisibility(R.id.widget_playlist_btn, if (showAddToPlaylist) View.VISIBLE else View.GONE)
