@@ -69,7 +69,16 @@ object PerformanceEngine {
         }
     }
 
+    fun toggleOptimization(context: Context): Boolean {
+        val next = if (currentMode == MODE_POTATO) MODE_BALANCED else MODE_POTATO
+        setMode(context, next)
+        return isPotatoMode
+    }
+
     val isPotatoMode: Boolean
+        get() = currentMode == MODE_POTATO
+
+    val isOptimizationEnabled: Boolean
         get() = currentMode == MODE_POTATO
 
     val targetFps: Int

@@ -1115,13 +1115,6 @@ class DokiStageSpriteView(context: Context) : View(context) {
         if (w <= 0f || h <= 0f) return
 
         val now = System.currentTimeMillis()
-        val interval = PerformanceEngine.dokiFrameIntervalMs
-        if (now - lastDrawMs < interval && lastDrawMs != 0L) {
-            if (isShown && windowVisibility == VISIBLE) {
-                postInvalidateDelayed(interval - (now - lastDrawMs))
-            }
-            return
-        }
         lastDrawMs = now
 
         if (isChibiMode && customLockedPath == null) {
@@ -1133,7 +1126,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
 
         if (isShown && windowVisibility == VISIBLE) {
             if (PerformanceEngine.isPotatoMode) {
-                postInvalidateDelayed(interval)
+                postInvalidateDelayed(PerformanceEngine.dokiFrameIntervalMs)
             } else {
                 postInvalidateOnAnimation()
             }

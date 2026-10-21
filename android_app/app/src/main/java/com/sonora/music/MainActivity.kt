@@ -398,14 +398,6 @@ class VisualizerView(context: Context) : View(context) {
 
         val reducedMotion = MotionTokens.isReducedMotion(context)
         val now = System.currentTimeMillis()
-        val interval = PerformanceEngine.frameIntervalMs
-        if (now - lastFrameMs < interval && lastFrameMs != 0L) {
-            val settling = !isPlaying && magnitudes[0] > 0.055f
-            if (isShown && windowVisibility == VISIBLE && (isPlaying || settling) && !reducedMotion) {
-                postInvalidateDelayed(interval - (now - lastFrameMs))
-            }
-            return
-        }
         val dtSec = if (lastFrameMs > 0L) ((now - lastFrameMs) / 1000f).coerceIn(0.005f, 0.05f) else 0.016f
         lastFrameMs = now
 
@@ -439,7 +431,7 @@ class VisualizerView(context: Context) : View(context) {
         val settling = !isPlaying && magnitudes[0] > 0.055f
         if (isShown && windowVisibility == VISIBLE && (isPlaying || settling) && !reducedMotion) {
             if (PerformanceEngine.isPotatoMode) {
-                postInvalidateDelayed(interval)
+                postInvalidateDelayed(PerformanceEngine.frameIntervalMs)
             } else {
                 postInvalidateOnAnimation()
             }
@@ -1584,15 +1576,20 @@ class MainActivity : AppCompatActivity(), RowHost {
 
     fun updateStageCoverVideo(uriString: String?) {
         if (uriString.isNullOrEmpty()) {
-            currentCoverVideoUri = null
-            try {
-                stageCoverVideoPlayer?.stop()
-                stageCoverVideoPlayer?.reset()
-            } catch (_: Exception) {}
-            stageCoverVideoView?.visibility = View.GONE
-            if (::stageExpandedCoverImage.isInitialized) {
-                stageExpandedCoverImage.visibility = View.VISIBLE
+            if (currentCoverVideoUri != null) {
+                currentCoverVideoUri = null
+                try {
+                    stageCoverVideoPlayer?.stop()
+                    stageCoverVideoPlayer?.reset()
+                } catch (_: Exception) {}
+                stageCoverVideoView?.visibility = View.GONE
+                if (::stageExpandedCoverImage.isInitialized) {
+                    stageExpandedCoverImage.visibility = View.VISIBLE
+                }
             }
+            return
+        }
+        if (currentCoverVideoUri == uriString && stageCoverVideoPlayer != null && stageCoverVideoView?.visibility == View.VISIBLE) {
             return
         }
         currentCoverVideoUri = uriString
@@ -2867,7 +2864,7 @@ class MainActivity : AppCompatActivity(), RowHost {
 
             // Rendimiento & Optimización para celulares patata y gama alta
             val perfTitle = TextView(this).apply {
-                text = "Modos de Rendimiento (Sin perder funciones)"
+                text = "Modo Rendimiento (Activar / Desactivar)"
                 setTextColor(Color.WHITE)
                 textSize = 14f
                 setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
@@ -2876,7 +2873,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             root.addView(perfTitle)
 
             val perfSub = TextView(this).apply {
-                text = "Optimiza para celulares modestos o exprime los 120 FPS. Todas las funciones (visualizador, dokis, video covers y letras) se mantienen 100% activas."
+                text = "Activa o desactiva la optimización para celulares modestos. Todas las funciones (visualizador, dokis, video covers y letras) se mantienen 100% activas."
                 setTextColor(Color.parseColor(Pal.SUB))
                 textSize = 11.5f
                 setPadding(0, 0, 0, dp(8))
@@ -2891,6 +2888,57 @@ class MainActivity : AppCompatActivity(), RowHost {
                 setPadding(0, 0, 0, dp(8))
             }
             root.addView(perfStatusTv)
+
+            // Switch principal de Activar / Desactivar
+            val toggleRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(10), dp(12), dp(10))
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor(Pal.SURFACE_HI))
+                    cornerRadius = dpf(12f)
+                    setStroke(dp(1), Color.parseColor("#35FFFFFF"))
+                }
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(10)
+                }
+            }
+            val toggleInfo = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
+            }
+            val toggleTitle = TextView(this).apply {
+                text = "Modo Optimización"
+                textSize = 13.5f
+                setTextColor(Color.WHITE)
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+            }
+            val toggleSub = TextView(this).apply {
+                text = if (PerformanceEngine.isPotatoMode) "Activado: Modo Patata (30 FPS, ahorro RAM y CPU)" else "Desactivado: Alta Fidelidad (60 FPS fluido)"
+                textSize = 11.5f
+                setTextColor(Color.parseColor(Pal.MUTED))
+            }
+            toggleInfo.addView(toggleTitle)
+            toggleInfo.addView(toggleSub)
+
+            val toggleSwitch = Switch(this).apply {
+                isChecked = PerformanceEngine.isPotatoMode
+                thumbTintList = ColorStateList.valueOf(Color.WHITE)
+                trackTintList = ColorStateList.valueOf(Color.parseColor(Pal.ACCENT))
+                setOnCheckedChangeListener { _, isChecked ->
+                    val newMode = if (isChecked) PerformanceEngine.MODE_POTATO else PerformanceEngine.MODE_BALANCED
+                    PerformanceEngine.setMode(this@MainActivity, newMode)
+                    toggleSub.text = if (isChecked) "Activado: Modo Patata (30 FPS, ahorro RAM y CPU)" else "Desactivado: Alta Fidelidad (60 FPS fluido)"
+                    perfStatusTv.text = PerformanceEngine.getShortLabel()
+                    showVizHudBadge(if (isChecked) "Optimización ACTIVADA (30 FPS)" else "Optimización DESACTIVADA (60 FPS)")
+                    if (::visualizerView.isInitialized) visualizerView.postInvalidate()
+                    if (::dokiSpriteView.isInitialized) dokiSpriteView.postInvalidate()
+                }
+            }
+            toggleRow.setOnClickListener { toggleSwitch.isChecked = !toggleSwitch.isChecked }
+            toggleRow.addView(toggleInfo)
+            toggleRow.addView(toggleSwitch)
+            root.addView(toggleRow)
 
             val perfRow = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
