@@ -58,6 +58,12 @@ object MotionTokens {
     /** `--ease-drawer`: `cubic-bezier(0.32, 0.72, 0, 1)` (iOS / Vaul sheet curve) for bottom sheets. */
     val EASE_DRAWER = PathInterpolator(0.32f, 0.72f, 0f, 1f)
 
+    /** Launcher / Home screen app repositioning spring curve. */
+    val SPRING_LAUNCHER = PathInterpolator(0.22f, 1f, 0.36f, 1f)
+
+    /** Bouncy overshoot spring for home screen drop & drag interactions. */
+    val SPRING_OVERSHOOT = android.view.animation.OvershootInterpolator(1.35f)
+
     const val DUR_PRESS_DOWN = 100L
     const val DUR_PRESS_UP = 160L
     const val DUR_FAST = 180L
@@ -552,7 +558,7 @@ class Pill(context: Context, label: String, private val iconRes: Int = 0, privat
  */
 fun ImageView.bindCover(t: TrackItem?, px: Int, onBitmapReady: ((Bitmap) -> Unit)? = null) {
     GifImageSupport.ensure(context)
-    scaleType = ImageView.ScaleType.FIT_CENTER
+    val targetScale = if (scaleType == ImageView.ScaleType.MATRIX) ImageView.ScaleType.CENTER_CROP else scaleType
     val customUriStr = if (t != null) SonoraStore.getString(context, "cover_gif_${t.key.hashCode()}", "") else ""
     val gifOrUrl = customUriStr.ifEmpty { t?.coverUrl ?: "" }
     val bmp = t?.coverBitmap
@@ -565,7 +571,7 @@ fun ImageView.bindCover(t: TrackItem?, px: Int, onBitmapReady: ((Bitmap) -> Unit
                 val d = GifImageSupport.decodeDrawableFromUri(context, uri, px.coerceAtLeast(512))
                 val first = GifImageSupport.decodeFirstFrameFromUri(context, uri, px.coerceAtLeast(512))
                 post {
-                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    scaleType = targetScale
                     if (d != null) {
                         setImageDrawable(d)
                         GifImageSupport.startLooping(d)
@@ -592,7 +598,7 @@ fun ImageView.bindCover(t: TrackItem?, px: Int, onBitmapReady: ((Bitmap) -> Unit
                     val first = GifImageSupport.decodeFirstFrameFromUri(context, uri, px.coerceAtLeast(512))
                         ?: if (t != null) GifImageSupport.resolveTrackCoverBitmap(context, t) else null
                     post {
-                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        scaleType = targetScale
                         if (d != null) {
                             setImageDrawable(d)
                             GifImageSupport.startLooping(d)
@@ -611,7 +617,7 @@ fun ImageView.bindCover(t: TrackItem?, px: Int, onBitmapReady: ((Bitmap) -> Unit
                     size(px, px)
                     listener(
                         onSuccess = { _, result ->
-                            scaleType = ImageView.ScaleType.FIT_CENTER
+                            scaleType = targetScale
                             val d = result.drawable
                             GifImageSupport.startLooping(d)
                             val first = GifImageSupport.extractFirstFrame(d)
@@ -626,7 +632,7 @@ fun ImageView.bindCover(t: TrackItem?, px: Int, onBitmapReady: ((Bitmap) -> Unit
                                     val embedded = GifImageSupport.resolveTrackCoverBitmap(context, t)
                                     if (embedded != null) {
                                         post {
-                                            scaleType = ImageView.ScaleType.FIT_CENTER
+                                            scaleType = targetScale
                                             setImageBitmap(embedded)
                                             onBitmapReady?.invoke(embedded)
                                         }

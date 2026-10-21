@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Doki Doki Music Club (DDMC)</string>
+    <string name="app_name">DDMC</string>
     <string name="widget_description">Widget DDMC personalizable con soporte Hi-Res, Doki Chibi, GIF y controles directos</string>
-    <string name="notif_channel_name">Doki Doki Music Club (DDMC)</string>
+    <string name="notif_channel_name">DDMC (Doki Doki Music Club)</string>
 </resources>

@@ -778,6 +778,8 @@ class DokiStageSpriteView(context: Context) : View(context) {
             }
         }
     var audioEnergy: Float = 0f
+    var currentSongBpm: Float = 120f
+    private var lastDrawMs: Long = 0L
     private var breathPhase: Float = 0f
     private var lastBlinkCheckMs: Long = 0L
     private var blinkEndMs: Long = 0L
@@ -828,6 +830,8 @@ class DokiStageSpriteView(context: Context) : View(context) {
             }
             invalidate()
         }
+
+    var onDokiAngryAndSwitch: (() -> Unit)? = null
 
     val isChibiMode: Boolean
         get() = activeEmotion == "shimeji" || activeDokiId == "bocchi" || activeDokiId == "konata"
@@ -1038,8 +1042,8 @@ class DokiStageSpriteView(context: Context) : View(context) {
                 if (isDraggingChibi && isChibiMode) {
                     isDraggingChibi = false
                     shimejiState = ShimejiState.FLUNG
-                    velX = velX.coerceIn(-context.dpf(14f), context.dpf(14f))
-                    velY = velY.coerceIn(-context.dpf(14f), context.dpf(10f))
+                    velX = velX.coerceIn(-context.dpf(38f), context.dpf(38f))
+                    velY = velY.coerceIn(-context.dpf(36f), context.dpf(25f))
                 } else if (totalMove < context.dpf(14f) && elapsed < 380L) {
                     // Tap -> Poke interaction!
                     handlePokeInteraction(now, skin)
@@ -1056,57 +1060,33 @@ class DokiStageSpriteView(context: Context) : View(context) {
     }
 
     private fun handlePokeInteraction(now: Long, skin: DdscEngine.PinkChanSkin) {
-        if (now - lastPokeMs < 1800L) {
-            annoyanceCount++
-        } else {
-            annoyanceCount = 1
-        }
         lastPokeMs = now
-        DdscEngine.playCharacterSound(context, activeDokiId)
-
-        if (annoyanceCount >= 5) {
-            annoyanceCount = 0
-            if (isChibiMode) {
-                shimejiState = ShimejiState.ANGRY
-                stateTicks = 80
-            } else {
-                val outfit = DdscEngine.resolveOutfitSet(activeDokiId, activePose)
-                val reactionSprites = if (outfit.molesta.isNotEmpty()) outfit.molesta else outfit.feliz
-                if (reactionSprites.isNotEmpty()) {
-                    val chosen = reactionSprites.random()
-                    val folder = outfit.folder.ifEmpty { "$activeDokiId $activePose" }
-                    customLockedPath = "$folder/$chosen"
-                    postDelayed({
-                        customLockedPath = null
-                        postInvalidateOnAnimation()
-                    }, 2800L)
-                }
-                breathPhase += 0.8f
-            }
-            say(skin.quotesAngry.random(), 3200L)
-            spawnParticles("💢", 4)
+        // Animate comical angry reaction
+        if (isChibiMode) {
+            shimejiState = ShimejiState.ANGRY
+            stateTicks = 70
+            // Absurd physics launch on poke: tiny rage hop
+            velY = -context.dpf(7.5f)
+            velX = if (Random.nextBoolean()) context.dpf(5f) else -context.dpf(5f)
         } else {
-            if (isChibiMode) {
-                shimejiState = ShimejiState.HAPPY_JUMP
-                stateTicks = 36
-                velY = -context.dpf(5.5f)
-            } else {
-                val outfit = DdscEngine.resolveOutfitSet(activeDokiId, activePose)
-                val pool = (outfit.feliz + outfit.pensando + outfit.examen).filter { s: String -> s.isNotEmpty() }
-                if (pool.isNotEmpty()) {
-                    val chosen = pool.random()
-                    val folder = outfit.folder.ifEmpty { "$activeDokiId $activePose" }
-                    customLockedPath = "$folder/$chosen"
-                    postDelayed({
-                        customLockedPath = null
-                        postInvalidateOnAnimation()
-                    }, 2800L)
-                }
-                breathPhase += 0.6f
+            val outfit = DdscEngine.resolveOutfitSet(activeDokiId, activePose)
+            val reactionSprites = if (outfit.molesta.isNotEmpty()) outfit.molesta else outfit.feliz
+            if (reactionSprites.isNotEmpty()) {
+                val chosen = reactionSprites.random()
+                val folder = outfit.folder.ifEmpty { "$activeDokiId $activePose" }
+                customLockedPath = "$folder/$chosen"
+                postDelayed({
+                    customLockedPath = null
+                    postInvalidateOnAnimation()
+                }, 1600L)
             }
-            say(skin.quotesPoke.random(), 2800L)
-            spawnParticles("✨", 3)
+            breathPhase += 1.2f
         }
+        spawnParticles("💢", 5)
+        postInvalidateOnAnimation()
+
+        // Trigger character switch immediately as requested!
+        onDokiAngryAndSwitch?.invoke()
     }
 
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
@@ -1191,41 +1171,40 @@ class DokiStageSpriteView(context: Context) : View(context) {
             ShimejiState.FLUNG -> {
                 posX += velX
                 posY += velY
-                velY += gravity
-                velX *= 0.98f
+                velY += gravity * 0.85f // slightly floatier gravity
+                velX *= 0.992f // low air drag for absurd flight
 
+                // Left wall superball pinball ricochet
                 if (posX <= leftWallX) {
                     posX = leftWallX
-                    if (Random.nextFloat() < 0.65f) {
-                        shimejiState = ShimejiState.CLIMB_LEFT
-                        stateTicks = Random.nextInt(70, 140)
-                        velX = 0f; velY = 0f
-                    } else {
-                        velX = -velX * 0.6f
-                        facingRight = true
-                    }
+                    velX = -velX * 1.05f // Absurd elastic amplification!
+                    facingRight = true
+                    spawnParticles("💥", 2)
                 } else if (posX >= rightWallX) {
                     posX = rightWallX
-                    if (Random.nextFloat() < 0.65f) {
-                        shimejiState = ShimejiState.CLIMB_RIGHT
-                        stateTicks = Random.nextInt(70, 140)
-                        velX = 0f; velY = 0f
-                    } else {
-                        velX = -velX * 0.6f
-                        facingRight = false
-                    }
+                    velX = -velX * 1.05f
+                    facingRight = false
+                    spawnParticles("💥", 2)
                 }
-                if (posY <= ceilingY + context.dpf(60f)) {
-                    posY = ceilingY + context.dpf(60f)
-                    shimejiState = ShimejiState.CEILING
-                    stateTicks = Random.nextInt(80, 150)
-                    velX = 0f; velY = 0f
+
+                // Ceiling ricochet
+                if (posY <= ceilingY + context.dpf(50f)) {
+                    posY = ceilingY + context.dpf(50f)
+                    velY = -velY * 0.95f
+                    spawnParticles("✨", 2)
                 } else if (posY >= floorY) {
                     posY = floorY
-                    velY = 0f
-                    velX = 0f
-                    shimejiState = ShimejiState.HAPPY_JUMP
-                    stateTicks = 28
+                    // Absurd superball floor bounce: if moving with speed, bounce back up!
+                    if (abs(velY) > context.dpf(3f)) {
+                        velY = -velY * 0.88f // Bounce high!
+                        velX *= 0.92f
+                        spawnParticles("💨", 2)
+                    } else {
+                        velY = 0f
+                        velX = 0f
+                        shimejiState = ShimejiState.HAPPY_JUMP
+                        stateTicks = 25
+                    }
                 }
             }
             ShimejiState.FALL -> {
@@ -1324,9 +1303,12 @@ class DokiStageSpriteView(context: Context) : View(context) {
         val drawH = targetH
         val drawW = (drawH * aspect).coerceAtMost(w * 0.90f)
 
-        // Music beat bounce when on floor
+        // Music rhythm-locked beat bounce (calibrated to song BPM and delta time)
+        val bpm = currentSongBpm.coerceIn(60f, 200f)
+        val beatPeriodMs = (60000.0 / bpm).coerceIn(300.0, 1000.0)
         val beatBounceY = if (isMusicPlaying && shimejiState in listOf(ShimejiState.STAND, ShimejiState.WALK, ShimejiState.SIT, ShimejiState.HAPPY_JUMP, ShimejiState.CUSTOM_ACTION)) {
-            abs(sin(animTick * 0.16f)) * context.dpf(4f + audioEnergy * 8f)
+            val beatPhase = (now.toDouble() / beatPeriodMs) * 2.0 * Math.PI
+            (abs(sin(beatPhase)).toFloat() * context.dpf(3.2f + audioEnergy * 6.5f)).coerceIn(0f, context.dpf(12f))
         } else 0f
 
         val jumpOffsetY = if (shimejiState == ShimejiState.HAPPY_JUMP) {
@@ -1420,60 +1402,78 @@ class DokiStageSpriteView(context: Context) : View(context) {
 
     private fun selectChibiFrameName(skin: DdscEngine.PinkChanSkin): String {
         val isBocchiOrKonata = !skin.nativeFacesLeft
+        val now = System.currentTimeMillis()
+        val bpm = currentSongBpm.coerceIn(60f, 200f)
+        val beatPeriodMs = (60000.0 / bpm).coerceIn(300.0, 1000.0)
+        // Dance & walking steps sync to song tempo (every half-beat = 2 steps per beat):
+        val danceStep = if (isMusicPlaying) (now / (beatPeriodMs * 0.5).toLong()).toLong() else (now / 350L)
+        val walkStep = if (isMusicPlaying) (now / (beatPeriodMs * 0.5).toLong()).toLong() else (now / 240L)
+        val runStep = (now / 150L)
+
         return when (shimejiState) {
             ShimejiState.DRAGGED -> {
                 if (velX < -context.dpf(1.2f)) "air_swing_r.png"
                 else if (velX > context.dpf(1.2f)) "air_swing_l.png"
-                else if ((animTick / 10) % 2 == 0) "air_swing_l.png" else "air_swing_r.png"
+                else if ((now / 200L) % 2L == 0L) "air_swing_l.png" else "air_swing_r.png"
             }
             ShimejiState.FALL, ShimejiState.FLUNG -> {
                 if (isBocchiOrKonata) "fall1.png" else "air.png"
             }
             ShimejiState.CLIMB_LEFT, ShimejiState.CLIMB_RIGHT -> {
                 if (isBocchiOrKonata) {
-                    if ((animTick / 8) % 2 == 0) "climb1.png" else "climb2.png"
+                    if ((now / 220L) % 2L == 0L) "climb1.png" else "climb2.png"
                 } else {
                     "climb.png"
                 }
             }
             ShimejiState.CEILING -> {
                 if (isBocchiOrKonata) {
-                    if ((animTick / 10) % 2 == 0) "ceiling1.png" else "ceiling2.png"
+                    if ((now / 260L) % 2L == 0L) "ceiling1.png" else "ceiling2.png"
                 } else {
                     "climb_top.png"
                 }
             }
             ShimejiState.SIT -> {
                 if (isBocchiOrKonata) {
-                    val idx = ((animTick / 16) % 4) + 1
+                    val idx = ((now / 400L) % 4) + 1
                     "sit$idx.png"
                 } else {
                     "snug.png"
                 }
             }
             ShimejiState.HAPPY_JUMP, ShimejiState.ANGRY -> {
+                val jumpStep = (now / 220L)
                 if (isBocchiOrKonata) {
-                    if ((animTick / 6) % 2 == 0) "jump1.png" else "land1.png"
+                    if (jumpStep % 2L == 0L) "jump1.png" else "land1.png"
                 } else {
                     val seq = arrayOf("jump_2.png", "jump_3.png", "jump_2.png", "jump_1.png")
-                    seq[(animTick / 6) % seq.size]
+                    seq[(jumpStep % seq.size).toInt()]
                 }
             }
-            ShimejiState.WALK, ShimejiState.RUN -> {
-                val div = if (shimejiState == ShimejiState.RUN) 5 else 8
+            ShimejiState.WALK -> {
                 if (isBocchiOrKonata) {
-                    val idx = ((animTick / div) % 4) + 1
+                    val idx = ((walkStep % 4) + 1).toInt()
                     "walk$idx.png"
                 } else {
                     val seq = arrayOf("stand.png", "stand_walk1.png", "stand_walk2.png", "stand_walk1.png")
-                    seq[(animTick / div) % seq.size]
+                    seq[(walkStep % seq.size).toInt()]
+                }
+            }
+            ShimejiState.RUN -> {
+                if (isBocchiOrKonata) {
+                    val idx = ((runStep % 4) + 1).toInt()
+                    "walk$idx.png"
+                } else {
+                    val seq = arrayOf("stand.png", "stand_walk1.png", "stand_walk2.png", "stand_walk1.png")
+                    seq[(runStep % seq.size).toInt()]
                 }
             }
             ShimejiState.CUSTOM_ACTION -> {
+                val actionStep = if (isMusicPlaying) (now / (beatPeriodMs * 0.5).toLong()).toLong() else (now / 200L)
                 when (customActionFrameType) {
-                    "guitar" -> "guitar${((animTick / 6) % 3) + 1}.png"
-                    "box" -> "box${((animTick / 12) % 2) + 1}.png"
-                    "clone" -> "clone_${((animTick / 8) % 4) + 1}.png"
+                    "guitar" -> "guitar${((actionStep % 3) + 1)}.png"
+                    "box" -> "box${(((now / 500L) % 2) + 1)}.png"
+                    "clone" -> "clone_${((actionStep % 4) + 1)}.png"
                     "jump" -> if (isBocchiOrKonata) "jump1.png" else "jump_2.png"
                     "snug" -> if (isBocchiOrKonata) "sit1.png" else "snug.png"
                     else -> "stand.png"
@@ -1481,13 +1481,13 @@ class DokiStageSpriteView(context: Context) : View(context) {
             }
             ShimejiState.STAND -> {
                 if (isMusicPlaying) {
-                    // Groove to the music beat!
+                    // Groove in perfect rhythm with the song beat!
                     if (isBocchiOrKonata) {
                         val seq = arrayOf("stand1.png", "stand2.png", "stand3.png", "stand2.png")
-                        seq[(animTick / 8) % seq.size]
+                        seq[(danceStep % seq.size).toInt()]
                     } else {
                         val seq = arrayOf("stand.png", "jump_1.png", "stand.png", "snug.png")
-                        seq[(animTick / 12) % seq.size]
+                        seq[(danceStep % seq.size).toInt()]
                     }
                 } else {
                     if (isBocchiOrKonata) "stand1.png" else "stand.png"

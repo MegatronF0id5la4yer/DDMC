@@ -77,6 +77,49 @@ class UpdateHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         print(f"[OTA-PC] {self.address_string()} - {fmt % args}")
 
+    def _send_apk(self, is_head=False):
+        req_name = os.path.basename(self.path.split("?")[0])
+        candidate = os.path.join(ROOT_DIR, req_name) if req_name.endswith(".apk") else None
+        if candidate and os.path.exists(candidate):
+            apk = candidate
+        else:
+            apk = get_apk_path()
+
+        if not os.path.exists(apk):
+            self.send_error(404, "APK not found on PC")
+            return
+        size = os.path.getsize(apk)
+        filename = os.path.basename(apk)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/vnd.android.package-archive")
+        self.send_header("Content-Length", str(size))
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.end_headers()
+        if not is_head:
+            with open(apk, "rb") as f:
+                shutil.copyfileobj(f, self.wfile)
+
+    def do_HEAD(self):
+        if self.path.startswith("/update.json") or self.path == "/":
+            payload = json.dumps(build_update_payload(), ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+        elif self.path.startswith("/Estudio-Musical-HiRes.apk") or self.path.startswith("/DDMC.apk") or self.path.endswith(".apk"):
+            self._send_apk(is_head=True)
+        elif self.path.endswith(".mp4"):
+            video_file = os.path.join(ROOT_DIR, os.path.basename(self.path.split("?")[0]))
+            if os.path.exists(video_file):
+                self.send_response(200)
+                self.send_header("Content-Type", "video/mp4")
+                self.send_header("Content-Length", str(os.path.getsize(video_file)))
+                self.end_headers()
+            else:
+                self.send_error(404, "Video Not Found")
+        else:
+            self.send_error(404, "Not Found")
+
     def do_GET(self):
         if self.path.startswith("/update.json") or self.path == "/":
             payload = json.dumps(build_update_payload(), ensure_ascii=False).encode("utf-8")
@@ -85,19 +128,20 @@ class UpdateHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
-        elif self.path.startswith("/Estudio-Musical-HiRes.apk") or self.path.endswith(".apk"):
-            apk = get_apk_path()
-            if not os.path.exists(apk):
-                self.send_error(404, "APK not found on PC")
-                return
-            size = os.path.getsize(apk)
-            self.send_response(200)
-            self.send_header("Content-Type", "application/vnd.android.package-archive")
-            self.send_header("Content-Length", str(size))
-            self.send_header("Content-Disposition", 'attachment; filename="Estudio-Musical-HiRes.apk"')
-            self.end_headers()
-            with open(apk, "rb") as f:
-                shutil.copyfileobj(f, self.wfile)
+        elif self.path.startswith("/Estudio-Musical-HiRes.apk") or self.path.startswith("/DDMC.apk") or self.path.endswith(".apk"):
+            self._send_apk(is_head=False)
+        elif self.path.endswith(".mp4"):
+            video_file = os.path.join(ROOT_DIR, os.path.basename(self.path.split("?")[0]))
+            if os.path.exists(video_file):
+                self.send_response(200)
+                self.send_header("Content-Type", "video/mp4")
+                self.send_header("Content-Length", str(os.path.getsize(video_file)))
+                self.send_header("Content-Disposition", f'inline; filename="{os.path.basename(video_file)}"')
+                self.end_headers()
+                with open(video_file, "rb") as f:
+                    shutil.copyfileobj(f, self.wfile)
+            else:
+                self.send_error(404, "Video Not Found")
         else:
             self.send_error(404, "Not Found")
 

@@ -10,3 +10,31 @@ __pycache__/
 /flatpak/*.flatpak
 /flatpak/flatpak
 /.flatpak-builder
+
+# Android & Gradle
+**/.gradle/
+**/build/
+local.properties
+*.apk
+*.aab
+
+# Binary media & scratch files
+*.mp3
+*.wav
+*.mp4
+*.zip
+*.lock
+
+# Root test images & local clones
+/*.png
+/namida_repo/
+/rea_repo/
+/spotiflac_repo/
+/temp_musicolet/
+/temp_musicolet_dex/
+/video reference/
+
+# Root scratch scripts
+/*.py
+!/pc_update_server.py
+/TestMusicoletDecrypt.java

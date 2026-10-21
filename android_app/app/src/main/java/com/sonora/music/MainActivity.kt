@@ -49,6 +49,11 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.AspectRatioFrameLayout
+import android.transition.TransitionManager
+import android.transition.AutoTransition
+import android.view.animation.PathInterpolator
+import java.io.FileOutputStream
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -209,6 +214,8 @@ class VisualizerView(context: Context) : View(context) {
     private val waterfallHistory = ArrayDeque<FloatArray>()
     private val maxHistoryRows = 28
     private var phase = 0f
+    private var lastFrameMs = 0L
+    var songBpm: Float = 120f
 
     // Pre-allocated drawing primitives (zero GC allocations per frame at 60/120fps)
     private val primaryWavePath = Path()
@@ -387,8 +394,14 @@ class VisualizerView(context: Context) : View(context) {
         if (w <= 0f || h <= 0f) return
 
         val reducedMotion = MotionTokens.isReducedMotion(context)
+        val now = System.currentTimeMillis()
+        val dtSec = if (lastFrameMs > 0L) ((now - lastFrameMs) / 1000f).coerceIn(0.005f, 0.05f) else 0.016f
+        lastFrameMs = now
+
         if (isPlaying && !reducedMotion) {
-            phase += 0.095f
+            val bpm = songBpm.coerceIn(60f, 200f)
+            val bpmSpeed = (bpm / 120f) * 2.8f
+            phase += dtSec * bpmSpeed
         }
         if (!hasRealFftSignal || !isPlaying) {
             stepAcousticSimulation()
@@ -631,7 +644,11 @@ class MainActivity : AppCompatActivity(), RowHost {
     // Looping silent cover video & Nav position
     private var stageCoverVideoPlayer: MediaPlayer? = null
     private var stageCoverVideoView: TextureView? = null
+    private var stageCoverSurface: Surface? = null
     private var currentCoverVideoUri: String? = null
+    private var lastCoverVideoWidth: Int = 0
+    private var lastCoverVideoHeight: Int = 0
+    private var pendingVideoTrack: TrackItem? = null
     private val navItemContainers = mutableListOf<LinearLayout>()
     private var currentNavPosition: String = "bottom"
 
@@ -871,6 +888,35 @@ class MainActivity : AppCompatActivity(), RowHost {
                 ) exoPlayer.seekTo(t.trimStartMs)
                 bindNowPlaying()
                 saveQueueState()
+
+                if (isVideoMode) {
+                    val cur = tracks.getOrNull(idx)
+                    if (cur != null && cur.videoUrl.isEmpty() && cur.provider.contains("YouTube", true)) {
+                        val ytId = YouTubeEngine.extractVideoId(cur.audioUrl)
+                        if (ytId != null) {
+                            kotlin.concurrent.thread {
+                                try {
+                                    val streams = YouTubeEngine.resolveStreams(ytId)
+                                    val vUrl = streams.videoStreamUrl.ifEmpty { streams.audioStreamUrl }
+                                    if (vUrl.isNotEmpty()) {
+                                        runOnUiThread {
+                                            val playing = tracks.getOrNull(currentTrackIndex)
+                                            if (playing != null && playing.key == cur.key) {
+                                                val updated = playing.copy(videoUrl = vUrl)
+                                                tracks[currentTrackIndex] = updated
+                                                val pos = exoPlayer.currentPosition
+                                                val wasPlaying = exoPlayer.isPlaying
+                                                exoPlayer.setMediaItem(toMediaItem(updated), pos)
+                                                exoPlayer.prepare()
+                                                if (wasPlaying) exoPlayer.play()
+                                            }
+                                        }
+                                    }
+                                } catch (_: Exception) {}
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -970,13 +1016,48 @@ class MainActivity : AppCompatActivity(), RowHost {
         if (result.resultCode == Activity.RESULT_OK) {
             val uri = result.data?.data ?: return@registerForActivityResult
             try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
-            val t = tracks.getOrNull(currentTrackIndex)
-            if (t != null) {
-                SonoraStore.putString(this, "cover_video_${t.key}", uri.toString())
+            val t = pendingVideoTrack ?: tracks.getOrNull(currentTrackIndex)
+            pendingVideoTrack = null
+
+            val trackKey = t?.key ?: "active"
+            val destFile = File(filesDir, "cover_vid_${trackKey.hashCode().toString().replace('-', '_')}.mp4")
+            showVizHudBadge("Guardando video en bucle...")
+
+            kotlin.concurrent.thread {
+                try {
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        FileOutputStream(destFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    val savedUri = Uri.fromFile(destFile).toString()
+                    runOnUiThread {
+                        if (t != null) {
+                            SonoraStore.putString(this@MainActivity, "cover_video_${t.key}", savedUri)
+                        }
+                        SonoraStore.putString(this@MainActivity, "cover_video_active", savedUri)
+                        val cur = tracks.getOrNull(currentTrackIndex)
+                        if (cur == null || t == null || cur.key == t.key) {
+                            updateStageCoverVideo(savedUri)
+                        }
+                        showVizHudBadge("¡Video aplicado sin barras negras!")
+                        Toast.makeText(this@MainActivity, "Video en bucle aplicado como portada", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (_: Exception) {
+                    val rawUriStr = uri.toString()
+                    runOnUiThread {
+                        if (t != null) {
+                            SonoraStore.putString(this@MainActivity, "cover_video_${t.key}", rawUriStr)
+                        }
+                        SonoraStore.putString(this@MainActivity, "cover_video_active", rawUriStr)
+                        val cur = tracks.getOrNull(currentTrackIndex)
+                        if (cur == null || t == null || cur.key == t.key) {
+                            updateStageCoverVideo(rawUriStr)
+                        }
+                        Toast.makeText(this@MainActivity, "Video aplicado", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
-            SonoraStore.putString(this, "cover_video_active", uri.toString())
-            updateStageCoverVideo(uri.toString())
-            Toast.makeText(this, "Video en bucle aplicado como portada", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1433,12 +1514,65 @@ class MainActivity : AppCompatActivity(), RowHost {
         )
     }
 
+    private fun setDataSourceSafely(player: MediaPlayer, uriString: String) {
+        val uri = Uri.parse(uriString)
+        if (uri.scheme == "file") {
+            val f = File(uri.path ?: "")
+            if (f.exists()) {
+                player.setDataSource(f.absolutePath)
+                return
+            }
+        }
+        if (uri.scheme == "content") {
+            try {
+                contentResolver.openAssetFileDescriptor(uri, "r")?.use { afd ->
+                    player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    return
+                }
+            } catch (_: Exception) {}
+        }
+        player.setDataSource(this, uri)
+    }
+
+    private fun adjustVideoCropMatrix(textureView: TextureView, videoWidth: Int, videoHeight: Int) {
+        if (videoWidth > 0 && videoHeight > 0) {
+            lastCoverVideoWidth = videoWidth
+            lastCoverVideoHeight = videoHeight
+        }
+        val vW = if (videoWidth > 0) videoWidth else lastCoverVideoWidth
+        val vH = if (videoHeight > 0) videoHeight else lastCoverVideoHeight
+        if (vW <= 0 || vH <= 0) return
+
+        val viewW = textureView.width.toFloat()
+        val viewH = textureView.height.toFloat()
+        if (viewW <= 0f || viewH <= 0f) return
+
+        val viewRatio = viewW / viewH
+        val videoRatio = vW.toFloat() / vH.toFloat()
+
+        var scaleX = 1.0f
+        var scaleY = 1.0f
+
+        // Eliminate black bars on any video resolution via Center-Crop
+        if (videoRatio > viewRatio) {
+            scaleX = videoRatio / viewRatio
+        } else {
+            scaleY = viewRatio / videoRatio
+        }
+
+        val matrix = Matrix()
+        matrix.setScale(scaleX, scaleY, viewW / 2f, viewH / 2f)
+        textureView.setTransform(matrix)
+    }
+
     fun updateStageCoverVideo(uriString: String?) {
         if (uriString.isNullOrEmpty()) {
-            stageCoverVideoPlayer?.stop()
-            stageCoverVideoPlayer?.release()
-            stageCoverVideoPlayer = null
-            stageCoverVideoView?.let { it.visibility = View.GONE }
+            currentCoverVideoUri = null
+            try {
+                stageCoverVideoPlayer?.stop()
+                stageCoverVideoPlayer?.reset()
+            } catch (_: Exception) {}
+            stageCoverVideoView?.visibility = View.GONE
             if (::stageExpandedCoverImage.isInitialized) {
                 stageExpandedCoverImage.visibility = View.VISIBLE
             }
@@ -1456,12 +1590,21 @@ class MainActivity : AppCompatActivity(), RowHost {
                 )
                 surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                     override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
-                        startLoopingVideo(Surface(st), currentCoverVideoUri)
+                        stageCoverSurface?.release()
+                        stageCoverSurface = Surface(st)
+                        startLoopingVideo(stageCoverSurface, currentCoverVideoUri)
                     }
-                    override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
+                    override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {
+                        adjustVideoCropMatrix(this@apply, lastCoverVideoWidth, lastCoverVideoHeight)
+                    }
                     override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-                        stageCoverVideoPlayer?.release()
+                        try {
+                            stageCoverVideoPlayer?.stop()
+                            stageCoverVideoPlayer?.release()
+                        } catch (_: Exception) {}
                         stageCoverVideoPlayer = null
+                        stageCoverSurface?.release()
+                        stageCoverSurface = null
                         return true
                     }
                     override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
@@ -1469,31 +1612,57 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
             stageExpandedCoverCard.addView(stageCoverVideoView)
         }
-        stageCoverVideoView?.let { it.visibility = View.VISIBLE }
-        stageExpandedCoverImage.visibility = View.GONE
+        stageCoverVideoView?.visibility = View.VISIBLE
+        if (::stageExpandedCoverImage.isInitialized) {
+            stageExpandedCoverImage.visibility = View.GONE
+        }
         stageCoverVideoView?.let { v ->
             if (v.isAvailable && v.surfaceTexture != null) {
-                val surface = Surface(v.surfaceTexture)
-                startLoopingVideo(surface, uriString)
+                if (stageCoverSurface == null) {
+                    stageCoverSurface = Surface(v.surfaceTexture)
+                }
+                startLoopingVideo(stageCoverSurface, uriString)
             }
         }
     }
 
-    private fun startLoopingVideo(surface: Surface, uriString: String?) {
-        if (uriString == null) return
+    private fun startLoopingVideo(surface: Surface?, uriString: String?) {
+        if (surface == null || uriString.isNullOrEmpty()) return
         try {
-            stageCoverVideoPlayer?.release()
-            stageCoverVideoPlayer = MediaPlayer().apply {
-                setSurface(surface)
-                setDataSource(this@MainActivity, Uri.parse(uriString))
-                isLooping = true
-                setVolume(0f, 0f) // Muted silent video
-                setOnPreparedListener { it.start() }
-                prepareAsync()
+            val player = stageCoverVideoPlayer ?: MediaPlayer().also { stageCoverVideoPlayer = it }
+            player.reset()
+            player.setSurface(surface)
+            setDataSourceSafely(player, uriString)
+            player.isLooping = true
+            player.setVolume(0f, 0f) // Muted silent video cover
+            player.setOnVideoSizeChangedListener { _, w, h ->
+                lastCoverVideoWidth = w
+                lastCoverVideoHeight = h
+                stageCoverVideoView?.let { adjustVideoCropMatrix(it, w, h) }
             }
+            player.setOnPreparedListener { mp ->
+                mp.start()
+                val w = mp.videoWidth
+                val h = mp.videoHeight
+                if (w > 0 && h > 0) {
+                    lastCoverVideoWidth = w
+                    lastCoverVideoHeight = h
+                    stageCoverVideoView?.let { adjustVideoCropMatrix(it, w, h) }
+                }
+            }
+            player.setOnErrorListener { _, _, _ ->
+                runOnUiThread {
+                    stageCoverVideoView?.visibility = View.GONE
+                    if (::stageExpandedCoverImage.isInitialized) stageExpandedCoverImage.visibility = View.VISIBLE
+                }
+                true
+            }
+            player.prepareAsync()
         } catch (_: Exception) {
-            stageCoverVideoView?.let { it.visibility = View.GONE }
-            stageExpandedCoverImage.visibility = View.VISIBLE
+            stageCoverVideoView?.visibility = View.GONE
+            if (::stageExpandedCoverImage.isInitialized) {
+                stageExpandedCoverImage.visibility = View.VISIBLE
+            }
         }
     }
 
@@ -1615,6 +1784,100 @@ class MainActivity : AppCompatActivity(), RowHost {
 
     private var vizHudBadge: TextView? = null
 
+    private fun safeDetach(v: View?) {
+        v ?: return
+        (v.parent as? ViewGroup)?.removeView(v)
+    }
+
+    private fun reorderStageContainers() {
+        if (!::unifiedStageBlock.isInitialized || !::stageColumnsRow.isInitialized) return
+
+        // Smooth home screen launcher spring physics transition
+        if (!MotionTokens.isReducedMotion(this) && unifiedStageBlock.isAttachedToWindow) {
+            val transition = AutoTransition().apply {
+                duration = 340
+                interpolator = PathInterpolator(0.22f, 1f, 0.36f, 1f)
+            }
+            TransitionManager.beginDelayedTransition(unifiedStageBlock, transition)
+        }
+
+        val coverAtBottom = SonoraStore.getBool(this, "stage_cover_at_bottom", false)
+        val columnsSwapped = SonoraStore.getBool(this, "stage_columns_swapped", false)
+        val vizPos = SonoraStore.getInt(this, "stage_viz_position", 0)
+
+        safeDetach(dokiLeftCol)
+        safeDetach(lyricsRightCol)
+        safeDetach(stageLyricsScroll)
+        safeDetach(vizDeckCard)
+        safeDetach(stageExpandedCoverCard)
+        safeDetach(stageVideoCard)
+
+        // 1. Reassemble lyricsRightCol (Lyrics vs Viz)
+        lyricsRightCol.removeAllViews()
+        when (vizPos) {
+            1 -> { // Viz above lyrics
+                lyricsRightCol.addView(vizDeckCard)
+                lyricsRightCol.addView(stageLyricsScroll)
+            }
+            2, 3 -> { // Viz is docked at full width in stage, so only lyrics in this column
+                lyricsRightCol.addView(stageLyricsScroll)
+            }
+            else -> { // 0: Viz below lyrics
+                lyricsRightCol.addView(stageLyricsScroll)
+                lyricsRightCol.addView(vizDeckCard)
+            }
+        }
+
+        // 2. Reassemble stageColumnsRow (Doki vs Lyrics/Viz column)
+        stageColumnsRow.removeAllViews()
+        if (columnsSwapped) {
+            stageColumnsRow.addView(lyricsRightCol)
+            stageColumnsRow.addView(dokiLeftCol)
+        } else {
+            stageColumnsRow.addView(dokiLeftCol)
+            stageColumnsRow.addView(lyricsRightCol)
+        }
+
+        // 3. Reassemble unifiedStageBlock
+        unifiedStageBlock.removeAllViews()
+        val coverCards = listOf(stageExpandedCoverCard, stageVideoCard)
+
+        when (vizPos) {
+            2 -> { // Viz full-width in the middle (between cover and columns)
+                if (coverAtBottom) {
+                    unifiedStageBlock.addView(stageColumnsRow)
+                    unifiedStageBlock.addView(vizDeckCard)
+                    coverCards.forEach { unifiedStageBlock.addView(it) }
+                } else {
+                    coverCards.forEach { unifiedStageBlock.addView(it) }
+                    unifiedStageBlock.addView(vizDeckCard)
+                    unifiedStageBlock.addView(stageColumnsRow)
+                }
+            }
+            3 -> { // Viz full-width at the bottom of the stage
+                if (coverAtBottom) {
+                    coverCards.forEach { unifiedStageBlock.addView(it) }
+                    unifiedStageBlock.addView(stageColumnsRow)
+                    unifiedStageBlock.addView(vizDeckCard)
+                } else {
+                    coverCards.forEach { unifiedStageBlock.addView(it) }
+                    unifiedStageBlock.addView(stageColumnsRow)
+                    unifiedStageBlock.addView(vizDeckCard)
+                }
+            }
+            else -> {
+                if (coverAtBottom) {
+                    unifiedStageBlock.addView(stageColumnsRow)
+                    coverCards.forEach { unifiedStageBlock.addView(it) }
+                } else {
+                    coverCards.forEach { unifiedStageBlock.addView(it) }
+                    unifiedStageBlock.addView(stageColumnsRow)
+                }
+            }
+        }
+        updateStageLayout()
+    }
+
     fun showVizHudBadge(textMsg: String) {
         runOnUiThread {
             if (vizHudBadge == null && ::mainRootLayout.isInitialized) {
@@ -1682,11 +1945,45 @@ class MainActivity : AppCompatActivity(), RowHost {
                 return true
             }
 
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                val curPos = SonoraStore.getInt(this@MainActivity, "stage_viz_position", 0)
+                val nextPos = (curPos + 1) % 4
+                SonoraStore.putInt(this@MainActivity, "stage_viz_position", nextPos)
+                reorderStageContainers()
+                val desc = when (nextPos) {
+                    1 -> "Visualizador arriba de letras"
+                    2 -> "Visualizador centro (ancho completo)"
+                    3 -> "Visualizador fondo (ancho completo)"
+                    else -> "Visualizador abajo de letras"
+                }
+                showVizHudBadge(desc)
+                card.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                return true
+            }
+
             override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 if (e1 == null) return false
                 val dx = e2.x - e1.x
                 val dy = e2.y - e1.y
-                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > dp(30)) {
+                if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > dp(30)) {
+                    val curPos = SonoraStore.getInt(this@MainActivity, "stage_viz_position", 0)
+                    val nextPos = if (dy < 0) {
+                        if (curPos == 0) 1 else 2
+                    } else {
+                        if (curPos == 1) 0 else 3
+                    }
+                    SonoraStore.putInt(this@MainActivity, "stage_viz_position", nextPos)
+                    reorderStageContainers()
+                    val desc = when (nextPos) {
+                        1 -> "Visualizador arriba de letras"
+                        2 -> "Visualizador centro (ancho completo)"
+                        3 -> "Visualizador fondo (ancho completo)"
+                        else -> "Visualizador abajo de letras"
+                    }
+                    showVizHudBadge(desc)
+                    card.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    return true
+                } else if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > dp(30)) {
                     if (dx > 0) {
                         vizView.visualMode = if (vizView.visualMode > 0) vizView.visualMode - 1 else VisualizerView.MODE_NAMES.size - 1
                     } else {
@@ -1703,6 +2000,13 @@ class MainActivity : AppCompatActivity(), RowHost {
         val longPressRunnable = Runnable {
             isLongPressResize = true
             card.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            card.animate()
+                .scaleX(1.04f)
+                .scaleY(1.04f)
+                .translationZ(dpf(16f))
+                .setDuration(180)
+                .setInterpolator(OvershootInterpolator(1.35f))
+                .start()
             showVizHudBadge("Visualizador: Arrastra ↑ agrandar, ↓ achicar")
         }
 
@@ -1730,6 +2034,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                         longPressHandler.removeCallbacks(longPressRunnable)
                     }
                     if (isLongPressResize) {
+                        card.translationY = dy * 0.25f
                         val newH = (initialHeight - dy.toInt()).coerceIn(dp(30), dp(320))
                         card.layoutParams.height = newH
                         card.requestLayout()
@@ -1743,6 +2048,15 @@ class MainActivity : AppCompatActivity(), RowHost {
                     v.parent?.requestDisallowInterceptTouchEvent(false)
                     if (isLongPressResize) {
                         isLongPressResize = false
+                        card.animate()
+                            .scaleX(1.0f)
+                            .scaleY(1.0f)
+                            .translationX(0f)
+                            .translationY(0f)
+                            .translationZ(0f)
+                            .setDuration(260)
+                            .setInterpolator(OvershootInterpolator(1.35f))
+                            .start()
                         val curH = card.layoutParams.height
                         val dpVal = (curH / resources.displayMetrics.density).toInt()
                         SonoraStore.putInt(this, "player_viz_height_dp", dpVal)
@@ -1765,6 +2079,18 @@ class MainActivity : AppCompatActivity(), RowHost {
         var isLongPressResize = false
         val longPressHandler = Handler(Looper.getMainLooper())
 
+        // Connect instant angry reaction and character cycle
+        spriteView.onDokiAngryAndSwitch = {
+            val dokiList = listOf("natsuki", "sayori", "monika", "yuri", "bocchi", "konata")
+            val curIdx = dokiList.indexOf(selectedDokiId).takeIf { it >= 0 } ?: 0
+            val nextDoki = dokiList[(curIdx + 1) % dokiList.size]
+            selectedDokiId = nextDoki
+            val prefs = getSharedPreferences("doki_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putString("doki_id", selectedDokiId).apply()
+            updateDokiViews()
+            showVizHudBadge("${selectedDokiId.replaceFirstChar { it.uppercase() }} 💢")
+        }
+
         val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
                 val newScale = (spriteView.dokiScale * detector.scaleFactor).coerceIn(0.4f, 2.5f)
@@ -1776,14 +2102,33 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
         })
 
+        val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                // Double tap swaps columns: Doki left <-> right!
+                val swapped = SonoraStore.getBool(this@MainActivity, "stage_columns_swapped", false)
+                SonoraStore.putBool(this@MainActivity, "stage_columns_swapped", !swapped)
+                reorderStageContainers()
+                showVizHudBadge(if (!swapped) "Doki a la derecha" else "Doki a la izquierda")
+                return true
+            }
+        })
+
         val longPressRunnable = Runnable {
             isLongPressResize = true
             dokiCol.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            showVizHudBadge("Doki: Arrastra ↑ agrandar, ↓ achicar")
+            dokiCol.animate()
+                .scaleX(1.05f)
+                .scaleY(1.05f)
+                .translationZ(dpf(18f))
+                .setDuration(180)
+                .setInterpolator(OvershootInterpolator(1.4f))
+                .start()
+            showVizHudBadge("Doki: Moviendo... Arrastra a los lados")
         }
 
         dokiCol.setOnTouchListener { v, event ->
             scaleDetector.onTouchEvent(event)
+            gestureDetector.onTouchEvent(event)
             if (scaleDetector.isInProgress) {
                 longPressHandler.removeCallbacks(longPressRunnable)
                 isLongPressResize = false
@@ -1807,12 +2152,45 @@ class MainActivity : AppCompatActivity(), RowHost {
                         longPressHandler.removeCallbacks(longPressRunnable)
                     }
                     if (isLongPressResize) {
-                        val scaleDelta = -dy / dpf(220f)
-                        val newScale = (initialScale + scaleDelta).coerceIn(0.4f, 2.5f)
-                        spriteView.dokiScale = newScale
-                        spriteView.translationX = initialTx + dx
-                        val pct = (newScale * 100).toInt()
-                        showVizHudBadge("Doki: $pct%")
+                        val screenW = resources.displayMetrics.widthPixels.toFloat()
+                        val isSwapped = SonoraStore.getBool(this@MainActivity, "stage_columns_swapped", false)
+                        val touchX = event.rawX
+
+                        // Smooth home screen follow and tilt
+                        dokiCol.translationX = dx * 0.40f
+                        dokiCol.translationY = dy * 0.20f
+                        if (screenW > 0) {
+                            dokiCol.rotation = (dx / screenW * 8f).coerceIn(-6f, 6f)
+                        }
+
+                        // Dynamic Drag-to-Relocate: dragging across screen moves Doki to that side!
+                        if (!isSwapped && touchX > screenW * 0.65f) {
+                            SonoraStore.putBool(this@MainActivity, "stage_columns_swapped", true)
+                            reorderStageContainers()
+                            showVizHudBadge("Doki reubicada a la derecha")
+                            v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        } else if (isSwapped && touchX < screenW * 0.35f) {
+                            SonoraStore.putBool(this@MainActivity, "stage_columns_swapped", false)
+                            reorderStageContainers()
+                            showVizHudBadge("Doki reubicada a la izquierda")
+                            v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        } else if (Math.abs(dx) > Math.abs(dy) * 1.2f && screenW > 0) {
+                            // Relational Horizontal Split: dragging horizontally adjusts Doki vs Lyrics proportionally
+                            val rawRatio = touchX / screenW
+                            val newWeight = (if (isSwapped) (1f - rawRatio) else rawRatio).coerceIn(0.20f, 0.80f)
+                            SonoraStore.putFloat(this@MainActivity, "stage_doki_weight", newWeight)
+                            updateStageLayout()
+                            val dokiPct = (newWeight * 100).toInt()
+                            val lyricsPct = 100 - dokiPct
+                            showVizHudBadge("Distribución: ${dokiPct}% Doki | ${lyricsPct}% Letras")
+                        } else {
+                            // Vertical drag: resizes Doki scale
+                            val scaleDelta = -dy / dpf(220f)
+                            val newScale = (initialScale + scaleDelta).coerceIn(0.4f, 2.5f)
+                            spriteView.dokiScale = newScale
+                            val pct = (newScale * 100).toInt()
+                            showVizHudBadge("Doki: $pct%")
+                        }
                         return@setOnTouchListener true
                     }
                 }
@@ -1821,10 +2199,19 @@ class MainActivity : AppCompatActivity(), RowHost {
                     v.parent?.requestDisallowInterceptTouchEvent(false)
                     if (isLongPressResize) {
                         isLongPressResize = false
+                        dokiCol.animate()
+                            .scaleX(1.0f)
+                            .scaleY(1.0f)
+                            .translationX(0f)
+                            .translationY(0f)
+                            .rotation(0f)
+                            .translationZ(0f)
+                            .setDuration(280)
+                            .setInterpolator(OvershootInterpolator(1.35f))
+                            .start()
                         val pct = (spriteView.dokiScale * 100).toInt()
                         SonoraStore.putInt(this, "player_doki_scale_pct", pct)
-                        SonoraStore.putFloat(this, "layout_doki_tx", spriteView.translationX)
-                        showVizHudBadge("Doki: $pct% (Guardado)")
+                        showVizHudBadge("Diseño guardado")
                         v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                         return@setOnTouchListener true
                     }
@@ -1858,6 +2245,14 @@ class MainActivity : AppCompatActivity(), RowHost {
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 showGifCoverOptionsSheet()
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                val atBottom = SonoraStore.getBool(this@MainActivity, "stage_cover_at_bottom", false)
+                SonoraStore.putBool(this@MainActivity, "stage_cover_at_bottom", !atBottom)
+                reorderStageContainers()
+                showVizHudBadge(if (!atBottom) "Portada abajo" else "Portada arriba")
                 return true
             }
 
@@ -1906,7 +2301,14 @@ class MainActivity : AppCompatActivity(), RowHost {
         val longPressRunnable = Runnable {
             isLongPressResize = true
             card.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            showVizHudBadge("Portada: Arrastra ↑ agrandar, ↓ achicar")
+            card.animate()
+                .scaleX(1.04f)
+                .scaleY(1.04f)
+                .translationZ(dpf(18f))
+                .setDuration(180)
+                .setInterpolator(OvershootInterpolator(1.4f))
+                .start()
+            showVizHudBadge("Portada: Moviendo... Arrastra arriba/abajo")
         }
 
         card.setOnTouchListener { v, event ->
@@ -1933,11 +2335,34 @@ class MainActivity : AppCompatActivity(), RowHost {
                         longPressHandler.removeCallbacks(longPressRunnable)
                     }
                     if (isLongPressResize) {
-                        val newH = (initialHeight - dy.toInt()).coerceIn(dp(120), dp(450))
-                        card.layoutParams.height = newH
-                        card.requestLayout()
-                        val dpVal = (newH / resources.displayMetrics.density).toInt()
-                        showVizHudBadge("Portada: ${dpVal}dp")
+                        val screenH = resources.displayMetrics.heightPixels.toFloat()
+                        val screenW = resources.displayMetrics.widthPixels.toFloat()
+                        val atBottom = SonoraStore.getBool(this@MainActivity, "stage_cover_at_bottom", false)
+
+                        // Smooth home screen follow and tilt
+                        card.translationY = dy * 0.45f
+                        card.translationX = dx * 0.20f
+                        if (screenW > 0) {
+                            card.rotation = (dx / screenW * 6f).coerceIn(-5f, 5f)
+                        }
+
+                        if (!atBottom && event.rawY > screenH * 0.58f) {
+                            SonoraStore.putBool(this@MainActivity, "stage_cover_at_bottom", true)
+                            reorderStageContainers()
+                            showVizHudBadge("Portada reubicada abajo")
+                            v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        } else if (atBottom && event.rawY < screenH * 0.42f) {
+                            SonoraStore.putBool(this@MainActivity, "stage_cover_at_bottom", false)
+                            reorderStageContainers()
+                            showVizHudBadge("Portada reubicada arriba")
+                            v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        } else {
+                            val newH = (initialHeight - dy.toInt()).coerceIn(dp(120), dp(450))
+                            card.layoutParams.height = newH
+                            card.requestLayout()
+                            val dpVal = (newH / resources.displayMetrics.density).toInt()
+                            showVizHudBadge("Portada: ${dpVal}dp")
+                        }
                         return@setOnTouchListener true
                     }
                 }
@@ -1946,6 +2371,16 @@ class MainActivity : AppCompatActivity(), RowHost {
                     v.parent?.requestDisallowInterceptTouchEvent(false)
                     if (isLongPressResize) {
                         isLongPressResize = false
+                        card.animate()
+                            .scaleX(1.0f)
+                            .scaleY(1.0f)
+                            .translationX(0f)
+                            .translationY(0f)
+                            .rotation(0f)
+                            .translationZ(0f)
+                            .setDuration(260)
+                            .setInterpolator(OvershootInterpolator(1.35f))
+                            .start()
                         val curH = card.layoutParams.height
                         val dpVal = (curH / resources.displayMetrics.density).toInt()
                         SonoraStore.putInt(this, "player_cover_height_dp", dpVal)
@@ -2002,10 +2437,10 @@ class MainActivity : AppCompatActivity(), RowHost {
 
     fun showTutorialSheet() {
         showSheet(fullHeight = true) { root, dialog ->
-            root.addView(sheetTitle("Guía y Tutorial Completo", "Aprende todos los gestos y funciones de Sonora"))
+            root.addView(sheetTitle("Guía y Tutorial Completo", "Aprende todos los gestos y funciones de DDMC"))
 
             val intro = TextView(this).apply {
-                text = "Bienvenido a Sonora DDMC. Aquí tienes el resumen visual y rápido de todas las funciones táctiles y ajustes profesionales organizados por categorías."
+                text = "Bienvenido a DDMC. Aquí tienes el resumen visual y rápido de todas las funciones táctiles y ajustes profesionales organizados por categorías."
                 setTextColor(Color.parseColor(Pal.SUB))
                 textSize = 12.5f
                 setPadding(0, dp(2), 0, dp(12))
@@ -2179,19 +2614,111 @@ class MainActivity : AppCompatActivity(), RowHost {
             root.addView(sheetTitle("Personalizar Reproductor", "Deslizadores continuos y gestos touch directos"))
 
             val hintCard = TextView(this).apply {
-                text = "TIP TOUCH: En la pantalla principal puedes mantener presionado cualquier elemento (Portada, Visualizador, Doki) y mover tu dedo hacia arriba para agrandar o hacia abajo para achicar."
+                text = "TIP TOUCH DIRECTO:\n• Mantén presionado y arrastra: Portada (arriba/abajo), Doki (izq/der o tamaño), Visualizador (altura).\n• Doble toque: Cambia ubicación de Portada o Doki al instante.\n• Doble toque en Visualizador: Cambia su posición (arriba/abajo de letras o ancho completo)."
                 setTextColor(Color.parseColor(Pal.SUB))
                 textSize = 12f
-                setPadding(dp(12), dp(8), dp(12), dp(12))
+                setPadding(dp(12), dp(10), dp(12), dp(10))
                 background = GradientDrawable().apply {
                     setColor(Color.parseColor(Pal.SURFACE_HI))
                     cornerRadius = dpf(12f)
+                    setStroke(dp(1), Color.parseColor("#25FFFFFF"))
                 }
                 layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                    bottomMargin = dp(12)
+                    bottomMargin = dp(14)
                 }
             }
             root.addView(hintCard)
+
+            // Posición de Elementos (Toggles rápidos)
+            val posTitle = TextView(this).apply {
+                text = "Ubicación de Elementos"
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                setPadding(0, 0, 0, dp(6))
+            }
+            root.addView(posTitle)
+
+            val posRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(8)
+                }
+            }
+
+            val curCoverAtBottom = SonoraStore.getBool(this, "stage_cover_at_bottom", false)
+            val coverPosBtn = Pill(this, if (curCoverAtBottom) "Portada: Abajo" else "Portada: Arriba", R.drawable.ic_album, 34)
+            coverPosBtn.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
+            coverPosBtn.setOnClickListener {
+                val next = !SonoraStore.getBool(this@MainActivity, "stage_cover_at_bottom", false)
+                SonoraStore.putBool(this@MainActivity, "stage_cover_at_bottom", next)
+                reorderStageContainers()
+                coverPosBtn.labelView.text = if (next) "Portada: Abajo" else "Portada: Arriba"
+                showVizHudBadge(if (next) "Portada abajo" else "Portada arriba")
+            }
+            posRow.addView(coverPosBtn)
+
+            val curDokiSwapped = SonoraStore.getBool(this, "stage_columns_swapped", false)
+            val dokiPosBtn = Pill(this, if (curDokiSwapped) "Doki: Derecha" else "Doki: Izquierda", R.drawable.ic_sparkles, 34)
+            dokiPosBtn.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            dokiPosBtn.setOnClickListener {
+                val next = !SonoraStore.getBool(this@MainActivity, "stage_columns_swapped", false)
+                SonoraStore.putBool(this@MainActivity, "stage_columns_swapped", next)
+                reorderStageContainers()
+                dokiPosBtn.labelView.text = if (next) "Doki: Derecha" else "Doki: Izquierda"
+                showVizHudBadge(if (next) "Doki a la derecha" else "Doki a la izquierda")
+            }
+            posRow.addView(dokiPosBtn)
+            root.addView(posRow)
+
+            val vizPosRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(14)
+                }
+            }
+            val curVizPos = SonoraStore.getInt(this, "stage_viz_position", 0)
+            fun vizPosLabel(p: Int) = when (p) {
+                1 -> "Viz: Arriba Letras"
+                2 -> "Viz: Centro Dock"
+                3 -> "Viz: Fondo Dock"
+                else -> "Viz: Abajo Letras"
+            }
+            val vizPosBtn = Pill(this, vizPosLabel(curVizPos), R.drawable.ic_waveform, 34)
+            vizPosBtn.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            vizPosBtn.setOnClickListener {
+                val p = (SonoraStore.getInt(this@MainActivity, "stage_viz_position", 0) + 1) % 4
+                SonoraStore.putInt(this@MainActivity, "stage_viz_position", p)
+                reorderStageContainers()
+                vizPosBtn.labelView.text = vizPosLabel(p)
+                showVizHudBadge(vizPosLabel(p))
+            }
+            vizPosRow.addView(vizPosBtn)
+            root.addView(vizPosRow)
+
+            val videoModeRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(14)
+                }
+            }
+            val isGlobalVid = SonoraStore.getBool(this, "cover_video_global_mode", false)
+            val videoModeBtn = Pill(
+                this,
+                if (isGlobalVid) "Video: Mismo para todas las canciones" else "Video: Individual por canción",
+                R.drawable.ic_video,
+                34
+            )
+            videoModeBtn.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            videoModeBtn.setOnClickListener {
+                val next = !SonoraStore.getBool(this@MainActivity, "cover_video_global_mode", false)
+                SonoraStore.putBool(this@MainActivity, "cover_video_global_mode", next)
+                videoModeBtn.labelView.text = if (next) "Video: Mismo para todas las canciones" else "Video: Individual por canción"
+                bindNowPlaying()
+                showVizHudBadge(if (next) "Video global activado" else "Video por canción activado")
+            }
+            videoModeRow.addView(videoModeBtn)
+            root.addView(videoModeRow)
 
             val coverCurH = SonoraStore.getInt(this, "player_cover_height_dp", 228)
             val coverLabel = TextView(this).apply {
@@ -2996,6 +3523,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                 ).apply { bottomMargin = dp(8) }
                 setOnClickListener {
                     dialog.dismiss()
+                    pendingVideoTrack = t
                     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "video/*"
@@ -3005,7 +3533,8 @@ class MainActivity : AppCompatActivity(), RowHost {
             })
 
             val curTrackVideo = SonoraStore.getString(this, "cover_video_${t.key}", "")
-            if (!curTrackVideo.isNullOrEmpty()) {
+            val activeGlobalVideo = SonoraStore.getString(this, "cover_video_active", "")
+            if (!curTrackVideo.isNullOrEmpty() || !activeGlobalVideo.isNullOrEmpty()) {
                 root.addView(Pill(
                     this,
                     "Quitar Video en Bucle",
@@ -3019,6 +3548,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                     setOnClickListener {
                         dialog.dismiss()
                         SonoraStore.putString(this@MainActivity, "cover_video_${t.key}", "")
+                        SonoraStore.putString(this@MainActivity, "cover_video_active", "")
                         updateStageCoverVideo(null)
                         bindNowPlaying()
                         Toast.makeText(this@MainActivity, "Video de portada eliminado", Toast.LENGTH_SHORT).show()
@@ -3318,7 +3848,8 @@ class MainActivity : AppCompatActivity(), RowHost {
             lyricsRightCol.visibility = if (rightVisible) View.VISIBLE else View.GONE
             stageColumnsRow.visibility = if (showDokiInStage || rightVisible) View.VISIBLE else View.GONE
 
-            val leftWeight = if (isLandscapeMode) 0.35f else 0.39f
+            val savedWeight = SonoraStore.getFloat(this, "stage_doki_weight", if (isLandscapeMode) 0.35f else 0.40f)
+            val leftWeight = savedWeight.coerceIn(0.20f, 0.80f)
             val rightWeight = 1.0f - leftWeight
 
             when {
@@ -3354,7 +3885,22 @@ class MainActivity : AppCompatActivity(), RowHost {
             vizDeckCard.visibility = if (showStageViz) View.VISIBLE else View.GONE
             visualizerStripView.visibility = if (showStageViz) View.VISIBLE else View.GONE
 
-            if (showStageViz && !showLyricsNow) {
+            val vizPos = SonoraStore.getInt(this, "stage_viz_position", 0)
+            val savedVizH = SonoraStore.getInt(this, "player_viz_height_dp", if (isLandscapeMode) 64 else 76)
+            val vizH = dp(savedVizH)
+
+            if (vizPos == 2 || vizPos == 3) {
+                // Full stage width dock
+                vizDeckCard.layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, vizH
+                ).apply {
+                    topMargin = dp(4)
+                    bottomMargin = dp(4)
+                }
+                stageLyricsScroll.layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+                )
+            } else if (showStageViz && !showLyricsNow) {
                 vizDeckCard.layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
                 ).apply {
@@ -3365,8 +3911,6 @@ class MainActivity : AppCompatActivity(), RowHost {
                 stageLyricsScroll.layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
                 )
-                val savedVizH = SonoraStore.getInt(this, "player_viz_height_dp", if (isLandscapeMode) 64 else 76)
-                val vizH = dp(savedVizH)
                 vizDeckCard.layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, vizH
                 ).apply {
@@ -3672,6 +4216,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         playerView = PlayerView(this).apply {
             player = exoPlayer
             useController = true
+            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -6261,7 +6806,34 @@ class MainActivity : AppCompatActivity(), RowHost {
                     currentTrackIndex = exoPlayer.currentMediaItemIndex.coerceIn(0, tracks.lastIndex)
                     qAdapter.move(from, to)
                     saveQueueState()
+                    viewHolder.itemView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     return true
+                }
+
+                override fun onSelectedChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
+                    super.onSelectedChanged(viewHolder, actionState)
+                    if (actionState == ItemTouchHelper.ACTION_STATE_DRAG && viewHolder != null) {
+                        viewHolder.itemView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        viewHolder.itemView.animate()
+                            .scaleX(1.05f)
+                            .scaleY(1.05f)
+                            .translationZ(dpf(14f))
+                            .setDuration(160)
+                            .setInterpolator(OvershootInterpolator(1.3f))
+                            .start()
+                    }
+                }
+
+                override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+                    super.clearView(recyclerView, viewHolder)
+                    viewHolder.itemView.animate()
+                        .scaleX(1.0f)
+                        .scaleY(1.0f)
+                        .translationZ(0f)
+                        .setDuration(200)
+                        .setInterpolator(OvershootInterpolator(1.2f))
+                        .start()
+                    viewHolder.itemView.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
                 }
 
                 override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
@@ -6579,6 +7151,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                 }
                 12 -> showTrackAudioCustomizerDialog(track)
                 13 -> {
+                    pendingVideoTrack = track
                     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "video/*"
@@ -6798,7 +7371,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             SheetItem(R.drawable.ic_download, "Actualizar desde PC"),
             SheetItem(R.drawable.ic_trash, "Limpiar Historial", danger = true)
         )
-        showActionSheet("Opciones de Sonora", "${localTracksList.size} canciones en biblioteca", items) { which ->
+        showActionSheet("Opciones de DDMC", "${localTracksList.size} canciones en biblioteca", items) { which ->
             when (which) {
                 0 -> showTutorialSheet()
                 1 -> showThemeCustomizerSheet()
@@ -7034,20 +7607,21 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
 
         if (t.coverBitmap != null || !t.coverUrl.isNullOrEmpty() || t.path.isNotBlank() || t.audioUri != null) {
-            coverImage.scaleType = ImageView.ScaleType.FIT_CENTER
+            coverImage.scaleType = ImageView.ScaleType.CENTER_CROP
             coverImage.setPadding(0, 0, 0, 0)
             coverImage.clearColorFilter()
             coverImage.bindCover(t, 384, onCoverBitmapReady)
             ambientGlowImage.bindCover(t, 240)
 
             val tVideo = SonoraStore.getString(this, "cover_video_${t.key}", "")
-            val activeVideoCover = if (tVideo.isNotEmpty()) tVideo else SonoraStore.getString(this, "cover_video_active", "")
+            val isGlobalVideo = SonoraStore.getBool(this, "cover_video_global_mode", false)
+            val activeVideoCover = if (tVideo.isNotEmpty()) tVideo else (if (isGlobalVideo) SonoraStore.getString(this, "cover_video_active", "") else "")
             if (activeVideoCover.isNotEmpty()) {
                 updateStageCoverVideo(activeVideoCover)
             } else {
                 updateStageCoverVideo(null)
                 if (::stageExpandedCoverImage.isInitialized) {
-                    stageExpandedCoverImage.scaleType = ImageView.ScaleType.FIT_CENTER
+                    stageExpandedCoverImage.scaleType = ImageView.ScaleType.CENTER_CROP
                     stageExpandedCoverImage.setPadding(0, 0, 0, 0)
                     stageExpandedCoverImage.clearColorFilter()
                     stageExpandedCoverImage.bindCover(t, 640, onCoverBitmapReady)
@@ -7055,13 +7629,13 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
 
             if (::portraitMetaCoverThumb.isInitialized) {
-                portraitMetaCoverThumb.scaleType = ImageView.ScaleType.FIT_CENTER
+                portraitMetaCoverThumb.scaleType = ImageView.ScaleType.CENTER_CROP
                 portraitMetaCoverThumb.setPadding(0, 0, 0, 0)
                 portraitMetaCoverThumb.clearColorFilter()
                 portraitMetaCoverThumb.bindCover(t, 384, onCoverBitmapReady)
             }
             if (::landscapeCoverThumb.isInitialized) {
-                landscapeCoverThumb.scaleType = ImageView.ScaleType.FIT_CENTER
+                landscapeCoverThumb.scaleType = ImageView.ScaleType.CENTER_CROP
                 landscapeCoverThumb.setPadding(0, 0, 0, 0)
                 landscapeCoverThumb.clearColorFilter()
                 landscapeCoverThumb.bindCover(t, 320, onCoverBitmapReady)
