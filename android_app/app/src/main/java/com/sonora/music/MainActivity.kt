@@ -879,7 +879,7 @@ fun View.addPressFeedback(scaleTo: Float = 0.96f, haptic: Boolean = true) {
 }
 
 // ==========================================
-// WINDOWS DESKTOP-STYLE WINDOW FRAME
+// GESTURE-DRIVEN STAGE CONTAINER (ZERO UI / ZERO CHROME)
 // ==========================================
 class StageWindowFrame(
     context: Context,
@@ -889,31 +889,42 @@ class StageWindowFrame(
     val onMinimizeClick: (() -> Unit)? = null,
     val onMaximizeClick: (() -> Unit)? = null,
     val onMoreClick: (() -> Unit)? = null
-) : LinearLayout(context) {
+) : FrameLayout(context) {
 
-    val titleBar: LinearLayout
-    val titleTextView: TextView
+    val titleBar: View? = null
     val contentContainer: FrameLayout
     var isWindowMinimized: Boolean = false
     var isWindowMaximized: Boolean = false
     var windowScale: Float = 1.0f
     var onScaleUpdate: ((Float, String) -> Unit)? = null
 
-    private var downRawX = 0f
-    private var downRawY = 0f
-    private var initialTx = 0f
-    private var initialTy = 0f
-    private var isDragging = false
-    private var lastTapTime = 0L
+    private var lastFocusX = 0f
+    private var lastFocusY = 0f
+    private var isTwoFingerGesture = false
 
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
             parent?.requestDisallowInterceptTouchEvent(true)
+            lastFocusX = detector.focusX
+            lastFocusY = detector.focusY
+            isTwoFingerGesture = true
             translationZ = (context.resources.displayMetrics.density * 16f)
             return true
         }
 
         override fun onScale(detector: ScaleGestureDetector): Boolean {
+            val focusX = detector.focusX
+            val focusY = detector.focusY
+            val dx = focusX - lastFocusX
+            val dy = focusY - lastFocusY
+            lastFocusX = focusX
+            lastFocusY = focusY
+
+            // Fluid 2D translation (continuous motion across the screen)
+            translationX += dx
+            translationY += dy
+
+            // Continuous fluid scaling (1.0x, 1.1x, 1.2x... with zero snapping jumps)
             val factor = detector.scaleFactor
             windowScale = (windowScale * factor).coerceIn(0.40f, 2.80f)
             scaleX = windowScale
@@ -926,8 +937,15 @@ class StageWindowFrame(
         override fun onScaleEnd(detector: ScaleGestureDetector) {
             parent?.requestDisallowInterceptTouchEvent(false)
             val density = context.resources.displayMetrics.density
-            animate().translationZ(density * 3f).setDuration(220).start()
-            if (windowScale >= 2.3f) {
+            animate()
+                .translationX(0f)
+                .translationY(0f)
+                .translationZ(0f)
+                .setDuration(240)
+                .setInterpolator(android.view.animation.PathInterpolator(0.22f, 1f, 0.36f, 1f))
+                .start()
+
+            if (windowScale >= 2.2f) {
                 windowScale = 1.0f
                 scaleX = 1.0f
                 scaleY = 1.0f
@@ -941,10 +959,21 @@ class StageWindowFrame(
                 windowScale = 1.0f
                 animate().scaleX(1.0f).scaleY(1.0f).setDuration(180).start()
             }
+            isTwoFingerGesture = false
+        }
+    })
+
+    private val doubleTapDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onDoubleTap(e: MotionEvent): Boolean {
+            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            isWindowMaximized = !isWindowMaximized
+            onMaximizeClick?.invoke()
+            return true
         }
     })
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        doubleTapDetector.onTouchEvent(ev)
         if (ev.pointerCount >= 2) {
             scaleDetector.onTouchEvent(ev)
             return true
@@ -953,7 +982,8 @@ class StageWindowFrame(
     }
 
     override fun onTouchEvent(ev: MotionEvent): Boolean {
-        if (ev.pointerCount >= 2) {
+        doubleTapDetector.onTouchEvent(ev)
+        if (ev.pointerCount >= 2 || isTwoFingerGesture) {
             scaleDetector.onTouchEvent(ev)
             return true
         }
@@ -961,144 +991,16 @@ class StageWindowFrame(
     }
 
     init {
-        orientation = VERTICAL
-        val density = context.resources.displayMetrics.density
-        fun dp(v: Int) = (v * density).toInt()
+        clipChildren = false
+        clipToPadding = false
+        background = null
+        elevation = 0f
 
-        background = GradientDrawable().apply {
-            setColor(Color.parseColor("#141726"))
-            cornerRadius = density * 12f
-            setStroke(dp(1), Color.parseColor("#2638BDF8"))
-        }
-        elevation = density * 3f
-
-        // Windows Titlebar
-        titleBar = LinearLayout(context).apply {
-            orientation = HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(8), dp(4), dp(6), dp(4))
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#1E2338"))
-                cornerRadii = floatArrayOf(
-                    density * 12f, density * 12f,
-                    density * 12f, density * 12f,
-                    0f, 0f, 0f, 0f
-                )
-            }
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(28))
-        }
-
-        // Initialize content container before button callbacks access it
         contentContainer = FrameLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
             clipChildren = false
             clipToPadding = false
         }
-
-        // Window Icon
-        titleBar.addView(ImageView(context).apply {
-            setImageResource(iconRes)
-            setColorFilter(Color.parseColor("#38BDF8"))
-            layoutParams = LayoutParams(dp(14), dp(14)).apply { marginEnd = dp(6) }
-        })
-
-        // Window Title
-        titleTextView = TextView(context).apply {
-            text = title
-            textSize = 11.5f
-            setTextColor(Color.WHITE)
-            setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
-        }
-        titleBar.addView(titleTextView)
-
-        fun makeWinBtn(symbol: String, onClick: () -> Unit) = TextView(context).apply {
-            text = symbol
-            textSize = 10.5f
-            setTextColor(Color.parseColor("#94A3B8"))
-            gravity = Gravity.CENTER
-            setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
-            setPadding(dp(4), dp(2), dp(4), dp(2))
-            minWidth = dp(22)
-            isClickable = true
-            isFocusable = true
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#14FFFFFF"))
-                cornerRadius = density * 4f
-            }
-            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dp(20)).apply {
-                marginStart = dp(3)
-            }
-            setOnClickListener { onClick() }
-        }
-
-        val minBtn = makeWinBtn("—") {
-            isWindowMinimized = !isWindowMinimized
-            onMinimizeClick?.invoke()
-            contentContainer.visibility = if (isWindowMinimized) View.GONE else View.VISIBLE
-        }
-        val maxBtn = makeWinBtn("□") {
-            isWindowMaximized = !isWindowMaximized
-            onMaximizeClick?.invoke()
-        }
-        val optBtn = makeWinBtn("⋯") {
-            onMoreClick?.invoke()
-        }
-
-        titleBar.addView(minBtn)
-        titleBar.addView(maxBtn)
-        titleBar.addView(optBtn)
-
-        titleBar.setOnTouchListener { v, ev ->
-            when (ev.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    downRawX = ev.rawX
-                    downRawY = ev.rawY
-                    initialTx = translationX
-                    initialTy = translationY
-                    isDragging = false
-                    val now = System.currentTimeMillis()
-                    if (now - lastTapTime < 320L) {
-                        isWindowMaximized = !isWindowMaximized
-                        onMaximizeClick?.invoke()
-                    }
-                    lastTapTime = now
-                    v.parent?.requestDisallowInterceptTouchEvent(true)
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val dx = ev.rawX - downRawX
-                    val dy = ev.rawY - downRawY
-                    if (Math.abs(dx) > dp(3) || Math.abs(dy) > dp(3)) {
-                        isDragging = true
-                        translationX = initialTx + dx
-                        translationY = initialTy + dy
-                        translationZ = density * 16f
-                        scaleX = 1.02f
-                        scaleY = 1.02f
-                    }
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(false)
-                    if (isDragging) {
-                        isDragging = false
-                        animate()
-                            .scaleX(1.0f)
-                            .scaleY(1.0f)
-                            .translationZ(density * 3f)
-                            .setDuration(220)
-                            .start()
-                    }
-                    true
-                }
-                else -> false
-            }
-        }
-
-        addView(titleBar)
         addView(contentContainer)
     }
 
@@ -1610,7 +1512,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         PerformanceEngine.init(this)
         GifImageSupport.ensure(this)
         ThemeEngine.apply(this)
-        OtaUpdateEngine.checkAndAutoUpdate(this)
+        // Manual updates only from settings/panel to prevent constant background toasts
         Haptics.enabled = SonoraStore.getBool(this, "haptics", true)
         sortKey = SonoraStore.getString(this, "lib_sort", "title")
         sortAsc = SonoraStore.getBool(this, "lib_sort_asc", true)
@@ -1942,7 +1844,6 @@ class MainActivity : AppCompatActivity(), RowHost {
             background = GradientDrawable().apply {
                 colors = intArrayOf(Color.parseColor("#E6121526"), Color.parseColor("#E6090A12"))
                 orientation = GradientDrawable.Orientation.TOP_BOTTOM
-                setStroke(dp(1), Color.parseColor("#2238BDF8"))
             }
             setPadding(dp(18), dp(10), dp(12), dp(8))
             elevation = dpf(6f)
@@ -2490,7 +2391,6 @@ class MainActivity : AppCompatActivity(), RowHost {
             background = GradientDrawable().apply {
                 setColor(Color.parseColor("#E60D101C"))
                 cornerRadius = dpf(8f)
-                setStroke(dp(1), Color.parseColor("#2538BDF8"))
             }
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(32)).apply {
                 bottomMargin = dp(4)
@@ -2586,10 +2486,6 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         unifiedStageBlock.removeAllViews()
 
-        if (isLandscapeMode) {
-            unifiedStageBlock.addView(buildLandscapeWindowTabBar())
-        }
-
         // 1. FULLSCREEN SINGLE WINDOW MODE
         if (fullscreenWindowId != null) {
             val targetFrame = when (fullscreenWindowId) {
@@ -2602,7 +2498,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             if (targetFrame != null) {
                 targetFrame.layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-                ).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) }
+                )
                 unifiedStageBlock.addView(targetFrame)
                 updateStageLayout()
                 return
@@ -2610,7 +2506,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
 
         // 2. MULTI-WINDOW GRID MODES
-        val currentGrid = SonoraStore.getInt(this, "stage_grid_snap_mode", 0)
+        val currentGrid = SonoraStore.getInt(this, "stage_grid_snap_mode", 3)
         when (currentGrid) {
             0 -> { // 2x2 QUAD SNAP (Windows 4-corner snap)
                 val row1 = LinearLayout(this).apply {
@@ -2666,36 +2562,36 @@ class MainActivity : AppCompatActivity(), RowHost {
             2 -> { // BENTO PIP (Video minimizado en monitor PIP en la esquina, visualizador y letras amplios)
                 val topRow = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(140)).apply { bottomMargin = dp(4) }
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.40f).apply { bottomMargin = dp(4) }
                 }
                 dokiWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.55f).apply { marginEnd = dp(4) }
                 coverWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.45f)
                 topRow.addView(dokiWindowFrame)
                 topRow.addView(coverWindowFrame)
 
-                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(86)).apply { bottomMargin = dp(4) }
-                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.22f).apply { bottomMargin = dp(4) }
+                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.38f)
 
                 unifiedStageBlock.addView(topRow)
                 unifiedStageBlock.addView(vizWindowFrame)
                 unifiedStageBlock.addView(lyricsWindowFrame)
             }
-            else -> { // CLASICO APILADO
-                val coverH = if (isCoverMinimizedPip) dp(90) else dp(SonoraStore.getInt(this, "player_cover_height_dp", 228))
-                coverWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, coverH).apply { bottomMargin = dp(4) }
+            else -> { // CLASICO APILADO (Adaptativo a cualquier densidad de pantalla / S25 Ultra)
+                val coverWeight = if (isCoverMinimizedPip) 0.20f else 0.50f
+                coverWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, coverWeight).apply { bottomMargin = dp(4) }
                 unifiedStageBlock.addView(coverWindowFrame)
 
                 val bottomCols = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f - coverWeight)
                 }
                 dokiWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.39f).apply { marginEnd = dp(4) }
                 val rightStack = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
                     layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.61f)
                 }
-                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = dp(4) }
-                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(76))
+                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.65f).apply { bottomMargin = dp(4) }
+                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.35f)
                 rightStack.addView(lyricsWindowFrame)
                 rightStack.addView(vizWindowFrame)
 
@@ -4888,7 +4784,12 @@ class MainActivity : AppCompatActivity(), RowHost {
         if (::stageModeSwitchChip.isInitialized) stageModeSwitchChip.visibility = View.GONE
 
         if (::coverWindowFrame.isInitialized) {
-            // Under StageWindowFrame architecture, all window contents fill their frame container
+            // Update visibility based on toggles without chrome
+            coverWindowFrame.visibility = if (showStageCover) View.VISIBLE else View.GONE
+            dokiWindowFrame.visibility = if (showStageDoki) View.VISIBLE else View.GONE
+            lyricsWindowFrame.visibility = if (showStageLyrics) View.VISIBLE else View.GONE
+            vizWindowFrame.visibility = if (showStageViz) View.VISIBLE else View.GONE
+
             if (::stageExpandedCoverCard.isInitialized) {
                 stageExpandedCoverCard.layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
@@ -5091,12 +4992,17 @@ class MainActivity : AppCompatActivity(), RowHost {
             )
         }
 
-        portraitScrollContainer = ScrollView(this)
+        portraitScrollContainer = ScrollView(this).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+        }
 
         portraitInnerBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
             )
             setPadding(dp(12), dp(2), dp(12), dp(6))
         }

@@ -528,7 +528,8 @@ class Pill(context: Context, label: String, private val iconRes: Int = 0, privat
  */
 fun ImageView.bindCover(t: TrackItem?, px: Int, onBitmapReady: ((Bitmap) -> Unit)? = null) {
     GifImageSupport.ensure(context)
-    val targetScale = if (scaleType == ImageView.ScaleType.MATRIX) ImageView.ScaleType.CENTER_CROP else scaleType
+    val targetScale = ImageView.ScaleType.CENTER_CROP
+    scaleType = ImageView.ScaleType.CENTER_CROP
     val customUriStr = if (t != null) SonoraStore.getString(context, "cover_gif_${t.key.hashCode()}", "") else ""
     val gifOrUrl = customUriStr.ifEmpty { t?.coverUrl ?: "" }
     val bmp = t?.coverBitmap

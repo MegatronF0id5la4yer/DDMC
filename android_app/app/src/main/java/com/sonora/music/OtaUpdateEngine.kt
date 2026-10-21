@@ -368,7 +368,7 @@ object OtaUpdateEngine {
      * Checks for new versions in the background on app launch and automatically downloads & triggers installation.
      */
     fun checkAndAutoUpdate(activity: Activity) {
-        val autoUpdate = SonoraStore.getBool(activity, PREF_AUTO_UPDATE_ENABLED, true)
+        val autoUpdate = SonoraStore.getBool(activity, PREF_AUTO_UPDATE_ENABLED, false)
         if (!autoUpdate) return
 
         Thread {
