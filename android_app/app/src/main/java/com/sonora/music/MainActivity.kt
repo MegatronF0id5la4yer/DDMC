@@ -1142,6 +1142,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         PerformanceEngine.init(this)
         GifImageSupport.ensure(this)
         ThemeEngine.apply(this)
+        OtaUpdateEngine.checkAndAutoUpdate(this)
         Haptics.enabled = SonoraStore.getBool(this, "haptics", true)
         sortKey = SonoraStore.getString(this, "lib_sort", "title")
         sortAsc = SonoraStore.getBool(this, "lib_sort_asc", true)

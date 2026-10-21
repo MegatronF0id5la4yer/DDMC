@@ -27,10 +27,12 @@ object OtaUpdateEngine {
     private const val PREF_PC_HOST = "ota_pc_host"
     private const val PREF_GIT_REPO = "ota_git_repo"
     private const val PREF_DIRECT_APK_URL = "ota_direct_apk_url"
+    const val PREF_AUTO_UPDATE_ENABLED = "ota_auto_update_enabled"
+    private const val PREF_LAST_SEEN_COMMIT = "ota_last_seen_commit"
 
     // Default PC LAN IP detected on this machine (192.168.1.150:8765) + USB ADB tunnel fallback (127.0.0.1:8765)
     const val DEFAULT_PC_HOST = "192.168.1.150:8765"
-    const val DEFAULT_GIT_REPO = "MegatronF0id5l4yer/DDMC"
+    const val DEFAULT_GIT_REPO = "MegatronF0id5la4yer/DDMC"
 
     data class UpdateInfo(
         val sourceName: String,
@@ -360,6 +362,45 @@ object OtaUpdateEngine {
         } catch (e: Exception) {
             onError("No se pudo abrir el instalador: ${e.localizedMessage}")
         }
+    }
+
+    /**
+     * Checks for new versions in the background on app launch and automatically downloads & triggers installation.
+     */
+    fun checkAndAutoUpdate(activity: Activity) {
+        val autoUpdate = SonoraStore.getBool(activity, PREF_AUTO_UPDATE_ENABLED, true)
+        if (!autoUpdate) return
+
+        Thread {
+            try {
+                Thread.sleep(3500L) // Allow initial UI inflation to finish
+                val res = checkGitServer(activity).getOrNull() ?: return@Thread
+                val lastSeen = SonoraStore.getString(activity, PREF_LAST_SEEN_COMMIT, "")
+                val isNewCommit = res.commitHash != "HEAD" && res.commitHash != lastSeen
+                val isNewRelease = res.version.isNotBlank() && res.version != lastSeen
+
+                if (res.apkDownloadUrl.isNotBlank() && (isNewCommit || isNewRelease)) {
+                    activity.runOnUiThread {
+                        Toast.makeText(
+                            activity,
+                            "Nueva versión de DDMC detectada (${res.version}). Descargando e instalando automáticamente...",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    downloadAndInstallApk(
+                        activity = activity,
+                        apkUrl = res.apkDownloadUrl,
+                        onProgress = { pct, _ ->
+                            if (pct == 100) {
+                                val tag = if (res.commitHash != "HEAD") res.commitHash else res.version
+                                SonoraStore.putString(activity, PREF_LAST_SEEN_COMMIT, tag)
+                            }
+                        },
+                        onError = {}
+                    )
+                }
+            } catch (_: Exception) {}
+        }.start()
     }
 
     /**
