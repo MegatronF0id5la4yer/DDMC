@@ -896,6 +896,8 @@ class StageWindowFrame(
     val contentContainer: FrameLayout
     var isWindowMinimized: Boolean = false
     var isWindowMaximized: Boolean = false
+    var windowScale: Float = 1.0f
+    var onScaleUpdate: ((Float, String) -> Unit)? = null
 
     private var downRawX = 0f
     private var downRawY = 0f
@@ -903,6 +905,60 @@ class StageWindowFrame(
     private var initialTy = 0f
     private var isDragging = false
     private var lastTapTime = 0L
+
+    private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            parent?.requestDisallowInterceptTouchEvent(true)
+            translationZ = (context.resources.displayMetrics.density * 16f)
+            return true
+        }
+
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            val factor = detector.scaleFactor
+            windowScale = (windowScale * factor).coerceIn(0.40f, 2.80f)
+            scaleX = windowScale
+            scaleY = windowScale
+            val rounded = String.format(java.util.Locale.US, "%.1fx", windowScale)
+            onScaleUpdate?.invoke(windowScale, rounded)
+            return true
+        }
+
+        override fun onScaleEnd(detector: ScaleGestureDetector) {
+            parent?.requestDisallowInterceptTouchEvent(false)
+            val density = context.resources.displayMetrics.density
+            animate().translationZ(density * 3f).setDuration(220).start()
+            if (windowScale >= 2.3f) {
+                windowScale = 1.0f
+                scaleX = 1.0f
+                scaleY = 1.0f
+                onMaximizeClick?.invoke()
+            } else if (windowScale <= 0.48f) {
+                windowScale = 1.0f
+                scaleX = 1.0f
+                scaleY = 1.0f
+                onMinimizeClick?.invoke()
+            } else if (windowScale in 0.92f..1.08f) {
+                windowScale = 1.0f
+                animate().scaleX(1.0f).scaleY(1.0f).setDuration(180).start()
+            }
+        }
+    })
+
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.pointerCount >= 2) {
+            scaleDetector.onTouchEvent(ev)
+            return true
+        }
+        return super.onInterceptTouchEvent(ev)
+    }
+
+    override fun onTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.pointerCount >= 2) {
+            scaleDetector.onTouchEvent(ev)
+            return true
+        }
+        return super.onTouchEvent(ev)
+    }
 
     init {
         orientation = VERTICAL
@@ -1048,6 +1104,10 @@ class StageWindowFrame(
 
     fun setContent(view: View) {
         (view.parent as? ViewGroup)?.removeView(view)
+        view.layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
         contentContainer.removeAllViews()
         contentContainer.addView(view)
     }
@@ -2060,6 +2120,9 @@ class MainActivity : AppCompatActivity(), RowHost {
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     Gravity.CENTER
                 )
+                addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                    adjustVideoCropMatrix(this, lastCoverVideoWidth, lastCoverVideoHeight)
+                }
                 surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                     override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
                         stageCoverSurface?.release()
@@ -2294,8 +2357,13 @@ class MainActivity : AppCompatActivity(), RowHost {
                 title = "Portada & Video",
                 iconRes = R.drawable.ic_video,
                 onMinimizeClick = {
-                    isCoverMinimizedPip = !isCoverMinimizedPip
-                    showVizHudBadge(if (isCoverMinimizedPip) "Portada minimizada a PIP" else "Portada restaurada")
+                    if (fullscreenWindowId != null) {
+                        fullscreenWindowId = null
+                        showVizHudBadge("Cuadrícula Restaurada")
+                    } else {
+                        isCoverMinimizedPip = !isCoverMinimizedPip
+                        showVizHudBadge(if (isCoverMinimizedPip) "Portada minimizada a PIP" else "Portada restaurada")
+                    }
                     reorderStageContainers()
                 },
                 onMaximizeClick = {
@@ -2304,7 +2372,9 @@ class MainActivity : AppCompatActivity(), RowHost {
                     reorderStageContainers()
                 },
                 onMoreClick = { showGifCoverOptionsSheet() }
-            )
+            ).apply {
+                onScaleUpdate = { _, label -> showVizHudBadge("Portada: $label") }
+            }
         }
         if (!::vizWindowFrame.isInitialized) {
             vizWindowFrame = StageWindowFrame(
@@ -2313,7 +2383,13 @@ class MainActivity : AppCompatActivity(), RowHost {
                 title = "Visualizador Neón",
                 iconRes = R.drawable.ic_waveform,
                 onMinimizeClick = {
-                    reorderStageContainers()
+                    if (fullscreenWindowId != null) {
+                        fullscreenWindowId = null
+                        showVizHudBadge("Cuadrícula Restaurada")
+                        reorderStageContainers()
+                    } else {
+                        showVizHudBadge(if (vizWindowFrame.isWindowMinimized) "Visualizador minimizado" else "Visualizador restaurado")
+                    }
                 },
                 onMaximizeClick = {
                     fullscreenWindowId = if (fullscreenWindowId == "viz") null else "viz"
@@ -2321,7 +2397,9 @@ class MainActivity : AppCompatActivity(), RowHost {
                     reorderStageContainers()
                 },
                 onMoreClick = { cycleVisualizerMode() }
-            )
+            ).apply {
+                onScaleUpdate = { _, label -> showVizHudBadge("Visualizador: $label") }
+            }
         }
         if (!::lyricsWindowFrame.isInitialized) {
             lyricsWindowFrame = StageWindowFrame(
@@ -2330,7 +2408,13 @@ class MainActivity : AppCompatActivity(), RowHost {
                 title = "Letras en Vivo",
                 iconRes = R.drawable.ic_music,
                 onMinimizeClick = {
-                    reorderStageContainers()
+                    if (fullscreenWindowId != null) {
+                        fullscreenWindowId = null
+                        showVizHudBadge("Cuadrícula Restaurada")
+                        reorderStageContainers()
+                    } else {
+                        showVizHudBadge(if (lyricsWindowFrame.isWindowMinimized) "Letras minimizadas" else "Letras restauradas")
+                    }
                 },
                 onMaximizeClick = {
                     fullscreenWindowId = if (fullscreenWindowId == "lyrics") null else "lyrics"
@@ -2338,7 +2422,9 @@ class MainActivity : AppCompatActivity(), RowHost {
                     reorderStageContainers()
                 },
                 onMoreClick = { showLyricsSheet() }
-            )
+            ).apply {
+                onScaleUpdate = { _, label -> showVizHudBadge("Letras: $label") }
+            }
         }
         if (!::dokiWindowFrame.isInitialized) {
             dokiWindowFrame = StageWindowFrame(
@@ -2347,7 +2433,13 @@ class MainActivity : AppCompatActivity(), RowHost {
                 title = "Doki Companion",
                 iconRes = R.drawable.ic_sparkles,
                 onMinimizeClick = {
-                    reorderStageContainers()
+                    if (fullscreenWindowId != null) {
+                        fullscreenWindowId = null
+                        showVizHudBadge("Cuadrícula Restaurada")
+                        reorderStageContainers()
+                    } else {
+                        showVizHudBadge(if (dokiWindowFrame.isWindowMinimized) "Doki minimizado" else "Doki restaurado")
+                    }
                 },
                 onMaximizeClick = {
                     fullscreenWindowId = if (fullscreenWindowId == "doki") null else "doki"
@@ -2355,7 +2447,9 @@ class MainActivity : AppCompatActivity(), RowHost {
                     reorderStageContainers()
                 },
                 onMoreClick = { showQuickDokiSwitcherSheet() }
-            )
+            ).apply {
+                onScaleUpdate = { _, label -> showVizHudBadge("Doki: $label") }
+            }
         }
     }
 
@@ -2455,6 +2549,22 @@ class MainActivity : AppCompatActivity(), RowHost {
         safeDetach(stageLyricsScroll)
         safeDetach(dokiLeftCol)
 
+        stageExpandedCoverCard.layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        stageVideoCard.layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        vizDeckCard.layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        stageLyricsScroll.layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        dokiLeftCol.layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        )
+
         // Reset translations and scaling
         coverWindowFrame.translationX = 0f; coverWindowFrame.translationY = 0f
         vizWindowFrame.translationX = 0f; vizWindowFrame.translationY = 0f
@@ -2463,6 +2573,9 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         // Wrap actual views into window frames
         val coverBox = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            )
             addView(stageExpandedCoverCard)
             addView(stageVideoCard)
         }
@@ -4345,7 +4458,62 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
         })
 
+        val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            private var currentScale = 1.0f
+
+            override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                currentScale = 1.0f
+                targetView.parent?.requestDisallowInterceptTouchEvent(true)
+                targetView.translationZ = dpf(16f)
+                return true
+            }
+
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                currentScale = (currentScale * detector.scaleFactor).coerceIn(0.40f, 2.80f)
+                targetView.scaleX = currentScale
+                targetView.scaleY = currentScale
+                val label = String.format(java.util.Locale.US, "%.1fx", currentScale)
+                showVizHudBadge("Escala: $label")
+                return true
+            }
+
+            override fun onScaleEnd(detector: ScaleGestureDetector) {
+                targetView.parent?.requestDisallowInterceptTouchEvent(false)
+                targetView.animate().translationZ(0f).setDuration(220).start()
+                if (currentScale >= 2.3f) {
+                    currentScale = 1.0f
+                    targetView.scaleX = 1.0f
+                    targetView.scaleY = 1.0f
+                    if (fullscreenWindowId == null) {
+                        fullscreenWindowId = "cover"
+                        showVizHudBadge("Pantalla Completa: Portada & Video")
+                        reorderStageContainers()
+                    }
+                } else if (currentScale <= 0.48f) {
+                    currentScale = 1.0f
+                    targetView.scaleX = 1.0f
+                    targetView.scaleY = 1.0f
+                    if (fullscreenWindowId != null) {
+                        fullscreenWindowId = null
+                        showVizHudBadge("Cuadrícula Restaurada")
+                        reorderStageContainers()
+                    } else {
+                        isCoverMinimizedPip = !isCoverMinimizedPip
+                        showVizHudBadge(if (isCoverMinimizedPip) "Portada minimizada a PIP" else "Portada restaurada")
+                        reorderStageContainers()
+                    }
+                } else if (currentScale in 0.92f..1.08f) {
+                    currentScale = 1.0f
+                    targetView.animate().scaleX(1.0f).scaleY(1.0f).setDuration(180).start()
+                }
+            }
+        })
+
         targetView.setOnTouchListener { v, event ->
+            if (event.pointerCount >= 2) {
+                scaleDetector.onTouchEvent(event)
+                if (scaleDetector.isInProgress) return@setOnTouchListener true
+            }
             if (event.actionMasked == MotionEvent.ACTION_DOWN) {
                 v.parent?.requestDisallowInterceptTouchEvent(true)
             }
@@ -4408,7 +4576,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                     dp(248),
                     Gravity.CENTER
                 )
-                scaleType = ImageView.ScaleType.FIT_CENTER
+                scaleType = ImageView.ScaleType.CENTER_CROP
                 background = GradientDrawable().apply {
                     setColor(Color.parseColor(Pal.SURFACE_HI))
                     cornerRadius = dpf(22f)
@@ -4718,6 +4886,36 @@ class MainActivity : AppCompatActivity(), RowHost {
         if (::toggleDokiBtn.isInitialized) styleToggleIcon(toggleDokiBtn, R.drawable.ic_sparkles, showStageDoki)
         if (::toggleVizBtn.isInitialized) styleToggleIcon(toggleVizBtn, R.drawable.ic_waveform, showStageViz)
         if (::stageModeSwitchChip.isInitialized) stageModeSwitchChip.visibility = View.GONE
+
+        if (::coverWindowFrame.isInitialized) {
+            // Under StageWindowFrame architecture, all window contents fill their frame container
+            if (::stageExpandedCoverCard.isInitialized) {
+                stageExpandedCoverCard.layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+            if (::stageVideoCard.isInitialized) {
+                stageVideoCard.layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+            if (::vizDeckCard.isInitialized) {
+                vizDeckCard.layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+            if (::stageLyricsScroll.isInitialized) {
+                stageLyricsScroll.layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+            if (::dokiLeftCol.isInitialized) {
+                dokiLeftCol.layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+            return
+        }
 
         // Cover visibility (stage mini inset cover, full-width expanded cover card, & portrait lower metadata cover thumbnail)
         if (::stageCoverInsetCard.isInitialized) {
@@ -5130,7 +5328,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 Gravity.CENTER
             )
-            scaleType = ImageView.ScaleType.FIT_CENTER
+            scaleType = ImageView.ScaleType.CENTER_CROP
             isClickable = true
             setOnClickListener { showGifCoverOptionsSheet() }
             setOnLongClickListener {
@@ -6874,7 +7072,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                     }
                     val thumb = ImageView(this).apply {
                         layoutParams = LinearLayout.LayoutParams(dp(72), dp(54)).apply { marginEnd = dp(10) }
-                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        scaleType = ImageView.ScaleType.CENTER_CROP
                         background = GradientDrawable().apply {
                             setColor(Color.parseColor("#0B0F19"))
                             cornerRadius = dpf(8f)
@@ -9448,7 +9646,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                     val bmp = DdscEngine.loadFaceAvatarBitmap(this@MainActivity, doki.id)
                     if (bmp != null) setImageBitmap(bmp) else setImageResource(doki.resFor(selectedDokiPose))
                     layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
-                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    scaleType = ImageView.ScaleType.CENTER_CROP
                 })
                 chip.addView(TextView(this).apply {
                     text = doki.name
@@ -9717,7 +9915,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                     }
                     val previewImg = ImageView(this).apply {
                         layoutParams = LinearLayout.LayoutParams(dp(76), dp(86))
-                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        scaleType = ImageView.ScaleType.CENTER_CROP
                         setImageBitmap(DdscEngine.loadSprite(this@MainActivity, assetRel))
                     }
                     val labelTv = TextView(this).apply {

@@ -223,42 +223,12 @@ object GifImageSupport {
 
     /**
      * Normalizes any bitmap of ANY dimension or aspect ratio (e.g. 624x624, 87594275x1, 1x9999999, 16000x12000)
-     * into a safe hardware-renderable software Bitmap while showing 100% of the image without any cropping.
+     * into a clean hardware/software renderable Bitmap without baking in artificial black or letterbox bars.
      */
-    fun normalizeAnySizeBitmap(raw: Bitmap?, maxSidePx: Int = 1024, preserveFullImage: Boolean = true): Bitmap? {
+    fun normalizeAnySizeBitmap(raw: Bitmap?, maxSidePx: Int = 1024, preserveFullImage: Boolean = false): Bitmap? {
         val src = ensureSoftwareBitmap(raw) ?: return null
         val w = src.width.coerceAtLeast(1)
         val h = src.height.coerceAtLeast(1)
-
-        // Always fit 100% of non-square or extreme aspect ratio images onto a balanced canvas with zero cropping
-        if (preserveFullImage && w != h) {
-            val canvasSize = minOf(maxOf(w, h), maxSidePx).coerceIn(128, 1024)
-            val out = Bitmap.createBitmap(canvasSize, canvasSize, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(out)
-            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG)
-
-            // Sample average color for ambient letterbox/pillarbox bars
-            val sampleColor = try {
-                src.getPixel(w / 2, h / 2)
-            } catch (_: Exception) {
-                Color.parseColor("#141B2D")
-            }
-            val darkBg = Color.rgb(
-                (Color.red(sampleColor) * 0.25f + 10).toInt().coerceIn(0, 255),
-                (Color.green(sampleColor) * 0.25f + 12).toInt().coerceIn(0, 255),
-                (Color.blue(sampleColor) * 0.30f + 18).toInt().coerceIn(0, 255)
-            )
-            canvas.drawColor(darkBg)
-
-            val scale = minOf(canvasSize.toFloat() / w.toFloat(), canvasSize.toFloat() / h.toFloat())
-            val drawW = (w * scale).toInt().coerceIn(2, canvasSize)
-            val drawH = (h * scale).toInt().coerceIn(2, canvasSize)
-            val left = (canvasSize - drawW) / 2
-            val top = (canvasSize - drawH) / 2
-            val dstRect = android.graphics.Rect(left, top, left + drawW, top + drawH)
-            canvas.drawBitmap(src, null, dstRect, paint)
-            return out
-        }
 
         if (w <= maxSidePx && h <= maxSidePx) return src
         val scale = maxSidePx.toFloat() / maxOf(w, h).toFloat()
@@ -646,8 +616,8 @@ fun ImageView.bindCover(t: TrackItem?, px: Int, onBitmapReady: ((Bitmap) -> Unit
         }
         bmp != null -> {
             dispose()
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            val safe = GifImageSupport.normalizeAnySizeBitmap(bmp, px.coerceAtLeast(512), preserveFullImage = true)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            val safe = GifImageSupport.normalizeAnySizeBitmap(bmp, px.coerceAtLeast(512), preserveFullImage = false)
                 ?: GifImageSupport.ensureSoftwareBitmap(bmp) ?: bmp
             setImageBitmap(safe)
             onBitmapReady?.invoke(safe)
@@ -660,7 +630,7 @@ fun ImageView.bindCover(t: TrackItem?, px: Int, onBitmapReady: ((Bitmap) -> Unit
                     val embedded = GifImageSupport.resolveTrackCoverBitmap(context, t)
                     if (embedded != null) {
                         post {
-                            scaleType = ImageView.ScaleType.FIT_CENTER
+                            scaleType = ImageView.ScaleType.CENTER_CROP
                             setImageBitmap(embedded)
                             onBitmapReady?.invoke(embedded)
                         }
@@ -692,7 +662,7 @@ class CoverView(context: Context, private val sizeDp: Int, private val radiusDp:
         val pad = context.dp(sizeDp / 4)
         placeholder.setPadding(pad, pad, pad, pad)
         addView(placeholder, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-        image.scaleType = ImageView.ScaleType.FIT_CENTER
+        image.scaleType = ImageView.ScaleType.CENTER_CROP
         addView(image, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
@@ -766,7 +736,7 @@ class CoverView(context: Context, private val sizeDp: Int, private val radiusDp:
     fun bindUrl(url: String?) {
         stopVideo()
         GifImageSupport.ensure(context)
-        image.scaleType = ImageView.ScaleType.FIT_CENTER
+        image.scaleType = ImageView.ScaleType.CENTER_CROP
         if (url.isNullOrEmpty()) {
             image.dispose()
             image.setImageDrawable(null)
@@ -774,7 +744,7 @@ class CoverView(context: Context, private val sizeDp: Int, private val radiusDp:
             image.load(url) {
                 size(context.dp(sizeDp) * 2)
                 listener(onSuccess = { _, res ->
-                    image.scaleType = ImageView.ScaleType.FIT_CENTER
+                    image.scaleType = ImageView.ScaleType.CENTER_CROP
                     GifImageSupport.startLooping(res.drawable)
                 })
             }
