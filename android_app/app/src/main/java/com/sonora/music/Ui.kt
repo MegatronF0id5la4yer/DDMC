@@ -791,14 +791,14 @@ class CoverView(context: Context, private val sizeDp: Int, private val radiusDp:
 fun Activity.showSheet(fullHeight: Boolean = false, build: (LinearLayout, Dialog) -> Unit): Dialog {
     val d = Dialog(this)
     d.requestWindowFeature(Window.FEATURE_NO_TITLE)
-    val r = dpf(24f)
+    val r = dpf(26f)
     val root = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         background = GradientDrawable().apply {
-            colors = intArrayOf(Color.parseColor(Pal.STAGE_MID), Color.parseColor(Pal.BG_BOTTOM))
+            colors = intArrayOf(Color.parseColor("#F4121528"), Color.parseColor("#F4090A12"))
             orientation = GradientDrawable.Orientation.TOP_BOTTOM
             cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
-            setStroke(dp(1), Color.parseColor("#38FFFFFF"))
+            setStroke(dp(1), Color.parseColor("#3338BDF8"))
         }
         setPadding(dp(18), dp(6), dp(18), dp(22))
     }
@@ -808,10 +808,10 @@ fun Activity.showSheet(fullHeight: Boolean = false, build: (LinearLayout, Dialog
         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(26))
         val pill = View(context).apply {
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#45FFFFFF"))
+                setColor(Color.parseColor("#6038BDF8"))
                 cornerRadius = dpf(3f)
             }
-            layoutParams = FrameLayout.LayoutParams(dp(40), dp(4), Gravity.CENTER)
+            layoutParams = FrameLayout.LayoutParams(dp(44), dp(4), Gravity.CENTER)
         }
         addView(pill)
     }

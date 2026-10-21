@@ -203,6 +203,25 @@ class VisualizerView(context: Context) : View(context) {
         strokeCap = Paint.Cap.ROUND
     }
     private val waterfallPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val vuLedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val starPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val glitchPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val tunnelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val auroraPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private val auroraPath = Path()
+
+    // 50 pre-allocated cosmic stars for starfield mode
+    private val starCount = 50
+    private val starX = FloatArray(50) { (Math.random().toFloat() - 0.5f) * 2f }
+    private val starY = FloatArray(50) { (Math.random().toFloat() - 0.5f) * 2f }
+    private val starZ = FloatArray(50) { Math.random().toFloat().coerceIn(0.08f, 1f) }
+    private val starSpeed = FloatArray(50) { (0.010f + Math.random().toFloat() * 0.018f) }
 
     private var rawFft: ByteArray? = null
     private var rawWaveform: ByteArray? = null
@@ -236,7 +255,6 @@ class VisualizerView(context: Context) : View(context) {
                 if (isShown) postInvalidateOnAnimation()
             }
         }
-    // 0: Espectro Espejo Pro, 1: Osciloscopio Dual, 2: Pulso Radial 360°, 3: Cascada Espectral, 4: Híbrido
     var visualMode = 0
 
     companion object {
@@ -245,7 +263,12 @@ class VisualizerView(context: Context) : View(context) {
             "Osciloscopio Neón",
             "Pulso Radial 360°",
             "Cascada Espectral",
-            "Estudio Híbrido"
+            "Estudio Híbrido",
+            "Matriz VU LED Digital",
+            "Starfield Cósmico",
+            "Glitch Ciberpunk",
+            "Túnel Vortex 3D",
+            "Aurora Líquida"
         )
     }
 
@@ -421,10 +444,16 @@ class VisualizerView(context: Context) : View(context) {
             1 -> drawDualNeonWaveform(canvas, w, h)
             2 -> drawRadialPulse(canvas, w, h)
             3 -> drawWaterfall(canvas, w, h)
-            else -> {
+            4 -> {
                 drawMirrorBars(canvas, w, h)
                 drawDualNeonWaveform(canvas, w, h)
             }
+            5 -> drawDigitalVuMatrix(canvas, w, h)
+            6 -> drawCosmicStarfield(canvas, w, h)
+            7 -> drawCyberpunkGlitchWave(canvas, w, h)
+            8 -> drawVortexTunnel3D(canvas, w, h)
+            9 -> drawLiquidAurora(canvas, w, h)
+            else -> drawMirrorBars(canvas, w, h)
         }
 
         // Suspend animation loop when hidden, detached, or paused at rest
@@ -598,6 +627,213 @@ class VisualizerView(context: Context) : View(context) {
             rIdx++
         }
     }
+
+    private fun drawDigitalVuMatrix(canvas: Canvas, w: Float, h: Float) {
+        val totalCols = bands
+        val colW = (w / (totalCols * 1.35f)).coerceAtLeast(3f)
+        val gap = colW * 0.35f
+        val totalSpan = totalCols * (colW + gap) - gap
+        val startX = (w - totalSpan) / 2f
+        val numSegments = 14
+        val totalH = h * 0.88f
+        val segH = (totalH / numSegments) * 0.72f
+        val segGap = (totalH / numSegments) * 0.28f
+        val bottomY = h * 0.94f
+
+        for (i in 0 until totalCols) {
+            val mag = magnitudes[i].coerceIn(0.05f, 1.0f)
+            val activeSegments = (mag * numSegments).toInt().coerceIn(1, numSegments)
+            val peakSegment = (peakCaps[i] * numSegments).toInt().coerceIn(0, numSegments - 1)
+            val left = startX + i * (colW + gap)
+            val right = left + colW
+
+            for (s in 0 until numSegments) {
+                val segTop = bottomY - (s + 1) * (segH + segGap)
+                val segBottom = segTop + segH
+                val isActive = s < activeSegments
+                val isPeak = s == peakSegment
+
+                vuLedPaint.color = when {
+                    isPeak -> Color.WHITE
+                    isActive && s >= 11 -> Color.parseColor("#EF4444")
+                    isActive && s >= 8 -> Color.parseColor("#F59E0B")
+                    isActive -> Color.parseColor("#10B981")
+                    else -> Color.parseColor("#18334155")
+                }
+                canvas.drawRoundRect(left, segTop, right, segBottom, 2.5f, 2.5f, vuLedPaint)
+            }
+        }
+    }
+
+    private fun drawCosmicStarfield(canvas: Canvas, w: Float, h: Float) {
+        val cx = w / 2f
+        val cy = h / 2f
+        val bass = (magnitudes[0] + magnitudes[1] + magnitudes[2]) * 0.33f
+        val speedMult = 1f + bass * 3.5f
+
+        val acc = getAccentColor()
+        val sec = getSecondaryColor()
+
+        for (s in 0 until starCount) {
+            val prevZ = starZ[s]
+            starZ[s] -= starSpeed[s] * speedMult
+            if (starZ[s] <= 0.04f) {
+                starZ[s] = 1.0f
+                starX[s] = (Math.random().toFloat() - 0.5f) * 2f
+                starY[s] = (Math.random().toFloat() - 0.5f) * 2f
+            }
+            val z = starZ[s]
+            val px = cx + (starX[s] / z) * (w * 0.48f)
+            val py = cy + (starY[s] / z) * (h * 0.48f)
+            val ppx = cx + (starX[s] / prevZ) * (w * 0.48f)
+            val ppy = cy + (starY[s] / prevZ) * (h * 0.48f)
+
+            if (px in 0f..w && py in 0f..h) {
+                val alpha = ((1f - z) * 255).toInt().coerceIn(30, 255)
+                val dotSize = (1.5f + (1f - z) * 4f).coerceAtLeast(1f)
+                starPaint.color = when {
+                    s % 3 == 0 -> (acc and 0x00FFFFFF) or (alpha shl 24)
+                    s % 3 == 1 -> (sec and 0x00FFFFFF) or (alpha shl 24)
+                    else -> Color.argb(alpha, 255, 255, 255)
+                }
+                starPaint.strokeWidth = dotSize
+                canvas.drawLine(ppx, ppy, px, py, starPaint)
+                canvas.drawCircle(px, py, dotSize * 0.6f, starPaint)
+            }
+        }
+    }
+
+    private fun drawCyberpunkGlitchWave(canvas: Canvas, w: Float, h: Float) {
+        val midY = h * 0.52f
+        primaryWavePath.reset()
+        val points = 32
+        val dx = w / (points - 1).toFloat()
+        var prevX = 0f
+        var prevY = midY
+
+        val isGlitch = magnitudes[1] > 0.45f || magnitudes[3] > 0.5f
+        val glitchOffset = if (isGlitch) (sin(phase * 8f) * 6f) else 0f
+
+        for (i in 0 until points) {
+            val x = i * dx
+            val bandIdx = ((i.toFloat() / points) * (bands - 1)).toInt().coerceIn(0, bands - 1)
+            val env = if (isPlaying) magnitudes[bandIdx] else 0.05f
+            val sample = sin(phase * 2.2f + i * 0.45f) * env * 0.82f
+            val y = (midY + sample * (h * 0.42f) + (if (i % 4 == 0) glitchOffset else 0f)).coerceIn(4f, h - 4f)
+
+            if (i == 0) {
+                primaryWavePath.moveTo(x, y)
+            } else {
+                val cx = (prevX + x) / 2f
+                primaryWavePath.cubicTo(cx, prevY, cx, y, x, y)
+            }
+            prevX = x
+            prevY = y
+        }
+
+        glitchPaint.style = Paint.Style.STROKE
+        glitchPaint.strokeCap = Paint.Cap.ROUND
+        glitchPaint.strokeWidth = 3.5f
+        glitchPaint.color = Color.parseColor("#E6FF007F")
+        canvas.save()
+        canvas.translate(-3.5f + glitchOffset * 0.5f, -1.5f)
+        canvas.drawPath(primaryWavePath, glitchPaint)
+        canvas.restore()
+
+        glitchPaint.color = Color.parseColor("#E600F0FF")
+        canvas.save()
+        canvas.translate(3.5f - glitchOffset * 0.5f, 1.5f)
+        canvas.drawPath(primaryWavePath, glitchPaint)
+        canvas.restore()
+
+        glitchPaint.color = Color.WHITE
+        glitchPaint.strokeWidth = 2.5f
+        canvas.drawPath(primaryWavePath, glitchPaint)
+    }
+
+    private fun drawVortexTunnel3D(canvas: Canvas, w: Float, h: Float) {
+        val cx = w / 2f
+        val cy = h / 2f
+        val minDim = minOf(w, h)
+        val rings = 9
+        val acc = getAccentColor()
+        val sec = getSecondaryColor()
+
+        for (r in 0 until rings) {
+            val progress = ((r.toFloat() + (phase * 0.22f) % 1f) / rings.toFloat())
+            val radius = minDim * 0.48f * progress * progress
+            val ringMag = magnitudes[r % bands].coerceIn(0.06f, 1.0f)
+            val dynamicR = radius * (0.85f + ringMag * 0.35f)
+            val ringAngle = phase * 0.4f + r * 0.3f
+
+            tunnelPaint.color = when {
+                r % 2 == 0 -> (acc and 0x00FFFFFF) or (((0.3f + progress * 0.7f) * 255).toInt() shl 24)
+                else -> (sec and 0x00FFFFFF) or (((0.3f + progress * 0.7f) * 255).toInt() shl 24)
+            }
+            tunnelPaint.strokeWidth = 2f + progress * 2.5f
+
+            val sides = 6
+            primaryWavePath.reset()
+            for (s in 0 until sides) {
+                val a = ringAngle + (s.toFloat() / sides) * (Math.PI * 2.0)
+                val px = cx + (cos(a) * dynamicR).toFloat()
+                val py = cy + (sin(a) * dynamicR).toFloat()
+                if (s == 0) primaryWavePath.moveTo(px, py) else primaryWavePath.lineTo(px, py)
+            }
+            primaryWavePath.close()
+            canvas.drawPath(primaryWavePath, tunnelPaint)
+        }
+    }
+
+    private fun drawLiquidAurora(canvas: Canvas, w: Float, h: Float) {
+        val midY = h * 0.65f
+        val acc = getAccentColor()
+        val sec = getSecondaryColor()
+
+        for (layer in 0 until 3) {
+            auroraPath.reset()
+            auroraPath.moveTo(0f, h)
+            val points = 24
+            val dx = w / (points - 1)
+            var prevX = 0f
+            var prevY = midY
+
+            val speed = 1.1f + layer * 0.5f
+            val phaseShift = layer * 1.2f
+
+            for (i in 0 until points) {
+                val x = i * dx
+                val bandIdx = ((i.toFloat() / points) * (bands - 1)).toInt().coerceIn(0, bands - 1)
+                val env = magnitudes[bandIdx]
+                val waveH = (sin(phase * speed + i * 0.35f + phaseShift) * (h * 0.28f) * env)
+                val y = (midY - waveH - (2 - layer) * (h * 0.08f)).coerceIn(4f, h - 2f)
+
+                if (i == 0) {
+                    auroraPath.lineTo(x, y)
+                } else {
+                    val cx = (prevX + x) / 2f
+                    auroraPath.cubicTo(cx, prevY, cx, y, x, y)
+                }
+                prevX = x
+                prevY = y
+            }
+            auroraPath.lineTo(w, h)
+            auroraPath.close()
+
+            val alpha = when (layer) {
+                0 -> 70
+                1 -> 110
+                else -> 160
+            }
+            val color = when (layer) {
+                0 -> Color.parseColor("#10B981")
+                1 -> sec
+                else -> acc
+            }
+            auroraPaint.color = (color and 0x00FFFFFF) or (alpha shl 24)
+            canvas.drawPath(auroraPath, auroraPaint)
+        }
+    }
 }
 
 // ==========================================
@@ -642,6 +878,180 @@ fun View.addPressFeedback(scaleTo: Float = 0.96f, haptic: Boolean = true) {
     }
 }
 
+// ==========================================
+// WINDOWS DESKTOP-STYLE WINDOW FRAME
+// ==========================================
+class StageWindowFrame(
+    context: Context,
+    val windowId: String,
+    val title: String,
+    val iconRes: Int,
+    val onMinimizeClick: (() -> Unit)? = null,
+    val onMaximizeClick: (() -> Unit)? = null,
+    val onMoreClick: (() -> Unit)? = null
+) : LinearLayout(context) {
+
+    val titleBar: LinearLayout
+    val titleTextView: TextView
+    val contentContainer: FrameLayout
+    var isWindowMinimized: Boolean = false
+    var isWindowMaximized: Boolean = false
+
+    private var downRawX = 0f
+    private var downRawY = 0f
+    private var initialTx = 0f
+    private var initialTy = 0f
+    private var isDragging = false
+    private var lastTapTime = 0L
+
+    init {
+        orientation = VERTICAL
+        val density = context.resources.displayMetrics.density
+        fun dp(v: Int) = (v * density).toInt()
+
+        background = GradientDrawable().apply {
+            setColor(Color.parseColor("#141726"))
+            cornerRadius = density * 12f
+            setStroke(dp(1), Color.parseColor("#2638BDF8"))
+        }
+        elevation = density * 3f
+
+        // Windows Titlebar
+        titleBar = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(4), dp(6), dp(4))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#1E2338"))
+                cornerRadii = floatArrayOf(
+                    density * 12f, density * 12f,
+                    density * 12f, density * 12f,
+                    0f, 0f, 0f, 0f
+                )
+            }
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(28))
+        }
+
+        // Initialize content container before button callbacks access it
+        contentContainer = FrameLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
+            clipChildren = false
+            clipToPadding = false
+        }
+
+        // Window Icon
+        titleBar.addView(ImageView(context).apply {
+            setImageResource(iconRes)
+            setColorFilter(Color.parseColor("#38BDF8"))
+            layoutParams = LayoutParams(dp(14), dp(14)).apply { marginEnd = dp(6) }
+        })
+
+        // Window Title
+        titleTextView = TextView(context).apply {
+            text = title
+            textSize = 11.5f
+            setTextColor(Color.WHITE)
+            setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
+        }
+        titleBar.addView(titleTextView)
+
+        fun makeWinBtn(symbol: String, onClick: () -> Unit) = TextView(context).apply {
+            text = symbol
+            textSize = 10.5f
+            setTextColor(Color.parseColor("#94A3B8"))
+            gravity = Gravity.CENTER
+            setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+            setPadding(dp(4), dp(2), dp(4), dp(2))
+            minWidth = dp(22)
+            isClickable = true
+            isFocusable = true
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#14FFFFFF"))
+                cornerRadius = density * 4f
+            }
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dp(20)).apply {
+                marginStart = dp(3)
+            }
+            setOnClickListener { onClick() }
+        }
+
+        val minBtn = makeWinBtn("—") {
+            isWindowMinimized = !isWindowMinimized
+            onMinimizeClick?.invoke()
+            contentContainer.visibility = if (isWindowMinimized) View.GONE else View.VISIBLE
+        }
+        val maxBtn = makeWinBtn("□") {
+            isWindowMaximized = !isWindowMaximized
+            onMaximizeClick?.invoke()
+        }
+        val optBtn = makeWinBtn("⋯") {
+            onMoreClick?.invoke()
+        }
+
+        titleBar.addView(minBtn)
+        titleBar.addView(maxBtn)
+        titleBar.addView(optBtn)
+
+        titleBar.setOnTouchListener { v, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downRawX = ev.rawX
+                    downRawY = ev.rawY
+                    initialTx = translationX
+                    initialTy = translationY
+                    isDragging = false
+                    val now = System.currentTimeMillis()
+                    if (now - lastTapTime < 320L) {
+                        isWindowMaximized = !isWindowMaximized
+                        onMaximizeClick?.invoke()
+                    }
+                    lastTapTime = now
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = ev.rawX - downRawX
+                    val dy = ev.rawY - downRawY
+                    if (Math.abs(dx) > dp(3) || Math.abs(dy) > dp(3)) {
+                        isDragging = true
+                        translationX = initialTx + dx
+                        translationY = initialTy + dy
+                        translationZ = density * 16f
+                        scaleX = 1.02f
+                        scaleY = 1.02f
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
+                    if (isDragging) {
+                        isDragging = false
+                        animate()
+                            .scaleX(1.0f)
+                            .scaleY(1.0f)
+                            .translationZ(density * 3f)
+                            .setDuration(220)
+                            .start()
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+
+        addView(titleBar)
+        addView(contentContainer)
+    }
+
+    fun setContent(view: View) {
+        (view.parent as? ViewGroup)?.removeView(view)
+        contentContainer.removeAllViews()
+        contentContainer.addView(view)
+    }
+}
 
 class MainActivity : AppCompatActivity(), RowHost {
 
@@ -668,6 +1078,12 @@ class MainActivity : AppCompatActivity(), RowHost {
     private var showStageLyrics = true
     private var stageRightMode = 0 // 0 = Letra + Viz, 1 = Solo Audio Viz, 2 = Solo Letra
     private var isLandscapeMode = false
+    private lateinit var coverWindowFrame: StageWindowFrame
+    private lateinit var vizWindowFrame: StageWindowFrame
+    private lateinit var lyricsWindowFrame: StageWindowFrame
+    private lateinit var dokiWindowFrame: StageWindowFrame
+    private var fullscreenWindowId: String? = null
+    private var isCoverMinimizedPip = false
 
     private lateinit var mainRootLayout: RelativeLayout
     private lateinit var mainContentFrame: FrameLayout
@@ -1463,11 +1879,23 @@ class MainActivity : AppCompatActivity(), RowHost {
             id = View.generateViewId()
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.parseColor("#0A0A0E"))
-            setPadding(dp(20), dp(10), dp(12), dp(8))
+            background = GradientDrawable().apply {
+                colors = intArrayOf(Color.parseColor("#E6121526"), Color.parseColor("#E6090A12"))
+                orientation = GradientDrawable.Orientation.TOP_BOTTOM
+                setStroke(dp(1), Color.parseColor("#2238BDF8"))
+            }
+            setPadding(dp(18), dp(10), dp(12), dp(8))
+            elevation = dpf(6f)
             layoutParams = RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT
             ).apply { addRule(RelativeLayout.ALIGN_PARENT_TOP) }
+        }
+        val titleBox = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            isClickable = true
+            setOnClickListener { showLiveNotificationPanelSheet() }
         }
         headerTitle = TextView(this).apply {
             text = "DDMC"
@@ -1475,30 +1903,60 @@ class MainActivity : AppCompatActivity(), RowHost {
             letterSpacing = -0.02f
             setTextColor(Color.WHITE)
             setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            isClickable = true
-            setOnClickListener { showLiveNotificationPanelSheet() }
         }
+        val gridPill = TextView(this).apply {
+            text = "⊞ SNAP"
+            textSize = 9.5f
+            setTextColor(Color.parseColor("#38BDF8"))
+            setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+            setPadding(dp(6), dp(2), dp(6), dp(2))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#1F38BDF8"))
+                cornerRadius = dpf(6f)
+                setStroke(dp(1), Color.parseColor("#4038BDF8"))
+            }
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginStart = dp(8)
+            }
+            isClickable = true
+            setOnClickListener { cycleGridMode() }
+        }
+        titleBox.addView(headerTitle)
+        titleBox.addView(gridPill)
+
         fun headerIcon(res: Int, onClick: () -> Unit) = ImageView(this).apply {
             setImageResource(res)
             setColorFilter(Color.parseColor("#CBD5E1"))
-            val p = dp(9)
+            val p = dp(8)
             setPadding(p, p, p, p)
-            layoutParams = LinearLayout.LayoutParams(dp(38), dp(38))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#14FFFFFF"))
+            }
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply {
+                marginStart = dp(4)
+                marginEnd = dp(2)
+            }
             isClickable = true
             setOnClickListener { onClick() }
-            addPressFeedback(0.88f)
+            addPressFeedback(0.92f)
         }
         val avatarSize = dp(34)
         topDokiAvatar = ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(avatarSize, avatarSize).apply { marginStart = dp(6); marginEnd = dp(4) }
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(dp(2), dp(2), dp(2), dp(2))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#1838BDF8"))
+                setStroke(dp(1), Color.parseColor("#4038BDF8"))
+            }
             isClickable = true
             setOnClickListener { showDokiAvatarPicker() }
-            addPressFeedback(0.88f)
+            addPressFeedback(0.92f)
         }
-        h.addView(headerTitle)
+        h.addView(titleBox)
+        h.addView(headerIcon(R.drawable.ic_widgets) { cycleGridMode() })
         h.addView(headerIcon(R.drawable.ic_search) { openLibrarySearch() })
         h.addView(headerIcon(R.drawable.ic_list_music) { showQueueSheet() })
         h.addView(topDokiAvatar)
@@ -1655,7 +2113,17 @@ class MainActivity : AppCompatActivity(), RowHost {
                 stageCoverVideoView?.let { adjustVideoCropMatrix(it, w, h) }
             }
             player.setOnPreparedListener { mp ->
+                try {
+                    mp.setVolume(0f, 0f)
+                    val tracks = mp.trackInfo
+                    for (i in tracks.indices) {
+                        if (tracks[i].trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO) {
+                            try { mp.deselectTrack(i) } catch (_: Exception) {}
+                        }
+                    }
+                } catch (_: Exception) {}
                 mp.start()
+                try { mp.setVolume(0f, 0f) } catch (_: Exception) {}
                 val w = mp.videoWidth
                 val h = mp.videoHeight
                 if (w > 0 && h > 0) {
@@ -1663,6 +2131,21 @@ class MainActivity : AppCompatActivity(), RowHost {
                     lastCoverVideoHeight = h
                     stageCoverVideoView?.let { adjustVideoCropMatrix(it, w, h) }
                 }
+            }
+            player.setOnSeekCompleteListener { mp ->
+                try { mp.setVolume(0f, 0f) } catch (_: Exception) {}
+            }
+            player.setOnInfoListener { mp, _, _ ->
+                try { mp.setVolume(0f, 0f) } catch (_: Exception) {}
+                false
+            }
+            player.setOnCompletionListener { mp ->
+                try {
+                    mp.setVolume(0f, 0f)
+                    mp.seekTo(0)
+                    mp.start()
+                    mp.setVolume(0f, 0f)
+                } catch (_: Exception) {}
             }
             player.setOnErrorListener { _, _, _ ->
                 runOnUiThread {
@@ -1803,90 +2286,309 @@ class MainActivity : AppCompatActivity(), RowHost {
         (v.parent as? ViewGroup)?.removeView(v)
     }
 
+    private fun ensureWindowFrames() {
+        if (!::coverWindowFrame.isInitialized) {
+            coverWindowFrame = StageWindowFrame(
+                context = this,
+                windowId = "cover",
+                title = "Portada & Video",
+                iconRes = R.drawable.ic_video,
+                onMinimizeClick = {
+                    isCoverMinimizedPip = !isCoverMinimizedPip
+                    showVizHudBadge(if (isCoverMinimizedPip) "Portada minimizada a PIP" else "Portada restaurada")
+                    reorderStageContainers()
+                },
+                onMaximizeClick = {
+                    fullscreenWindowId = if (fullscreenWindowId == "cover") null else "cover"
+                    showVizHudBadge(if (fullscreenWindowId != null) "Pantalla Completa: Portada (Desliza para cambiar)" else "Cuadrícula Restaurada")
+                    reorderStageContainers()
+                },
+                onMoreClick = { showGifCoverOptionsSheet() }
+            )
+        }
+        if (!::vizWindowFrame.isInitialized) {
+            vizWindowFrame = StageWindowFrame(
+                context = this,
+                windowId = "viz",
+                title = "Visualizador Neón",
+                iconRes = R.drawable.ic_waveform,
+                onMinimizeClick = {
+                    reorderStageContainers()
+                },
+                onMaximizeClick = {
+                    fullscreenWindowId = if (fullscreenWindowId == "viz") null else "viz"
+                    showVizHudBadge(if (fullscreenWindowId != null) "Pantalla Completa: Visualizador (Desliza para cambiar)" else "Cuadrícula Restaurada")
+                    reorderStageContainers()
+                },
+                onMoreClick = { cycleVisualizerMode() }
+            )
+        }
+        if (!::lyricsWindowFrame.isInitialized) {
+            lyricsWindowFrame = StageWindowFrame(
+                context = this,
+                windowId = "lyrics",
+                title = "Letras en Vivo",
+                iconRes = R.drawable.ic_music,
+                onMinimizeClick = {
+                    reorderStageContainers()
+                },
+                onMaximizeClick = {
+                    fullscreenWindowId = if (fullscreenWindowId == "lyrics") null else "lyrics"
+                    showVizHudBadge(if (fullscreenWindowId != null) "Pantalla Completa: Letras (Desliza para cambiar)" else "Cuadrícula Restaurada")
+                    reorderStageContainers()
+                },
+                onMoreClick = { showLyricsSheet() }
+            )
+        }
+        if (!::dokiWindowFrame.isInitialized) {
+            dokiWindowFrame = StageWindowFrame(
+                context = this,
+                windowId = "doki",
+                title = "Doki Companion",
+                iconRes = R.drawable.ic_sparkles,
+                onMinimizeClick = {
+                    reorderStageContainers()
+                },
+                onMaximizeClick = {
+                    fullscreenWindowId = if (fullscreenWindowId == "doki") null else "doki"
+                    showVizHudBadge(if (fullscreenWindowId != null) "Pantalla Completa: Doki (Desliza para cambiar)" else "Cuadrícula Restaurada")
+                    reorderStageContainers()
+                },
+                onMoreClick = { showQuickDokiSwitcherSheet() }
+            )
+        }
+    }
+
+    fun cycleFullscreenWindow(forward: Boolean) {
+        val windowIds = listOf("cover", "viz", "lyrics", "doki")
+        val curIdx = windowIds.indexOf(fullscreenWindowId)
+        val nextIdx = if (curIdx < 0) {
+            if (forward) 0 else windowIds.lastIndex
+        } else {
+            if (forward) (curIdx + 1) % windowIds.size else (curIdx - 1 + windowIds.size) % windowIds.size
+        }
+        fullscreenWindowId = windowIds[nextIdx]
+        val label = when (fullscreenWindowId) {
+            "cover" -> "Portada & Video"
+            "viz" -> "Visualizador Neón"
+            "lyrics" -> "Letras en Vivo"
+            "doki" -> "Doki Companion"
+            else -> "Cuadrícula"
+        }
+        showVizHudBadge("Ventana: $label")
+        reorderStageContainers()
+    }
+
+    fun cycleGridMode() {
+        val next = (SonoraStore.getInt(this, "stage_grid_snap_mode", 0) + 1) % 4
+        SonoraStore.putInt(this, "stage_grid_snap_mode", next)
+        fullscreenWindowId = null
+        val names = arrayOf("Cuadrícula 2x2 Quad", "Dividido 50/50", "Bento PIP Editor", "Clásico Apilado")
+        showVizHudBadge("Diseño: ${names[next]}")
+        reorderStageContainers()
+    }
+
+    private fun buildLandscapeWindowTabBar(): LinearLayout {
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(6), dp(2), dp(6), dp(4))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#E60D101C"))
+                cornerRadius = dpf(8f)
+                setStroke(dp(1), Color.parseColor("#2538BDF8"))
+            }
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(32)).apply {
+                bottomMargin = dp(4)
+            }
+        }
+
+        fun makeTab(label: String, winId: String?) = TextView(this).apply {
+            text = label
+            textSize = 10.5f
+            val isActive = (winId == fullscreenWindowId)
+            setTextColor(if (isActive) Color.WHITE else Color.parseColor("#94A3B8"))
+            setTypeface(Typeface.create("sans-serif-medium", if (isActive) Typeface.BOLD else Typeface.NORMAL))
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(3), dp(8), dp(3))
+            background = GradientDrawable().apply {
+                setColor(if (isActive) Color.parseColor("#2638BDF8") else Color.TRANSPARENT)
+                cornerRadius = dpf(6f)
+                if (isActive) setStroke(dp(1), Color.parseColor("#38BDF8"))
+            }
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(2)
+                marginEnd = dp(2)
+            }
+            isClickable = true
+            setOnClickListener {
+                fullscreenWindowId = winId
+                showVizHudBadge(if (winId != null) "Ventana: $label" else "Vista de Cuadrícula")
+                reorderStageContainers()
+            }
+        }
+
+        bar.addView(makeTab("Portada", "cover"))
+        bar.addView(makeTab("Visualizador", "viz"))
+        bar.addView(makeTab("Letras", "lyrics"))
+        bar.addView(makeTab("Doki", "doki"))
+        bar.addView(makeTab("Cuadrícula", null))
+        return bar
+    }
+
     private fun reorderStageContainers() {
-        if (!::unifiedStageBlock.isInitialized || !::stageColumnsRow.isInitialized) return
+        if (!::unifiedStageBlock.isInitialized) return
+        ensureWindowFrames()
 
         // Smooth home screen launcher spring physics transition
         if (!MotionTokens.isReducedMotion(this) && unifiedStageBlock.isAttachedToWindow) {
             val transition = AutoTransition().apply {
-                duration = 340
+                duration = 320
                 interpolator = PathInterpolator(0.22f, 1f, 0.36f, 1f)
             }
             TransitionManager.beginDelayedTransition(unifiedStageBlock, transition)
         }
 
-        val coverAtBottom = SonoraStore.getBool(this, "stage_cover_at_bottom", false)
-        val columnsSwapped = SonoraStore.getBool(this, "stage_columns_swapped", false)
-        val vizPos = SonoraStore.getInt(this, "stage_viz_position", 0)
-
-        safeDetach(dokiLeftCol)
-        safeDetach(lyricsRightCol)
-        safeDetach(stageLyricsScroll)
-        safeDetach(vizDeckCard)
         safeDetach(stageExpandedCoverCard)
         safeDetach(stageVideoCard)
+        safeDetach(vizDeckCard)
+        safeDetach(stageLyricsScroll)
+        safeDetach(dokiLeftCol)
 
-        // 1. Reassemble lyricsRightCol (Lyrics vs Viz)
-        lyricsRightCol.removeAllViews()
-        when (vizPos) {
-            1 -> { // Viz above lyrics
-                lyricsRightCol.addView(vizDeckCard)
-                lyricsRightCol.addView(stageLyricsScroll)
-            }
-            2, 3 -> { // Viz is docked at full width in stage, so only lyrics in this column
-                lyricsRightCol.addView(stageLyricsScroll)
-            }
-            else -> { // 0: Viz below lyrics
-                lyricsRightCol.addView(stageLyricsScroll)
-                lyricsRightCol.addView(vizDeckCard)
-            }
+        // Reset translations and scaling
+        coverWindowFrame.translationX = 0f; coverWindowFrame.translationY = 0f
+        vizWindowFrame.translationX = 0f; vizWindowFrame.translationY = 0f
+        lyricsWindowFrame.translationX = 0f; lyricsWindowFrame.translationY = 0f
+        dokiWindowFrame.translationX = 0f; dokiWindowFrame.translationY = 0f
+
+        // Wrap actual views into window frames
+        val coverBox = FrameLayout(this).apply {
+            addView(stageExpandedCoverCard)
+            addView(stageVideoCard)
         }
+        coverWindowFrame.setContent(coverBox)
+        vizWindowFrame.setContent(vizDeckCard)
+        lyricsWindowFrame.setContent(stageLyricsScroll)
+        dokiWindowFrame.setContent(dokiLeftCol)
 
-        // 2. Reassemble stageColumnsRow (Doki vs Lyrics/Viz column)
-        stageColumnsRow.removeAllViews()
-        if (columnsSwapped) {
-            stageColumnsRow.addView(lyricsRightCol)
-            stageColumnsRow.addView(dokiLeftCol)
-        } else {
-            stageColumnsRow.addView(dokiLeftCol)
-            stageColumnsRow.addView(lyricsRightCol)
-        }
-
-        // 3. Reassemble unifiedStageBlock
         unifiedStageBlock.removeAllViews()
-        val coverCards = listOf(stageExpandedCoverCard, stageVideoCard)
 
-        when (vizPos) {
-            2 -> { // Viz full-width in the middle (between cover and columns)
-                if (coverAtBottom) {
-                    unifiedStageBlock.addView(stageColumnsRow)
-                    unifiedStageBlock.addView(vizDeckCard)
-                    coverCards.forEach { unifiedStageBlock.addView(it) }
-                } else {
-                    coverCards.forEach { unifiedStageBlock.addView(it) }
-                    unifiedStageBlock.addView(vizDeckCard)
-                    unifiedStageBlock.addView(stageColumnsRow)
-                }
+        if (isLandscapeMode) {
+            unifiedStageBlock.addView(buildLandscapeWindowTabBar())
+        }
+
+        // 1. FULLSCREEN SINGLE WINDOW MODE
+        if (fullscreenWindowId != null) {
+            val targetFrame = when (fullscreenWindowId) {
+                "cover" -> coverWindowFrame
+                "viz" -> vizWindowFrame
+                "lyrics" -> lyricsWindowFrame
+                "doki" -> dokiWindowFrame
+                else -> null
             }
-            3 -> { // Viz full-width at the bottom of the stage
-                if (coverAtBottom) {
-                    coverCards.forEach { unifiedStageBlock.addView(it) }
-                    unifiedStageBlock.addView(stageColumnsRow)
-                    unifiedStageBlock.addView(vizDeckCard)
-                } else {
-                    coverCards.forEach { unifiedStageBlock.addView(it) }
-                    unifiedStageBlock.addView(stageColumnsRow)
-                    unifiedStageBlock.addView(vizDeckCard)
-                }
+            if (targetFrame != null) {
+                targetFrame.layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+                ).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) }
+                unifiedStageBlock.addView(targetFrame)
+                updateStageLayout()
+                return
             }
-            else -> {
-                if (coverAtBottom) {
-                    unifiedStageBlock.addView(stageColumnsRow)
-                    coverCards.forEach { unifiedStageBlock.addView(it) }
-                } else {
-                    coverCards.forEach { unifiedStageBlock.addView(it) }
-                    unifiedStageBlock.addView(stageColumnsRow)
+        }
+
+        // 2. MULTI-WINDOW GRID MODES
+        val currentGrid = SonoraStore.getInt(this, "stage_grid_snap_mode", 0)
+        when (currentGrid) {
+            0 -> { // 2x2 QUAD SNAP (Windows 4-corner snap)
+                val row1 = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply {
+                        bottomMargin = dp(4)
+                    }
                 }
+                val row2 = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+                }
+                coverWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply { marginEnd = dp(4) }
+                dokiWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply { marginEnd = dp(4) }
+                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+
+                row1.addView(coverWindowFrame)
+                row1.addView(dokiWindowFrame)
+                row2.addView(vizWindowFrame)
+                row2.addView(lyricsWindowFrame)
+
+                unifiedStageBlock.addView(row1)
+                unifiedStageBlock.addView(row2)
+            }
+            1 -> { // SPLIT 50/50 (Dividido Izquierda / Derecha)
+                val splitRow = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+                }
+                val leftCol = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply { marginEnd = dp(4) }
+                }
+                val rightCol = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                }
+                coverWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.55f).apply { bottomMargin = dp(4) }
+                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.45f)
+                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.60f).apply { bottomMargin = dp(4) }
+                dokiWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.40f)
+
+                leftCol.addView(coverWindowFrame)
+                leftCol.addView(vizWindowFrame)
+                rightCol.addView(lyricsWindowFrame)
+                rightCol.addView(dokiWindowFrame)
+
+                splitRow.addView(leftCol)
+                splitRow.addView(rightCol)
+                unifiedStageBlock.addView(splitRow)
+            }
+            2 -> { // BENTO PIP (Video minimizado en monitor PIP en la esquina, visualizador y letras amplios)
+                val topRow = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(140)).apply { bottomMargin = dp(4) }
+                }
+                dokiWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.55f).apply { marginEnd = dp(4) }
+                coverWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.45f)
+                topRow.addView(dokiWindowFrame)
+                topRow.addView(coverWindowFrame)
+
+                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(86)).apply { bottomMargin = dp(4) }
+                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+
+                unifiedStageBlock.addView(topRow)
+                unifiedStageBlock.addView(vizWindowFrame)
+                unifiedStageBlock.addView(lyricsWindowFrame)
+            }
+            else -> { // CLASICO APILADO
+                val coverH = if (isCoverMinimizedPip) dp(90) else dp(SonoraStore.getInt(this, "player_cover_height_dp", 228))
+                coverWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, coverH).apply { bottomMargin = dp(4) }
+                unifiedStageBlock.addView(coverWindowFrame)
+
+                val bottomCols = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+                }
+                dokiWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.39f).apply { marginEnd = dp(4) }
+                val rightStack = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.61f)
+                }
+                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = dp(4) }
+                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(76))
+                rightStack.addView(lyricsWindowFrame)
+                rightStack.addView(vizWindowFrame)
+
+                bottomCols.addView(dokiWindowFrame)
+                bottomCols.addView(rightStack)
+                unifiedStageBlock.addView(bottomCols)
             }
         }
         updateStageLayout()
@@ -2642,6 +3344,82 @@ class MainActivity : AppCompatActivity(), RowHost {
                 }
             }
             root.addView(hintCard)
+
+            val gridTitle = TextView(this).apply {
+                text = "Cuadrícula y Ventanas (Windows Snap)"
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                setPadding(0, 0, 0, dp(6))
+            }
+            root.addView(gridTitle)
+
+            val gridRow1 = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(6)
+                }
+            }
+            val curSnap = SonoraStore.getInt(this, "stage_grid_snap_mode", 0)
+            val btn2x2 = Pill(this, if (curSnap == 0) "● Cuadrícula 2x2" else "Cuadrícula 2x2", R.drawable.ic_widgets, 34)
+            btn2x2.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
+            btn2x2.setOnClickListener {
+                SonoraStore.putInt(this@MainActivity, "stage_grid_snap_mode", 0)
+                fullscreenWindowId = null
+                reorderStageContainers()
+                showVizHudBadge("Cuadrícula 2x2 activada")
+            }
+            val btnSplit = Pill(this, if (curSnap == 1) "● Dividido 50/50" else "Dividido 50/50", R.drawable.ic_sliders, 34)
+            btnSplit.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            btnSplit.setOnClickListener {
+                SonoraStore.putInt(this@MainActivity, "stage_grid_snap_mode", 1)
+                fullscreenWindowId = null
+                reorderStageContainers()
+                showVizHudBadge("Dividido 50/50 activado")
+            }
+            gridRow1.addView(btn2x2)
+            gridRow1.addView(btnSplit)
+            root.addView(gridRow1)
+
+            val gridRow2 = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(14)
+                }
+            }
+            val btnBento = Pill(this, if (curSnap == 2) "● Bento PIP" else "Bento PIP", R.drawable.ic_sparkles, 34)
+            btnBento.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
+            btnBento.setOnClickListener {
+                SonoraStore.putInt(this@MainActivity, "stage_grid_snap_mode", 2)
+                fullscreenWindowId = null
+                reorderStageContainers()
+                showVizHudBadge("Bento PIP activado")
+            }
+            val btnClassic = Pill(this, if (curSnap == 3) "● Clásico Apilado" else "Clásico Apilado", R.drawable.ic_list_music, 34)
+            btnClassic.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            btnClassic.setOnClickListener {
+                SonoraStore.putInt(this@MainActivity, "stage_grid_snap_mode", 3)
+                fullscreenWindowId = null
+                reorderStageContainers()
+                showVizHudBadge("Clásico Apilado activado")
+            }
+            gridRow2.addView(btnBento)
+            gridRow2.addView(btnClassic)
+            root.addView(gridRow2)
+
+            if (fullscreenWindowId != null) {
+                val restoreFullscreenBtn = Pill(this, "Restaurar Cuadrícula (Salir de Pantalla Completa)", R.drawable.ic_refresh, 36).apply {
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        bottomMargin = dp(12)
+                    }
+                    setOnClickListener {
+                        fullscreenWindowId = null
+                        reorderStageContainers()
+                        showVizHudBadge("Cuadrícula restaurada")
+                    }
+                }
+                root.addView(restoreFullscreenBtn)
+            }
 
             // Posición de Elementos (Toggles rápidos)
             val posTitle = TextView(this).apply {
@@ -3506,16 +4284,21 @@ class MainActivity : AppCompatActivity(), RowHost {
 
                 if (absX > absY && absX > dp(40) && kotlin.math.abs(velocityX) > 200) {
                     targetView.parent?.requestDisallowInterceptTouchEvent(true)
+                    if (isLandscapeMode || fullscreenWindowId != null) {
+                        if (Haptics.enabled) targetView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        cycleFullscreenWindow(forward = (diffX < 0))
+                        return true
+                    }
                     if (diffX < 0) {
                         // Swipe Left -> Next
                         if (Haptics.enabled) targetView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                         playNext()
-                        Toast.makeText(this@MainActivity, "Siguiente pista \u2192", Toast.LENGTH_SHORT).show()
+                        showVizHudBadge("Siguiente pista →")
                     } else {
                         // Swipe Right -> Previous
                         if (Haptics.enabled) targetView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                         playPrevious()
-                        Toast.makeText(this@MainActivity, "\u2190 Pista anterior", Toast.LENGTH_SHORT).show()
+                        showVizHudBadge("← Pista anterior")
                     }
                     return true
                 } else if (absY > absX && absY > dp(50) && kotlin.math.abs(velocityY) > 200) {

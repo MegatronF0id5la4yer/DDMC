@@ -3064,57 +3064,88 @@ object MusicoletSettingsCenter {
             ) { openBackupRestoreScreen() }
         )
 
-        for (cat in categories) {
-            val card = LinearLayout(activity).apply {
+        val gridContainer = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        for (i in categories.indices step 2) {
+            val row = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setBackgroundResource(R.drawable.bg_card_spotiflac)
-                setPadding(dp(activity, 14), dp(activity, 14), dp(activity, 14), dp(activity, 14))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { bottomMargin = dp(activity, 8) }
-                setOnClickListener { cat.onClick() }
             }
-            card.addView(ImageView(activity).apply {
-                setImageResource(cat.iconRes)
-                setColorFilter(Color.parseColor("#22D3EE"))
-                val p = dp(activity, 8)
-                setPadding(p, p, p, p)
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(Color.parseColor("#1422D3EE"))
+
+            fun buildBentoCard(cat: CatItem): View {
+                val card = LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor("#121524"))
+                        cornerRadius = dpf(activity, 12f)
+                        setStroke(dp(activity, 1), Color.parseColor("#2638BDF8"))
+                    }
+                    setPadding(dp(activity, 12), dp(activity, 12), dp(activity, 12), dp(activity, 12))
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    setOnClickListener { cat.onClick() }
                 }
-                layoutParams = LinearLayout.LayoutParams(dp(activity, 38), dp(activity, 38)).apply {
-                    marginEnd = dp(activity, 14)
+                val topRow = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        bottomMargin = dp(activity, 8)
+                    }
                 }
-            })
-            val textCol = LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                topRow.addView(ImageView(activity).apply {
+                    setImageResource(cat.iconRes)
+                    setColorFilter(Color.parseColor("#38BDF8"))
+                    val p = dp(activity, 6)
+                    setPadding(p, p, p, p)
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.parseColor("#1838BDF8"))
+                    }
+                    layoutParams = LinearLayout.LayoutParams(dp(activity, 32), dp(activity, 32))
+                })
+                topRow.addView(View(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
+                })
+                topRow.addView(ImageView(activity).apply {
+                    setImageResource(R.drawable.ic_chevron_right)
+                    setColorFilter(Color.parseColor("#64748B"))
+                    layoutParams = LinearLayout.LayoutParams(dp(activity, 14), dp(activity, 14))
+                })
+                card.addView(topRow)
+
+                card.addView(TextView(activity).apply {
+                    text = cat.title
+                    textSize = 13f
+                    setTextColor(Color.WHITE)
+                    setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                })
+                card.addView(TextView(activity).apply {
+                    text = cat.subtitle
+                    textSize = 10.5f
+                    setTextColor(Color.parseColor("#94A3B8"))
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setPadding(0, dp(activity, 2), 0, 0)
+                })
+                return card
             }
-            textCol.addView(TextView(activity).apply {
-                text = cat.title
-                textSize = 14.5f
-                setTextColor(Color.WHITE)
-                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
-            })
-            textCol.addView(TextView(activity).apply {
-                text = cat.subtitle
-                textSize = 12f
-                setTextColor(Color.parseColor("#94A3B8"))
-                setPadding(0, dp(activity, 2), 0, 0)
-            })
-            card.addView(textCol)
-            card.addView(ImageView(activity).apply {
-                setImageResource(R.drawable.ic_chevron_right)
-                setColorFilter(Color.parseColor("#64748B"))
-                layoutParams = LinearLayout.LayoutParams(dp(activity, 18), dp(activity, 18)).apply {
-                    marginStart = dp(activity, 8)
-                }
-            })
-            mainBody.addView(card)
+
+            val c1 = buildBentoCard(categories[i])
+            row.addView(c1)
+            if (i + 1 < categories.size) {
+                (c1.layoutParams as LinearLayout.LayoutParams).marginEnd = dp(activity, 8)
+                val c2 = buildBentoCard(categories[i + 1])
+                row.addView(c2)
+            }
+            gridContainer.addView(row)
         }
+        mainBody.addView(gridContainer)
 
         pushPage(mainPage)
         dialog.setContentView(root)
