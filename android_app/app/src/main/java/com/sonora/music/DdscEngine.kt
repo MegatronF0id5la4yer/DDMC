@@ -893,7 +893,12 @@ class DokiStageSpriteView(context: Context) : View(context) {
     private fun spawnParticles(symbol: String, count: Int) {
         val cx = if (posX > 0f) posX else width / 2f
         val cy = if (posY > 0f) posY - context.dpf(60f) else height * 0.5f
-        for (i in 0 until count) {
+        val allowedCount = minOf(count, PerformanceEngine.maxParticles)
+        val maxTotal = PerformanceEngine.maxParticles * 3
+        while (particles.size > maxTotal && particles.isNotEmpty()) {
+            particles.removeAt(0)
+        }
+        for (i in 0 until allowedCount) {
             particles.add(
                 FloatingParticle(
                     x = cx + (Random.nextFloat() - 0.5f) * context.dpf(50f),
@@ -1110,6 +1115,15 @@ class DokiStageSpriteView(context: Context) : View(context) {
         if (w <= 0f || h <= 0f) return
 
         val now = System.currentTimeMillis()
+        val interval = PerformanceEngine.dokiFrameIntervalMs
+        if (now - lastDrawMs < interval && lastDrawMs != 0L) {
+            if (isShown && windowVisibility == VISIBLE) {
+                postInvalidateDelayed(interval - (now - lastDrawMs))
+            }
+            return
+        }
+        lastDrawMs = now
+
         if (isChibiMode && customLockedPath == null) {
             drawPinkChanShimeji(canvas, w, h, now)
         } else {
@@ -1118,7 +1132,11 @@ class DokiStageSpriteView(context: Context) : View(context) {
         drawParticlesAndSpeechBubble(canvas, w, h, now)
 
         if (isShown && windowVisibility == VISIBLE) {
-            postInvalidateOnAnimation()
+            if (PerformanceEngine.isPotatoMode) {
+                postInvalidateDelayed(interval)
+            } else {
+                postInvalidateOnAnimation()
+            }
         }
     }
 

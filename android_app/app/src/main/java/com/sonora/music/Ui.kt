@@ -349,7 +349,7 @@ object GifImageSupport {
                 }
                 val decodeOpts = android.graphics.BitmapFactory.Options().apply {
                     inSampleSize = sampleSize.coerceAtLeast(1)
-                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                    inPreferredConfig = PerformanceEngine.preferredBitmapConfig
                 }
                 val decoded = context.contentResolver.openInputStream(uri)?.use {
                     android.graphics.BitmapFactory.decodeStream(it, null, decodeOpts)
@@ -401,7 +401,7 @@ object GifImageSupport {
                     while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1024) sample *= 2
                     val opts = android.graphics.BitmapFactory.Options().apply {
                         inSampleSize = sample
-                        inPreferredConfig = Bitmap.Config.ARGB_8888
+                        inPreferredConfig = PerformanceEngine.preferredBitmapConfig
                     }
                     val decoded = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
                     val norm = normalizeAnySizeBitmap(decoded, 640, preserveFullImage = true)
@@ -447,7 +447,7 @@ object GifImageSupport {
                         while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1024) sample *= 2
                         val opts = android.graphics.BitmapFactory.Options().apply {
                             inSampleSize = sample
-                            inPreferredConfig = Bitmap.Config.ARGB_8888
+                            inPreferredConfig = PerformanceEngine.preferredBitmapConfig
                         }
                         val decoded = android.graphics.BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, opts)
                         val norm = normalizeAnySizeBitmap(decoded, 640, preserveFullImage = true)

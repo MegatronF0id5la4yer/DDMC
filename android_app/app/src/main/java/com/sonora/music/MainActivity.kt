@@ -208,11 +208,14 @@ class VisualizerView(context: Context) : View(context) {
     private var rawWaveform: ByteArray? = null
     private var hasRealFftSignal = false
     private var hasRealWaveSignal = false
-    private val bands = 44
-    private val magnitudes = FloatArray(bands)
-    private val peakCaps = FloatArray(bands)
+    private val bands: Int
+        get() = PerformanceEngine.visualizerBands
+    private val maxBands = 44
+    private val magnitudes = FloatArray(maxBands)
+    private val peakCaps = FloatArray(maxBands)
     private val waterfallHistory = ArrayDeque<FloatArray>()
-    private val maxHistoryRows = 28
+    private val maxHistoryRows: Int
+        get() = PerformanceEngine.maxWaterfallRows
     private var phase = 0f
     private var lastFrameMs = 0L
     var songBpm: Float = 120f
@@ -395,6 +398,14 @@ class VisualizerView(context: Context) : View(context) {
 
         val reducedMotion = MotionTokens.isReducedMotion(context)
         val now = System.currentTimeMillis()
+        val interval = PerformanceEngine.frameIntervalMs
+        if (now - lastFrameMs < interval && lastFrameMs != 0L) {
+            val settling = !isPlaying && magnitudes[0] > 0.055f
+            if (isShown && windowVisibility == VISIBLE && (isPlaying || settling) && !reducedMotion) {
+                postInvalidateDelayed(interval - (now - lastFrameMs))
+            }
+            return
+        }
         val dtSec = if (lastFrameMs > 0L) ((now - lastFrameMs) / 1000f).coerceIn(0.005f, 0.05f) else 0.016f
         lastFrameMs = now
 
@@ -427,7 +438,11 @@ class VisualizerView(context: Context) : View(context) {
         // Suspend animation loop when hidden, detached, or paused at rest
         val settling = !isPlaying && magnitudes[0] > 0.055f
         if (isShown && windowVisibility == VISIBLE && (isPlaying || settling) && !reducedMotion) {
-            postInvalidateOnAnimation()
+            if (PerformanceEngine.isPotatoMode) {
+                postInvalidateDelayed(interval)
+            } else {
+                postInvalidateOnAnimation()
+            }
         }
     }
 
@@ -1124,6 +1139,7 @@ class MainActivity : AppCompatActivity(), RowHost {
     // ==========================================================
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        PerformanceEngine.init(this)
         GifImageSupport.ensure(this)
         ThemeEngine.apply(this)
         Haptics.enabled = SonoraStore.getBool(this, "haptics", true)
@@ -2840,13 +2856,106 @@ class MainActivity : AppCompatActivity(), RowHost {
 
             root.addView(Pill(this, "Posición de Pestañas", R.drawable.ic_sliders, 38).apply {
                 layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                    bottomMargin = dp(8)
+                    bottomMargin = dp(14)
                 }
                 setOnClickListener {
                     dialog.dismiss()
                     showTabBarPositionDialog()
                 }
             })
+
+            // Rendimiento & Optimización para celulares patata y gama alta
+            val perfTitle = TextView(this).apply {
+                text = "Modos de Rendimiento (Sin perder funciones)"
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                setPadding(0, dp(4), 0, dp(4))
+            }
+            root.addView(perfTitle)
+
+            val perfSub = TextView(this).apply {
+                text = "Optimiza para celulares modestos o exprime los 120 FPS. Todas las funciones (visualizador, dokis, video covers y letras) se mantienen 100% activas."
+                setTextColor(Color.parseColor(Pal.SUB))
+                textSize = 11.5f
+                setPadding(0, 0, 0, dp(8))
+            }
+            root.addView(perfSub)
+
+            val perfStatusTv = TextView(this).apply {
+                text = PerformanceEngine.getShortLabel()
+                setTextColor(Color.parseColor(Pal.ACCENT))
+                textSize = 12.5f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                setPadding(0, 0, 0, dp(8))
+            }
+            root.addView(perfStatusTv)
+
+            val perfRow = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(8)
+                }
+            }
+
+            val potatoBtn = Pill(this, "Modo Patata (30 FPS / Ahorro CPU y RAM)", R.drawable.ic_bolt, 36).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(6)
+                }
+                setOnClickListener {
+                    PerformanceEngine.setMode(this@MainActivity, PerformanceEngine.MODE_POTATO)
+                    perfStatusTv.text = PerformanceEngine.getShortLabel()
+                    showVizHudBadge("Modo Patata activado (30 FPS)")
+                    if (::visualizerView.isInitialized) visualizerView.postInvalidate()
+                    if (::dokiSpriteView.isInitialized) dokiSpriteView.postInvalidate()
+                }
+            }
+            val balancedBtn = Pill(this, "Modo Equilibrado (60 FPS Fluido)", R.drawable.ic_check, 36).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(6)
+                }
+                setOnClickListener {
+                    PerformanceEngine.setMode(this@MainActivity, PerformanceEngine.MODE_BALANCED)
+                    perfStatusTv.text = PerformanceEngine.getShortLabel()
+                    showVizHudBadge("Modo Equilibrado activado (60 FPS)")
+                    if (::visualizerView.isInitialized) visualizerView.postInvalidate()
+                    if (::dokiSpriteView.isInitialized) dokiSpriteView.postInvalidate()
+                }
+            }
+            val ultraBtn = Pill(this, "Modo Ultra (120 FPS / Máxima Fidelidad)", R.drawable.ic_sparkles, 36).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(6)
+                }
+                setOnClickListener {
+                    PerformanceEngine.setMode(this@MainActivity, PerformanceEngine.MODE_ULTRA)
+                    perfStatusTv.text = PerformanceEngine.getShortLabel()
+                    showVizHudBadge("Modo Ultra activado (120 FPS)")
+                    if (::visualizerView.isInitialized) visualizerView.postInvalidate()
+                    if (::dokiSpriteView.isInitialized) dokiSpriteView.postInvalidate()
+                }
+            }
+            val autoDetectBtn = Pill(this, "Auto-detectar según Hardware", R.drawable.ic_refresh, 36).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(8)
+                }
+                setOnClickListener {
+                    val isPotato = PerformanceEngine.isLowEndHardware(this@MainActivity)
+                    val mode = if (isPotato) PerformanceEngine.MODE_POTATO else PerformanceEngine.MODE_BALANCED
+                    PerformanceEngine.setMode(this@MainActivity, mode)
+                    perfStatusTv.text = PerformanceEngine.getShortLabel()
+                    val msg = if (isPotato) "Dispositivo modesto detectado: Modo Patata (30 FPS)" else "Dispositivo óptimo: Modo Equilibrado (60 FPS)"
+                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+                    showVizHudBadge(msg)
+                    if (::visualizerView.isInitialized) visualizerView.postInvalidate()
+                    if (::dokiSpriteView.isInitialized) dokiSpriteView.postInvalidate()
+                }
+            }
+
+            perfRow.addView(potatoBtn)
+            perfRow.addView(balancedBtn)
+            perfRow.addView(ultraBtn)
+            perfRow.addView(autoDetectBtn)
+            root.addView(perfRow)
         }
     }
 

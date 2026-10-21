@@ -2869,8 +2869,23 @@ object MusicoletSettingsCenter {
             addSwitchItem(body, "Ignorar artículos iniciales al ordenar ('The', 'A', 'El', 'La', 'Los')", "Útil para ordenar 'The Beatles' en la B o 'Los Bunkers' en la B", "sort_ignore_articles", true)
             addCycleOptionItem(body, "Ordenación alfanumérica (Alphanumerische Sortierung)", "adv_alphanum_sort", listOf("Natural (Pista 1, Pista 2, Pista 10)", "ASCII estricto (Ninguna)"))
 
-            addSectionHeader(body, "Rendimiento y Gestión de Caché (Namida Advanced)")
-            addCycleOptionItem(body, "Modo de rendimiento (Performance mode)", "adv_perf_mode", listOf("Personalizado (60 FPS Ultra Fluido)", "Equilibrado", "Ahorro de batería"))
+            addSectionHeader(body, "Rendimiento y Optimización de Hardware")
+            addCycleOptionItem(
+                body,
+                "Perfil de Rendimiento (Sin perder funciones)",
+                PerformanceEngine.PREF_PERF_MODE,
+                listOf(
+                    PerformanceEngine.getModeName(PerformanceEngine.MODE_POTATO),
+                    PerformanceEngine.getModeName(PerformanceEngine.MODE_BALANCED),
+                    PerformanceEngine.getModeName(PerformanceEngine.MODE_ULTRA)
+                )
+            )
+            addActionCard(body, "Auto-detectar hardware y aplicar perfil", "Evalúa núcleos CPU y memoria RAM disponible para configurar automáticamente") {
+                val isPotato = PerformanceEngine.isLowEndHardware(activity)
+                val mode = if (isPotato) PerformanceEngine.MODE_POTATO else PerformanceEngine.MODE_BALANCED
+                PerformanceEngine.setMode(activity, mode)
+                Toast.makeText(activity, "Perfil aplicado: " + PerformanceEngine.getModeName(mode), Toast.LENGTH_SHORT).show()
+            }
             addSwitchItem(body, "Comprimir imágenes en caché (Compress Images)", "Reduce el uso de almacenamiento de miniaturas", "adv_compress_cache_imgs", false)
             addSliderItem(body, "Tamaño máximo de caché de imágenes", "adv_max_img_cache_mb", 100, 5000, 1470) { String.format(Locale.US, "%.2f GB", it / 1000f) }
             addSliderItem(body, "Tamaño máximo de caché de audio", "adv_max_audio_cache_mb", 500, 10000, 4210) { String.format(Locale.US, "%.2f GB", it / 1000f) }
