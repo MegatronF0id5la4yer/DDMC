@@ -82,6 +82,7 @@ class SonoraAudioProcessor : BaseAudioProcessor() {
     // Simple 1st-order IIR low-pass filter states for bass boost
     private var lLow: Float = 0f
     private var rLow: Float = 0f
+    private val nativePcmFeed = FloatArray(512)
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         // We handle 16-bit PCM. If input is 16-bit PCM, enforce 2 channels stereo output.
@@ -176,8 +177,17 @@ class SonoraAudioProcessor : BaseAudioProcessor() {
             val finalL = left.coerceIn(-32768, 32767).toShort()
             val finalR = right.coerceIn(-32768, 32767).toShort()
 
+            if (i < 512) {
+                nativePcmFeed[i] = ((finalL.toInt() + finalR.toInt()) * 0.5f) / 32768.0f
+            }
+
             outBuffer.putShort(finalL)
             outBuffer.putShort(finalR)
+        }
+
+        if (frameCount > 0 && DdmcNative.isAvailable) {
+            val feedCount = minOf(frameCount, 512)
+            DdmcNative.feedAudioSamples(nativePcmFeed, feedCount, 1)
         }
 
         outBuffer.flip()

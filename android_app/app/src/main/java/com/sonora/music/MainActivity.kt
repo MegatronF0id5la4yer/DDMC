@@ -233,6 +233,10 @@ class VisualizerView(context: Context) : View(context) {
     private val maxBands = 44
     private val magnitudes = FloatArray(maxBands)
     private val peakCaps = FloatArray(maxBands)
+    private val nativeMags = FloatArray(maxBands)
+    private val nativeCaps = FloatArray(maxBands)
+    private val nativeWave = FloatArray(128)
+    private var usedNativeEngine = false
     private val waterfallHistory = ArrayDeque<FloatArray>()
     private val maxHistoryRows: Int
         get() = PerformanceEngine.maxWaterfallRows
@@ -448,7 +452,29 @@ class VisualizerView(context: Context) : View(context) {
             val bpmSpeed = (bpm / 120f) * 2.8f
             phase += dtSec * bpmSpeed
         }
-        if (!hasRealFftSignal || !isPlaying) {
+
+        usedNativeEngine = false
+        if (DdmcNative.isAvailable && isPlaying) {
+            val processed = DdmcNative.processSpectrum(dtSec, nativeMags, nativeCaps, nativeWave)
+            if (processed) {
+                var maxEnergy = 0f
+                val count = minOf(bands, nativeMags.size)
+                for (i in 0 until count) {
+                    val m = nativeMags[i]
+                    if (m > maxEnergy) maxEnergy = m
+                }
+                if (maxEnergy > 0.045f) {
+                    hasRealFftSignal = true
+                    usedNativeEngine = true
+                    for (i in 0 until count) {
+                        magnitudes[i] = nativeMags[i]
+                        peakCaps[i] = nativeCaps[i]
+                    }
+                }
+            }
+        }
+
+        if (!usedNativeEngine && (!hasRealFftSignal || !isPlaying)) {
             stepAcousticSimulation()
         }
 
@@ -529,13 +555,16 @@ class VisualizerView(context: Context) : View(context) {
         var prevY2 = midY
 
         val wave = rawWaveform
-        val useWave = hasRealWaveSignal && wave != null && wave.isNotEmpty() && isPlaying
+        val useWave = (hasRealWaveSignal && wave != null && wave.isNotEmpty() && isPlaying) || (usedNativeEngine && isPlaying)
 
         for (i in 0 until points) {
             val x = i * dx
-            val sample: Float = if (useWave && wave != null) {
+            val sample: Float = if (hasRealWaveSignal && wave != null && wave.isNotEmpty()) {
                 val idx = ((i.toFloat() / points) * wave.size).toInt().coerceIn(0, wave.size - 1)
                 ((wave[idx].toInt() and 0xFF) - 128) / 128f
+            } else if (usedNativeEngine) {
+                val idx = ((i.toFloat() / points) * 128).toInt().coerceIn(0, 127)
+                nativeWave[idx]
             } else {
                 val bandIdx = ((i.toFloat() / points) * (bands - 1)).toInt().coerceIn(0, bands - 1)
                 val env = if (isPlaying) magnitudes[bandIdx] else 0.05f
@@ -3518,7 +3547,8 @@ class MainActivity : AppCompatActivity(), RowHost {
     }
 
     fun showPlayerLayoutCustomizerSheet() {
-        showSheet(fullHeight = true) { root, dialog ->
+        FakePaywall.maybeIntercept(this, "Personalizar reproductor") {
+            showSheet(fullHeight = true) { root, dialog ->
             root.addView(sheetTitle("Personalizar Reproductor", "Deslizadores continuos y gestos touch directos"))
 
             val hintCard = TextView(this).apply {
@@ -4011,6 +4041,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             root.addView(perfRow)
         }
     }
+    }
 
     fun showTrackAudioCustomizerDialog(t: TrackItem) {
         val curBass = SonoraStore.getInt(this, "track_bass_${t.key}", 0)
@@ -4408,6 +4439,21 @@ class MainActivity : AppCompatActivity(), RowHost {
     }
 
     private fun switchTab(index: Int) {
+        val tabName = when (index) {
+            3 -> "Abrir pestana de Ecualizador y Audio DSP"
+            4 -> "Configurar Widgets de escritorio"
+            else -> null
+        }
+        if (tabName != null) {
+            FakePaywall.maybeIntercept(this, tabName) {
+                performSwitchTab(index)
+            }
+        } else {
+            performSwitchTab(index)
+        }
+    }
+
+    private fun performSwitchTab(index: Int) {
         currentTab = index
         val views = listOf(
             playerTabContainer, localFilesTabContainer, playlistTabContainer,
@@ -4454,11 +4500,13 @@ class MainActivity : AppCompatActivity(), RowHost {
     }
 
     private fun cycleVisualizerMode() {
-        val next = (visualizerStripView.visualMode + 1) % VisualizerView.MODE_NAMES.size
+        FakePaywall.maybeIntercept(this, "Cambiar modo del visualizador") {
+            val next = (visualizerStripView.visualMode + 1) % VisualizerView.MODE_NAMES.size
         visualizerStripView.visualMode = next
         visualizerView.visualMode = (next + 2) % VisualizerView.MODE_NAMES.size
         val modeName = VisualizerView.MODE_NAMES[next].uppercase()
         visualizerModeBadge.text = "$modeName \u2022 TOCA PARA CAMBIAR"
+        }
     }
 
     private fun cycleAbLoop() {
@@ -9310,26 +9358,30 @@ class MainActivity : AppCompatActivity(), RowHost {
     }
 
     private fun toggleCurrentTrackFavorite() {
-        val t = tracks.getOrNull(currentTrackIndex) ?: run { toastNoTrack(); return }
-        t.isFavorite = SonoraStore.toggleFavorite(this, t.key)
-        localTracksList.find { it.key == t.key }?.isFavorite = t.isFavorite
-        val res = if (t.isFavorite) R.drawable.ic_heart_filled else R.drawable.ic_heart
-        val col = Color.parseColor(if (t.isFavorite) Pal.ACCENT else Pal.SUB)
-        favBtn.setImageResource(res)
-        favBtn.setColorFilter(col)
-        if (::landscapeFavBtn.isInitialized) {
-            landscapeFavBtn.setImageResource(res)
-            landscapeFavBtn.setColorFilter(col)
+        FakePaywall.maybeIntercept(this, "Guardar cancion en Favoritos VIP") {
+            val t = tracks.getOrNull(currentTrackIndex) ?: run { toastNoTrack(); return@maybeIntercept }
+            t.isFavorite = SonoraStore.toggleFavorite(this, t.key)
+            localTracksList.find { it.key == t.key }?.isFavorite = t.isFavorite
+            val res = if (t.isFavorite) R.drawable.ic_heart_filled else R.drawable.ic_heart
+            val col = Color.parseColor(if (t.isFavorite) Pal.ACCENT else Pal.SUB)
+            favBtn.setImageResource(res)
+            favBtn.setColorFilter(col)
+            if (::landscapeFavBtn.isInitialized) {
+                landscapeFavBtn.setImageResource(res)
+                landscapeFavBtn.setColorFilter(col)
+            }
+            refreshLibrary()
+            SonoraWidgetProvider.updateAllWidgets(this)
         }
-        refreshLibrary()
-        SonoraWidgetProvider.updateAllWidgets(this)
     }
 
     private fun setShuffle(enabled: Boolean) {
-        isShuffle = enabled
-        exoPlayer.shuffleModeEnabled = enabled
-        SonoraStore.putBool(this, "shuffle", enabled)
-        applyShuffleRepeatUi()
+        FakePaywall.maybeIntercept(this, if (enabled) "Activar reproduccion aleatoria" else "Desactivar aleatorio") {
+            isShuffle = enabled
+            exoPlayer.shuffleModeEnabled = enabled
+            SonoraStore.putBool(this, "shuffle", enabled)
+            applyShuffleRepeatUi()
+        }
     }
 
     private fun cycleRepeat() {
@@ -9377,23 +9429,26 @@ class MainActivity : AppCompatActivity(), RowHost {
     }
 
     private fun togglePlayPause() {
-        if (tracks.isEmpty()) {
-            if (localTracksList.isNotEmpty()) {
-                playList(localTracksList, 0, autoPlay = true)
-            } else {
-                openSystemFilePicker()
+        FakePaywall.maybeIntercept(this, if (exoPlayer.isPlaying) "Pausar reproduccion" else "Reanudar reproduccion") {
+            if (tracks.isEmpty()) {
+                if (localTracksList.isNotEmpty()) {
+                    playList(localTracksList, 0, autoPlay = true)
+                } else {
+                    openSystemFilePicker()
+                }
+                return@maybeIntercept
             }
-            return
-        }
         if (exoPlayer.playbackState == Player.STATE_IDLE) {
             exoPlayer.prepare()
         }
         if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
         updatePlayState()
+        }
     }
 
     private fun playNext() {
-        if (tracks.isEmpty()) return
+        FakePaywall.maybeIntercept(this, "Saltar a siguiente cancion") {
+            if (tracks.isEmpty()) return@maybeIntercept
         if (exoPlayer.hasNextMediaItem()) {
             exoPlayer.seekToNextMediaItem()
         } else {
@@ -9402,15 +9457,17 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
         exoPlayer.prepare()
         exoPlayer.play()
+        }
     }
 
     private fun playPrevious() {
-        if (tracks.isEmpty()) return
+        FakePaywall.maybeIntercept(this, "Regresar a cancion anterior") {
+            if (tracks.isEmpty()) return@maybeIntercept
         val cur = tracks.getOrNull(currentTrackIndex)
         val minStart = cur?.trimStartMs ?: 0L
         if (exoPlayer.currentPosition > minStart + 3500L) {
             exoPlayer.seekTo(minStart)
-            return
+            return@maybeIntercept
         }
         if (exoPlayer.hasPreviousMediaItem()) {
             exoPlayer.seekToPreviousMediaItem()
@@ -9420,6 +9477,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
         exoPlayer.prepare()
         exoPlayer.play()
+        }
     }
 
     private fun saveQueueState() {

@@ -22,6 +22,7 @@ void FftAnalyzer::setPerfMode(PerfMode mode) {
 void FftAnalyzer::feedAudioSamples(const float* samples, size_t sampleCount, uint32_t channels) {
     if (!samples || sampleCount == 0 || channels == 0) return;
 
+    std::lock_guard<std::mutex> lock(m_mutex);
     for (size_t i = 0; i < sampleCount; i += channels) {
         float mono = 0.0f;
         for (uint32_t c = 0; c < channels; ++c) {
@@ -81,9 +82,12 @@ void FftAnalyzer::computeFft(const std::vector<float>& input, std::vector<std::c
 
 void FftAnalyzer::process(float dtSec) {
     // Unroll circular buffer into contiguous windowed buffer
-    for (size_t i = 0; i < FFT_SIZE; ++i) {
-        size_t readIdx = (m_ringWritePos + i) % FFT_SIZE;
-        m_windowedBuffer[i] = m_sampleRing[readIdx];
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        for (size_t i = 0; i < FFT_SIZE; ++i) {
+            size_t readIdx = (m_ringWritePos + i) % FFT_SIZE;
+            m_windowedBuffer[i] = m_sampleRing[readIdx];
+        }
     }
 
     // Capture 128 points for oscilloscope display

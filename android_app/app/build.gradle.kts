@@ -13,6 +13,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+        manifestPlaceholders["appName"] = "DDMC"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
@@ -22,6 +23,25 @@ android {
             cmake {
                 cppFlags += listOf("-std=c++17", "-O3", "-ffast-math")
             }
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    flavorDimensions += "edition"
+    productFlavors {
+        create("standard") {
+            dimension = "edition"
+            manifestPlaceholders["appName"] = "DDMC"
+            buildConfigField("Boolean", "IS_TROLL_EDITION", "false")
+        }
+        create("troll") {
+            dimension = "edition"
+            applicationIdSuffix = ".troll"
+            manifestPlaceholders["appName"] = "DDMC Version Troll"
+            buildConfigField("Boolean", "IS_TROLL_EDITION", "true")
         }
     }
 

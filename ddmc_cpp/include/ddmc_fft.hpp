@@ -2,6 +2,7 @@
 #include "ddmc_types.hpp"
 #include <vector>
 #include <complex>
+#include <mutex>
 
 namespace ddmc {
 
@@ -32,6 +33,7 @@ private:
     static constexpr size_t FFT_SIZE = 1024;
     static constexpr size_t HALF_FFT = FFT_SIZE / 2;
 
+    mutable std::mutex m_mutex;
     std::vector<float> m_sampleRing;
     size_t m_ringWritePos = 0;
     std::vector<float> m_windowedBuffer;
