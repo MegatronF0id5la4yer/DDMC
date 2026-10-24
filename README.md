@@ -18,6 +18,66 @@ All official releases, changelogs, and binary assets are published on [GitHub Re
 
 ---
 
+## Visual Showcase (Google Pixel Capture)
+
+### Standard Edition Experience
+
+| Landscape Stage (Column Visualizer) | Portrait Stage (Radial Pulse + Blur) |
+|:---:|:---:|
+| ![Landscape Stage](./docs/screenshots/landscape_stage_visualizer.png) | ![Portrait Stage Blur](./docs/screenshots/portrait_radial_pulse_blur.png) |
+| Centered artwork card with side column visualizer and Yuri companion | Real-time Gaussian blur backdrop with 360-degree radial pulse |
+
+| Floating Artwork & Waveform | Per-Track DSP Audio Engine |
+|:---:|:---:|
+| ![Portrait Stage Waveform](./docs/screenshots/portrait_stage_floating_card.png) | ![DSP Audio Controls](./docs/screenshots/dsp_per_track_audio_sheet.png) |
+| Floating rounded square artwork card with live oscilloscope wave | Cavifax bass boost and digital gain customization sheet |
+
+---
+
+### Troll Edition (Micro-Paywall Interceptions)
+
+| Paywall Modal Interceptor | 30s Mock Ad Countdown | Action Interception Toast |
+|:---:|:---:|:---:|
+| ![Troll Paywall Modal](./docs/screenshots/troll_paywall_modal.png) | ![Troll Ad Countdown](./docs/screenshots/troll_ad_countdown.png) | ![Troll Action Skip](./docs/screenshots/troll_action_interception.png) |
+| Doomentio Patreon, NostraCoins & comedy tiers | Colchones Perez mock ad timer | Intercepts play/pause, skips, and sound settings |
+
+---
+
+## Characters and Companions Showcase
+
+DDMC includes built-in interactive companions that celebrate and dance to real audio beats detected by the native C++ engine.
+
+### Doki Doki Literature Club
+
+| Character | Classic | Casual | School | Snug |
+|---|:---:|:---:|:---:|:---:|
+| **Monika** | ![Monika Classic](./docs/characters/monika_classic.png) | - | ![Monika School](./docs/characters/monika_school.png) | ![Monika Snug](./docs/characters/monika_snug.png) |
+| **Sayori** | ![Sayori Classic](./docs/characters/sayori_classic.png) | ![Sayori Casual](./docs/characters/sayori_casual.png) | ![Sayori School](./docs/characters/sayori_school.png) | ![Sayori Snug](./docs/characters/sayori_snug.png) |
+| **Natsuki** | ![Natsuki Classic](./docs/characters/natsuki_classic.png) | ![Natsuki Casual](./docs/characters/natsuki_casual.png) | ![Natsuki School](./docs/characters/natsuki_school.png) | ![Natsuki Snug](./docs/characters/natsuki_snug.png) |
+| **Yuri** | ![Yuri Classic](./docs/characters/yuri_classic.png) | ![Yuri Casual](./docs/characters/yuri_casual.png) | ![Yuri School](./docs/characters/yuri_school.png) | ![Yuri Snug](./docs/characters/yuri_snug.png) |
+
+### Guest Companions
+
+| Character | Stand Pose | Guitar Action | Origin |
+|---|:---:|:---:|---|
+| **Bocchi (Hitori Gotoh)** | ![Bocchi Stand](./docs/characters/bocchi_stand.png) | ![Bocchi Guitar](./docs/characters/bocchi_guitar.png) | Bocchi the Rock! |
+| **Konata Izumi** | ![Konata Stand](./docs/characters/konata_stand.png) | ![Konata Guitar](./docs/characters/konata_guitar.png) | Lucky Star |
+
+---
+
+## Bundled Video Covers (Lucky Star Series)
+
+The repository includes pre-cut video covers located in [`assets/video_covers/`](./assets/video_covers):
+- **`clip_01_konata.mp4`**: Konata Izumi looped sequence.
+- **`clip_02_kagami.mp4`**: Kagami Hiiragi gesture loop.
+- **`clip_03_akira.mp4`**: Akira Kogami idol performance.
+- **`clip_04_miyuki.mp4`**: Miyuki Takara portrait loop.
+- **`clip_05_tsukasa.mp4`**: Tsukasa Hiiragi reaction loop.
+
+All clips are encoded in H.264/AAC at 576x1024 (9:16 portrait) with zero letterboxing when rendered through the matrix center-crop engine.
+
+---
+
 ## Core Architecture and Features
 
 ### 1. Real-Time Native C++ FFT Engine
@@ -48,7 +108,7 @@ All official releases, changelogs, and binary assets are published on [GitHub Re
   - Eliminates overlap between radial/circular visualizers and the album art card in horizontal tablet and landscape phone orientations.
 
 ### 4. Doki Doki Companion Engine
-- **Characters**: Natsuki, Sayori, Yuri, Monika, and Bocchi.
+- **Characters**: Natsuki, Sayori, Yuri, Monika, Bocchi, and Konata.
 - **Beat and Kinetic Physics**: Companions jump, dance, and celebrate in sync with real bass beat drops detected in C++.
 - **Mounting Options**: Companions can sit or dance directly on the spectrum visualizer or wander along the stage dock.
 
