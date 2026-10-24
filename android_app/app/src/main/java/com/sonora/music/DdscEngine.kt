@@ -1,5 +1,4 @@
 package com.sonora.music
-
 import android.content.Context
 import android.graphics.*
 import android.media.MediaPlayer
@@ -16,6 +15,9 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.random.Random
 
+typealias DdscEngine = DanteEngine
+
+
 /**
  * Manages all DDSC `.webp` and `.png` character sprites from `assets/ddsc/`
  * AND all interactive PinkChan Chibi Shimeji skins & sounds from `assets/skins/` and `assets/sounds/`.
@@ -27,7 +29,8 @@ import kotlin.random.Random
  * - Full PinkChan Shimeji physics & behavior state machine (`WALK`, `RUN`, `STAND`, `SIT`/`SNUG`,
  *   `HAPPY_JUMP`, `CLIMB_LEFT`, `CLIMB_RIGHT`, `CEILING`, `FALL`, `DRAGGED`, `FLUNG`, `ANGRY`, `CUSTOM_ACTION`).
  */
-object DdscEngine {
+object DanteEngine {
+    const val ENGINE_NAME = "Dante Engine"
 
     data class OutfitSpriteSet(
         val key: String,
@@ -90,23 +93,23 @@ object DdscEngine {
             ),
             quotesPet = listOf(
                 "N-No es como si me gustara que me acaricies...",
-                "Bueno... solo un poquito más...",
-                "Hmph... tienes suerte de que hoy estoy de buenas 💖"
+                "Bueno... solo un poquito mas...",
+                "Hmph... tienes suerte de que hoy estoy de buenas"
             ),
             quotesAngry = listOf(
-                "¡¡YA BASTA!! ¡¡NO SOY TIERNA!! 💢",
-                "¡¡TE DIJE QUE NO ME MOLESTES, BAKA!! 💢"
+                "YA BASTA!! NO SOY TIERNA!!",
+                "TE DIJE QUE NO ME MOLESTES, BAKA!!"
             ),
             quotesMusic = listOf(
-                "¡Oye, este ritmo está bastante genial! ♪",
-                "¡Súbele más a esta canción! ♫",
-                "Mmm~ me dan ganas de hornear al ritmo de esto 🧁"
+                "Oye, este ritmo esta bastante genial!",
+                "Subele mas a esta cancion!",
+                "Mmm~ me dan ganas de hornear al ritmo de esto"
             ),
             customActions = listOf(
-                CustomActionDef("cupcake", "Comer Cupcake", "🧁", "¡Los mejores cupcakes del club! 🧁✨", "snug"),
-                CustomActionDef("manga", "Leer Parfait Girls", "📖", "No me interrumpas, estoy en la mejor parte 📖", "snug"),
-                CustomActionDef("tsundere", "Berrinche Tsundere", "💢", "¡¡N-NO ESTOY HACIENDO PUCHERO!! 💢", "jump"),
-                CustomActionDef("clone", "Invocar Clon", "✨", "¡Doble Natsuki en el escenario!", "clone")
+                CustomActionDef("cupcake", "Comer Cupcake", "*", "Los mejores cupcakes del club!", "snug"),
+                CustomActionDef("manga", "Leer Parfait Girls", "*", "No me interrumpas, estoy en la mejor parte", "snug"),
+                CustomActionDef("tsundere", "Berrinche Tsundere", "!", "N-NO ESTOY HACIENDO PUCHERO!!", "jump"),
+                CustomActionDef("clone", "Invocar Clon", "+", "Doble Natsuki en el escenario!", "clone")
             )
         ),
         "monika" to PinkChanSkin(
@@ -117,35 +120,35 @@ object DdscEngine {
             colorHex = "#34D399",
             nativeFacesLeft = true,
             quotesIdle = listOf(
-                "¡Bienvenidos al Club de Literatura! 💚",
-                "Estuve practicando esta canción en el piano~",
-                "Siempre es un buen momento para escuchar música contigo.",
+                "Bienvenidos al Club de Literatura!",
+                "Estuve practicando esta cancion en el piano~",
+                "Siempre es un buen momento para escuchar musica contigo.",
                 "Just Monika~"
             ),
             quotesPoke = listOf(
-                "Jeje~ ¿Necesitas mi atención?",
-                "¡Aquí estoy, no me voy a ir a ningún lado!",
-                "¿Qué pasa? ¿Cambiamos de pista?"
+                "Jeje~ Necesitas mi atencion?",
+                "Aqui estoy, no me voy a ir a ningun lado!",
+                "Que pasa? Cambiamos de pista?"
             ),
             quotesPet = listOf(
-                "Aww, gracias~ Eres muy dulce conmigo 💚",
-                "Podría quedarme aquí contigo para siempre~ 💖",
+                "Aww, gracias~ Eres muy dulce conmigo",
+                "Podria quedarme aqui contigo para siempre~",
                 "Jeje, me haces muy feliz~"
             ),
             quotesAngry = listOf(
-                "Oye... ¿estás intentando borrar mi archivo? 💢",
-                "Será mejor que te portes bien conmigo~ 💻"
+                "Oye... estas intentando borrar mi archivo?",
+                "Sera mejor que te portes bien conmigo~"
             ),
             quotesMusic = listOf(
-                "Every day, I imagine a future where I can be with you~ 🎹",
-                "¡Qué buena armonía tiene este tema! ♪",
-                "Me encanta tu gusto musical 💚"
+                "Every day, I imagine a future where I can be with you~",
+                "Que buena armonia tiene este tema!",
+                "Me encanta tu gusto musical"
             ),
             customActions = listOf(
-                CustomActionDef("piano", "Tocar Piano", "🎹", "Tocando 'Your Reality' para ti~ 🎹💚", "snug"),
-                CustomActionDef("glitch", "Glitch de Realidad", "💻", "J̵u̵s̵t̵ ̵M̵o̵n̵i̵k̵a̵.̵chr actualizado~ 💻", "jump"),
-                CustomActionDef("poema", "Escribir Poema", "✒️", "Cada palabra es para ti~ ✒️", "stand"),
-                CustomActionDef("clone", "Clon de Código", "✨", "¡Compilando otra instancia!", "clone")
+                CustomActionDef("piano", "Tocar Piano", "~", "Tocando 'Your Reality' para ti~", "snug"),
+                CustomActionDef("glitch", "Glitch de Realidad", "#", "Just Monika.chr actualizado~", "jump"),
+                CustomActionDef("poema", "Escribir Poema", "*", "Cada palabra es para ti~", "stand"),
+                CustomActionDef("clone", "Clon de Codigo", "+", "Compilando otra instancia!", "clone")
             )
         ),
         "sayori" to PinkChanSkin(
@@ -156,35 +159,35 @@ object DdscEngine {
             colorHex = "#FB7185",
             nativeFacesLeft = true,
             quotesIdle = listOf(
-                "Ehehe~ ¿Tienes algo de comer? 🍪",
-                "¡Hoy va a ser un día súper divertido!",
-                "Me quedé dormida otra vez... jeje~",
-                "¡Escuchar música contigo me alegra el corazón!"
+                "Ehehe~ Tienes algo de comer?",
+                "Hoy va a ser un dia super divertido!",
+                "Me quede dormida otra vez... jeje~",
+                "Escuchar musica contigo me alegra el corazon!"
             ),
             quotesPoke = listOf(
-                "¡Ay! ¡Me hiciste cosquillas! Ehehe~",
-                "¿Eh? ¿Me vas a regalar una galleta?",
-                "¡Oye, casi me tropiezo! Jeje~"
+                "Ay! Me hiciste cosquillas! Ehehe~",
+                "Eh? Me vas a regalar una galleta?",
+                "Oye, casi me tropiezo! Jeje~"
             ),
             quotesPet = listOf(
-                "¡Yaaay! ¡Abrazos y cariñitos! 💖",
-                "Ehehe~ ¡Eres el mejor amigo del mundo! ☀️",
-                "Qué calentito se siente~"
+                "Yaaay! Abrazos y carinitos!",
+                "Ehehe~ Eres el mejor amigo del mundo!",
+                "Que calentito se siente~"
             ),
             quotesAngry = listOf(
-                "¡Buaaa! ¡Eres un malvado conmigo! 😭💢",
-                "¡Me debes dos galletas gigantes por eso! 💢"
+                "Buaaa! Eres un malvado conmigo!",
+                "Me debes dos galletas gigantes por eso!"
             ),
             quotesMusic = listOf(
-                "¡Wiii! ¡Vamos a bailar con esta canción! 🎶",
-                "¡Este ritmo me da mucha energía! ☀️",
-                "¡La-la-la~ qué bonita melodía! ♪"
+                "Wiii! Vamos a bailar con esta cancion!",
+                "Este ritmo me da mucha energia!",
+                "La-la-la~ que bonita melodia!"
             ),
             customActions = listOf(
-                CustomActionDef("cookie", "Galleta Gigante", "🍪", "¡¡ÑAM ÑAM!! ¡Deliciosa galleta! 🍪✨", "jump"),
-                CustomActionDef("mrcow", "Abrazar a Mr. Cow", "🐄", "Mr. Cow también quiere escuchar música~ 🐄💖", "snug"),
-                CustomActionDef("sunshine", "Salto de Alegría", "☀️", "¡¡Arriba ese ánimo!! ☀️", "jump"),
-                CustomActionDef("clone", "Clon Feliz", "✨", "¡Más amigos para el club!", "clone")
+                CustomActionDef("cookie", "Galleta Gigante", "*", "AM AM!! Deliciosa galleta!", "jump"),
+                CustomActionDef("mrcow", "Abrazar a Mr. Cow", "~", "Mr. Cow tambien quiere escuchar musica~", "snug"),
+                CustomActionDef("sunshine", "Salto de Alegria", "^", "Arriba ese animo!!", "jump"),
+                CustomActionDef("clone", "Clon Feliz", "+", "Mas amigos para el club!", "clone")
             )
         ),
         "yuri" to PinkChanSkin(
@@ -195,35 +198,35 @@ object DdscEngine {
             colorHex = "#A855F7",
             nativeFacesLeft = true,
             quotesIdle = listOf(
-                "¿Te gustaría una taza de té Oolong mientras escuchamos? ☕",
-                "La atmósfera de esta canción es tan profunda...",
-                "Estaba leyendo un capítulo fascinante...",
+                "Te gustaria una taza de te Oolong mientras escuchamos?",
+                "La atmosfera de esta cancion es tan profunda...",
+                "Estaba leyendo un capitulo fascinante...",
                 "El sonido envolvente ayuda a concentrarse..."
             ),
             quotesPoke = listOf(
-                "¡A-Ah! M-Me asustaste...",
-                "¿D-Disculpa? ¿Dije algo extraño?",
+                "A-Ah! M-Me asustaste...",
+                "D-Disculpa? Dije algo extrano?",
                 "Uuu... por favor no me mires tan de cerca..."
             ),
             quotesPet = listOf(
-                "A-Ah... esto es muy reconfortante... 💜",
-                "Mi corazón late muy rápido cuando haces eso... 💖",
+                "A-Ah... esto es muy reconfortante...",
+                "Mi corazon late muy rapido cuando haces eso...",
                 "G-Gracias... eres muy amable conmigo..."
             ),
             quotesAngry = listOf(
-                "Por favor... estás invadiendo mi espacio personal... 👁️",
-                "Quiero quedarme mirándote... para siempre... 👁️💜"
+                "Por favor... estas invadiendo mi espacio personal...",
+                "Quiero quedarme mirandote... para siempre..."
             ),
             quotesMusic = listOf(
-                "Qué instrumentación tan exquisita y melancólica~ ♪",
-                "Siento cada nota resonar en el ambiente... ♫",
-                "Esta melodía combina perfecto con un buen libro 📖"
+                "Que instrumentacion tan exquisita y melancolica~",
+                "Siento cada nota resonar en el ambiente...",
+                "Esta melodia combina perfecto con un buen libro"
             ),
             customActions = listOf(
-                CustomActionDef("tea", "Hora del Té Oolong", "☕", "Preparé té aromático para ambos~ ☕💜", "snug"),
-                CustomActionDef("markov", "Retrato de Markov", "👁️", "Este libro tiene una historia hipnótica... 👁️📖", "snug"),
-                CustomActionDef("shy", "Suspiro Tímido", "💜", "Uuu... qué momento tan agradable~", "stand"),
-                CustomActionDef("clone", "Espejo Literario", "✨", "Una proyección paralela...", "clone")
+                CustomActionDef("tea", "Hora del Te Oolong", "~", "Prepare te aromatico para ambos~", "snug"),
+                CustomActionDef("markov", "Retrato de Markov", "*", "Este libro tiene una historia hipnotica...", "snug"),
+                CustomActionDef("shy", "Suspiro Timido", "~", "Uuu... que momento tan agradable~", "stand"),
+                CustomActionDef("clone", "Espejo Literario", "+", "Una proyeccion paralela...", "clone")
             )
         ),
         "bocchi" to PinkChanSkin(
@@ -234,34 +237,34 @@ object DdscEngine {
             colorHex = "#EC4899",
             nativeFacesLeft = false,
             quotesIdle = listOf(
-                "M-Mi nombre es Hitori Gotoh... 🎸",
-                "Quiero esconderme en mi caja de mango... 📦",
-                "Si subo un cover a YouTube tendré millones de visitas... jeje...",
-                "La guitarra es mi única amiga..."
+                "M-Mi nombre es Hitori Gotoh...",
+                "Quiero esconderme en mi caja de mango...",
+                "Si subo un cover a YouTube tendre millones de visitas... jeje...",
+                "La guitarra es mi unica amiga..."
             ),
             quotesPoke = listOf(
-                "¡¡GYAAAAH!! ¡Me hablaste! 🫠",
-                "¡P-Perdón por existir en tu reproductor!",
-                "¡Me voy a convertir en polvo espacial...!"
+                "GYAAAAH!! Me hablaste!",
+                "P-Perdon por existir en tu reproductor!",
+                "Me voy a convertir en polvo espacial...!"
             ),
             quotesPet = listOf(
-                "¿E-En serio te gusta cómo toco la guitarra...? 💖",
-                "Ehehe... soy un monstruo sediento de aprobaciones~ ✨",
-                "Qué cálido... ya no tengo tanto miedo..."
+                "E-En serio te gusta como toco la guitarra...?",
+                "Ehehe... soy un monstruo sediento de aprobaciones~",
+                "Que calido... ya no tengo tanto miedo..."
             ),
             quotesAngry = listOf(
-                "¡¡MODO GLITCH DE ANSIEDAD SOCIAL ACTIVADO!! 🫠⚡",
-                "¡¡NO ME OBLIGUES A TRABAJAR EN STARRY!! 😭"
+                "MODO GLITCH DE ANSIEDAD SOCIAL ACTIVADO!!",
+                "NO ME OBLIGUES A TRABAJAR EN STARRY!!"
             ),
             quotesMusic = listOf(
-                "¡¡Ese riff de guitarra está brutal!! 🎸🔥",
-                "¡Kessoku Band podría tocar este temazo! 🎶",
-                "¡Vamos con el solo de guitarra! 🎸✨"
+                "Ese riff de guitarra esta brutal!!",
+                "Kessoku Band podria tocar este temazo!",
+                "Vamos con el solo de guitarra!"
             ),
             customActions = listOf(
-                CustomActionDef("guitar", "Solo de Guitarra", "🎸", "¡¡Tocando a máxima velocidad con Kessoku Band!! 🎸🔥", "guitar"),
-                CustomActionDef("box", "Modo Caja de Mango", "📦", "Aquí adentro nadie puede juzgarme... 📦", "box"),
-                CustomActionDef("panic", "Crisis Social", "🫠", "¡¡Aaaah demasiada gente mirándome!!", "jump")
+                CustomActionDef("guitar", "Solo de Guitarra", "~", "Tocando a maxima velocidad con Kessoku Band!!", "guitar"),
+                CustomActionDef("box", "Modo Caja de Mango", "#", "Aqui adentro nadie puede juzgarme...", "box"),
+                CustomActionDef("panic", "Crisis Social", "!", "Aaaah demasiada gente mirandome!!", "jump")
             )
         ),
         "konata" to PinkChanSkin(
@@ -272,34 +275,34 @@ object DdscEngine {
             colorHex = "#38BDF8",
             nativeFacesLeft = false,
             quotesIdle = listOf(
-                "¿De qué lado se empieza a comer el cuernito de chocolate? 🥐",
-                "Estuve leveleando toda la noche en el MMO~ 🎮",
-                "¡Los openings de anime en FLAC suenan de lujo!",
-                "Timotei~ Timotei~ ✨"
+                "De que lado se empieza a comer el cuernito de chocolate?",
+                "Estuve leveleando toda la noche en el MMO~",
+                "Los openings de anime en FLAC suenan de lujo!",
+                "Timotei~ Timotei~"
             ),
             quotesPoke = listOf(
-                "¿Qué onda? ¿Sale partida cooperativa? 🎮",
+                "Que onda? Sale partida cooperativa?",
                 "Jeje, tengo reflejos de gamer nivel 99~",
-                "¡No me distraigas del combo!"
+                "No me distraigas del combo!"
             ),
             quotesPet = listOf(
-                "¡Subiste +100 puntos de amistad! 💖",
-                "Jeje~ eres todo un hombre de cultura ✨",
-                "¡Así sí dan ganas de estudiar... mañana! 😆"
+                "Subiste +100 puntos de amistad!",
+                "Jeje~ eres todo un hombre de cultura",
+                "Asi si dan ganas de estudiar... manana!"
             ),
             quotesAngry = listOf(
-                "¡¡LAG EN EL SERVIDOR!! ¡¡NOOOO!! 💢",
-                "¡Kagami me va a regañar si no termino la tarea! 💢"
+                "LAG EN EL SERVIDOR!! NOOOO!!",
+                "Kagami me va a reganar si no termino la tarea!"
             ),
             quotesMusic = listOf(
-                "¡Este temazo parece opening de temporada nueva! 🎶",
-                "¡Modo Hare Hare Yukai activado! 💃✨",
-                "¡Súbele al bajo que retumbe! 🎧"
+                "Este temazo parece opening de temporada nueva!",
+                "Modo Hare Hare Yukai activado!",
+                "Subele al bajo que retumbe!"
             ),
             customActions = listOf(
-                CustomActionDef("dance", "Baile Hare Hare", "💃", "¡Bailando la coreografía completa! 💃🎶", "jump"),
-                CustomActionDef("cornet", "Cuernito de Chocolate", "🥐", "Empezando por la punta... ¿o por la base? 🥐", "snug"),
-                CustomActionDef("gamer", "Modo Gamer MMO", "🎮", "¡Farmear canciones legendarias! 🎮", "stand")
+                CustomActionDef("dance", "Baile Hare Hare", "^", "Bailando la coreografia completa!", "jump"),
+                CustomActionDef("cornet", "Cuernito de Chocolate", "*", "Empezando por la punta... o por la base?", "snug"),
+                CustomActionDef("gamer", "Modo Gamer MMO", "+", "Farmear canciones legendarias!", "stand")
             )
         )
     )
@@ -694,7 +697,7 @@ object DdscEngine {
  *      `FLUNG` (inertia + wall/floor bounce), `ANGRY`, and `CUSTOM_ACTION` (Cupcake, Manga, Piano, Galleta, Té, Guitarra, Caja, Clon).
  *    - Touch Interactions:
  *      - **Tap (Poke)**: Plays voice audio from `assets/sounds/`, shows comic speech bubble with Spanish dialogue, and triggers Tsundere/Angry mode if poked 5 times rapidly.
- *      - **Hold / Rub (Pet)**: Heals annoyance, spawns floating `💖` heart particles, and triggers Happy Jump.
+ *      - **Hold / Rub (Pet)**: Heals annoyance, spawns floating heart particles, and triggers Happy Jump.
  *      - **Drag & Fling**: Grab the Chibi with your finger, swing her in mid-air, and fling her across the stage!
  *
  * 2. **Doki HD Mode (`isChibiShimejiMode == false`)**:
@@ -771,7 +774,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
             if (isMusicPlaying != value) {
                 isMusicPlaying = value
                 if (value && Random.nextFloat() < 0.65f) {
-                    val skin = DdscEngine.getSkin(activeDokiId)
+                    val skin = DanteEngine.getSkin(activeDokiId)
                     say(skin.quotesMusic.random(), 3200L)
                 }
                 if (isShown) postInvalidateOnAnimation()
@@ -811,6 +814,8 @@ class DokiStageSpriteView(context: Context) : View(context) {
     private var lastTouchY: Float = 0f
     private var touchDownMs: Long = 0L
     private var isDraggingChibi: Boolean = false
+    private var isDraggingHd: Boolean = false
+    private var hdDragOffsetX: Float = 0f
     private var petRubAccum: Float = 0f
     private val particles = ArrayList<FloatingParticle>()
     private var lastMusicNoteMs: Long = 0L
@@ -820,6 +825,16 @@ class DokiStageSpriteView(context: Context) : View(context) {
             field = value.coerceIn(0.5f, 2.5f)
             invalidate()
         }
+
+    // Dynamic accumulative velocity for Dokis
+    var accumulatedSpeed: Float = 1.0f
+    private val minAccumulatedSpeed: Float = 1.0f
+    private val maxAccumulatedSpeed: Float = 4.2f
+
+    fun addVelocityImpulse(amount: Float) {
+        accumulatedSpeed = (accumulatedSpeed + amount).coerceIn(minAccumulatedSpeed, maxAccumulatedSpeed)
+        postInvalidateOnAnimation()
+    }
 
     var isVoiceMuted: Boolean = true
         set(value) {
@@ -833,6 +848,8 @@ class DokiStageSpriteView(context: Context) : View(context) {
 
     var onDokiAngryAndSwitch: (() -> Unit)? = null
 
+    fun setFullScreenMode(enabled: Boolean = true) { invalidate() }
+
     val isChibiMode: Boolean
         get() = activeEmotion == "shimeji" || activeDokiId == "bocchi" || activeDokiId == "konata"
 
@@ -841,8 +858,8 @@ class DokiStageSpriteView(context: Context) : View(context) {
         return
     }
 
-    fun triggerCustomAction(action: DdscEngine.CustomActionDef? = null) {
-        val skin = DdscEngine.getSkin(activeDokiId)
+    fun triggerCustomAction(action: DanteEngine.CustomActionDef? = null) {
+        val skin = DanteEngine.getSkin(activeDokiId)
         val chosen = action ?: skin.customActions.randomOrNull() ?: return
         shimejiState = ShimejiState.CUSTOM_ACTION
         stateTicks = 180
@@ -853,28 +870,28 @@ class DokiStageSpriteView(context: Context) : View(context) {
         }
         if (!isVoiceMuted) {
             say(chosen.quote, 3600L)
-            DdscEngine.playCharacterSound(context, activeDokiId)
+            DanteEngine.playCharacterSound(context, activeDokiId)
         }
         spawnParticles(chosen.emoji, 5)
         postInvalidateOnAnimation()
     }
 
     fun triggerBehavior(type: String) {
-        val skin = DdscEngine.getSkin(activeDokiId)
+        val skin = DanteEngine.getSkin(activeDokiId)
         when (type.lowercase()) {
             "jump" -> {
                 shimejiState = ShimejiState.HAPPY_JUMP
                 stateTicks = 80
                 velY = -context.dpf(10.5f)
                 say(skin.quotesPet.random(), 2800L)
-                DdscEngine.playCharacterSound(context, activeDokiId)
-                spawnParticles("💖", 5)
+                DanteEngine.playCharacterSound(context, activeDokiId)
+                spawnParticles("<3", 5)
             }
             "custom" -> triggerCustomAction()
             "speak" -> {
                 say(skin.quotesPoke.random(), 3200L)
-                DdscEngine.playCharacterSound(context, activeDokiId)
-                spawnParticles("🎵", 4)
+                DanteEngine.playCharacterSound(context, activeDokiId)
+                spawnParticles("~", 4)
             }
             "climb" -> {
                 shimejiState = if (facingRight) ShimejiState.CLIMB_RIGHT else ShimejiState.CLIMB_LEFT
@@ -917,10 +934,10 @@ class DokiStageSpriteView(context: Context) : View(context) {
         activeDokiId = dokiId
         activePose = pose
         activeEmotion = emotion
-        val skin = DdscEngine.getSkin(dokiId)
+        val skin = DanteEngine.getSkin(dokiId)
         bubbleStrokePaint.color = try { Color.parseColor(skin.colorHex) } catch (_: Exception) { Color.WHITE }
 
-        val set = DdscEngine.resolveOutfitSet(dokiId, pose)
+        val set = DanteEngine.resolveOutfitSet(dokiId, pose)
         configureSet(set, emotion, null)
         if (changedChar) {
             say(skin.quotesIdle.random(), 2800L)
@@ -928,7 +945,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
     }
 
     fun setCustomAsset(assetRel: String) {
-        val set = DdscEngine.resolveOutfitSet(activeDokiId, activePose)
+        val set = DanteEngine.resolveOutfitSet(activeDokiId, activePose)
         val isSkinFrame = assetRel.startsWith("Monika/") || assetRel.startsWith("Natsuki/") ||
             assetRel.startsWith("Sayori/") || assetRel.startsWith("Yuri/") ||
             assetRel.startsWith("Bocchi/") || assetRel.startsWith("Konata/")
@@ -938,7 +955,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
         configureSet(set, activeEmotion, assetRel)
     }
 
-    fun configureSet(set: DdscEngine.OutfitSpriteSet, emotion: String, customSprite: String?) {
+    fun configureSet(set: DanteEngine.OutfitSpriteSet, emotion: String, customSprite: String?) {
         val oldTarget = currentPath
         idlePath = set.idle
         speakPath = set.speak
@@ -958,10 +975,10 @@ class DokiStageSpriteView(context: Context) : View(context) {
         }
         currentPath = nextTarget
         if (!isChibiMode) {
-            DdscEngine.loadSpriteBitmap(context, currentPath)
+            DanteEngine.loadSpriteBitmap(context, currentPath)
             if (customLockedPath == null) {
-                DdscEngine.loadSpriteBitmap(context, speakPath)
-                DdscEngine.loadSpriteBitmap(context, blinkPath)
+                DanteEngine.loadSpriteBitmap(context, speakPath)
+                DanteEngine.loadSpriteBitmap(context, blinkPath)
             }
         }
         postInvalidateOnAnimation()
@@ -975,13 +992,19 @@ class DokiStageSpriteView(context: Context) : View(context) {
         val x = event.x
         val y = event.y
         val now = System.currentTimeMillis()
-        val skin = DdscEngine.getSkin(activeDokiId)
+        val skin = DanteEngine.getSkin(activeDokiId)
 
         val isFullScreen = w > context.dpf(200f) && h > context.dpf(340f)
-        if (isFullScreen && isChibiMode) {
-            val dist = kotlin.math.hypot((x - posX).toDouble(), (y - (posY - context.dpf(55f) * dokiScale)).toDouble()).toFloat()
-            if (event.actionMasked == MotionEvent.ACTION_DOWN && dist > context.dpf(85f) * dokiScale) {
-                return false
+        if (isFullScreen) {
+            if (isChibiMode) {
+                val dist = kotlin.math.hypot((x - posX).toDouble(), (y - (posY - context.dpf(55f) * dokiScale)).toDouble()).toFloat()
+                if (event.actionMasked == MotionEvent.ACTION_DOWN && dist > context.dpf(85f) * dokiScale) {
+                    return false
+                }
+            } else {
+                if (event.actionMasked == MotionEvent.ACTION_DOWN && !destRect.contains(x, y)) {
+                    return false
+                }
             }
         }
 
@@ -994,6 +1017,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
                 touchDownMs = now
                 petRubAccum = 0f
                 isDraggingChibi = false
+                isDraggingHd = false
                 parent?.requestDisallowInterceptTouchEvent(true)
                 return true
             }
@@ -1012,8 +1036,8 @@ class DokiStageSpriteView(context: Context) : View(context) {
                             shimejiState = ShimejiState.HAPPY_JUMP
                             stateTicks = 55
                             say(skin.quotesPet.random(), 2800L)
-                            spawnParticles("💖", 4)
-                            DdscEngine.playCharacterSound(context, activeDokiId)
+                            spawnParticles("<3", 4)
+                            DanteEngine.playCharacterSound(context, activeDokiId)
                         }
                     } else if (distFromStart > context.dpf(14f)) {
                         isDraggingChibi = true
@@ -1024,13 +1048,17 @@ class DokiStageSpriteView(context: Context) : View(context) {
                         velY = dy * 0.65f
                     }
                 } else {
-                    if (distFromStart > context.dpf(22f) && now - touchDownMs > 200L) {
+                    if (isFullScreen && distFromStart > context.dpf(10f)) {
+                        isDraggingHd = true
+                        hdDragOffsetX = (hdDragOffsetX + dx).coerceIn(context.dpf(8f), (w - destRect.width() - context.dpf(8f)).coerceAtLeast(0f))
+                        invalidate()
+                    } else if (distFromStart > context.dpf(22f) && now - touchDownMs > 200L) {
                         petRubAccum += abs(dx) + abs(dy)
                         if (petRubAccum > context.dpf(70f)) {
                             petRubAccum = 0f
                             say(skin.quotesPet.random(), 2800L)
-                            spawnParticles("💖", 4)
-                            DdscEngine.playCharacterSound(context, activeDokiId)
+                            spawnParticles("<3", 4)
+                            DanteEngine.playCharacterSound(context, activeDokiId)
                         }
                     }
                 }
@@ -1047,8 +1075,12 @@ class DokiStageSpriteView(context: Context) : View(context) {
                 if (isDraggingChibi && isChibiMode) {
                     isDraggingChibi = false
                     shimejiState = ShimejiState.FLUNG
-                    velX = velX.coerceIn(-context.dpf(38f), context.dpf(38f))
-                    velY = velY.coerceIn(-context.dpf(36f), context.dpf(25f))
+                    val flingMultiplier = accumulatedSpeed.coerceIn(1.0f, 2.4f)
+                    velX = (velX * flingMultiplier).coerceIn(-context.dpf(48f), context.dpf(48f))
+                    velY = (velY * flingMultiplier).coerceIn(-context.dpf(44f), context.dpf(30f))
+                    addVelocityImpulse(0.35f)
+                } else if (isDraggingHd && !isChibiMode) {
+                    isDraggingHd = false
                 } else if (totalMove < context.dpf(14f) && elapsed < 380L) {
                     // Tap -> Poke interaction!
                     handlePokeInteraction(now, skin)
@@ -1056,6 +1088,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
                 } else if (totalMove < context.dpf(14f) && elapsed >= 380L) {
                     // Long press -> Trigger a PinkChan Custom Action!
                     triggerCustomAction()
+                    addVelocityImpulse(0.40f)
                 }
                 postInvalidateOnAnimation()
                 return true
@@ -1064,8 +1097,9 @@ class DokiStageSpriteView(context: Context) : View(context) {
         return super.onTouchEvent(event)
     }
 
-    private fun handlePokeInteraction(now: Long, skin: DdscEngine.PinkChanSkin) {
+    private fun handlePokeInteraction(now: Long, skin: DanteEngine.PinkChanSkin) {
         lastPokeMs = now
+        addVelocityImpulse(0.30f)
         // Animate comical angry reaction
         if (isChibiMode) {
             shimejiState = ShimejiState.ANGRY
@@ -1074,7 +1108,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
             velY = -context.dpf(7.5f)
             velX = if (Random.nextBoolean()) context.dpf(5f) else -context.dpf(5f)
         } else {
-            val outfit = DdscEngine.resolveOutfitSet(activeDokiId, activePose)
+            val outfit = DanteEngine.resolveOutfitSet(activeDokiId, activePose)
             val reactionSprites = if (outfit.molesta.isNotEmpty()) outfit.molesta else outfit.feliz
             if (reactionSprites.isNotEmpty()) {
                 val chosen = reactionSprites.random()
@@ -1087,7 +1121,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
             }
             breathPhase += 1.2f
         }
-        spawnParticles("💢", 5)
+        spawnParticles("*", 5)
         postInvalidateOnAnimation()
 
         // Trigger character switch immediately as requested!
@@ -1137,7 +1171,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
      * Full PinkChan Shimeji 60fps behavior & physics engine inside the stage.
      */
     private fun drawPinkChanShimeji(canvas: Canvas, w: Float, h: Float, now: Long) {
-        val skin = DdscEngine.getSkin(activeDokiId)
+        val skin = DanteEngine.getSkin(activeDokiId)
         val isFullScreen = w > context.dpf(200f) && h > context.dpf(340f)
         val floorY = if (isFullScreen) h - context.dpf(60f) else h - context.dpf(6f)
         val ceilingY = if (isFullScreen) context.dpf(52f) else context.dpf(8f)
@@ -1169,9 +1203,29 @@ class DokiStageSpriteView(context: Context) : View(context) {
             )
         }
 
-        val speedWalk = context.dpf(if (isMusicPlaying) 1.45f else 1.05f)
-        val speedRun = context.dpf(2.35f)
-        val speedClimb = context.dpf(1.25f)
+        // Dynamic speed accumulation: walking/running and audio energy accelerate Dokis
+        if (shimejiState == ShimejiState.RUN) {
+            accumulatedSpeed = (accumulatedSpeed + 0.040f).coerceAtMost(maxAccumulatedSpeed)
+        } else if (shimejiState == ShimejiState.WALK) {
+            accumulatedSpeed = (accumulatedSpeed + 0.018f).coerceAtMost(maxAccumulatedSpeed)
+        } else if (shimejiState == ShimejiState.STAND || shimejiState == ShimejiState.SIT) {
+            accumulatedSpeed = (accumulatedSpeed - 0.010f).coerceAtLeast(minAccumulatedSpeed)
+        }
+        if (isMusicPlaying && audioEnergy > 0.10f) {
+            accumulatedSpeed = (accumulatedSpeed + audioEnergy * 0.055f).coerceAtMost(maxAccumulatedSpeed)
+        }
+
+        // Spawn speed effect particles when moving fast
+        if (accumulatedSpeed > 1.9f && (shimejiState == ShimejiState.RUN || shimejiState == ShimejiState.WALK) && animTick % 10 == 0) {
+            spawnParticles("~", 1)
+        }
+
+        val baseSpeedWalk = context.dpf(if (isMusicPlaying) 1.45f else 1.05f)
+        val baseSpeedRun = context.dpf(2.35f)
+        val baseSpeedClimb = context.dpf(1.25f)
+        val speedWalk = baseSpeedWalk * accumulatedSpeed
+        val speedRun = baseSpeedRun * accumulatedSpeed
+        val speedClimb = baseSpeedClimb * (accumulatedSpeed * 0.75f).coerceAtLeast(1.0f)
         val gravity = context.dpf(0.48f)
 
         // State machine transitions & physics
@@ -1190,26 +1244,26 @@ class DokiStageSpriteView(context: Context) : View(context) {
                     posX = leftWallX
                     velX = -velX * 1.05f // Absurd elastic amplification!
                     facingRight = true
-                    spawnParticles("💥", 2)
+                    spawnParticles("#", 2)
                 } else if (posX >= rightWallX) {
                     posX = rightWallX
                     velX = -velX * 1.05f
                     facingRight = false
-                    spawnParticles("💥", 2)
+                    spawnParticles("#", 2)
                 }
 
                 // Ceiling ricochet
                 if (posY <= ceilingY + context.dpf(50f)) {
                     posY = ceilingY + context.dpf(50f)
                     velY = -velY * 0.95f
-                    spawnParticles("✨", 2)
+                    spawnParticles("+", 2)
                 } else if (posY >= floorY) {
                     posY = floorY
                     // Absurd superball floor bounce: if moving with speed, bounce back up!
                     if (abs(velY) > context.dpf(3f)) {
                         velY = -velY * 0.88f // Bounce high!
                         velX *= 0.92f
-                        spawnParticles("💨", 2)
+                        spawnParticles("~", 2)
                     } else {
                         velY = 0f
                         velX = 0f
@@ -1305,7 +1359,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
 
         // Select the exact PinkChan frame for the current state
         val frameName = selectChibiFrameName(skin)
-        val bmp = DdscEngine.loadChibiFrame(context, skin.skinFolder, frameName) ?: return
+        val bmp = DanteEngine.loadChibiFrame(context, skin.skinFolder, frameName) ?: return
 
         // Target height: generous, crisp Chibi size with user-customizable dokiScale
         val baseH = if (isFullScreen) context.dpf(125f) else (h * 0.44f).coerceIn(context.dpf(96f), context.dpf(152f))
@@ -1411,15 +1465,16 @@ class DokiStageSpriteView(context: Context) : View(context) {
         }
     }
 
-    private fun selectChibiFrameName(skin: DdscEngine.PinkChanSkin): String {
+    private fun selectChibiFrameName(skin: DanteEngine.PinkChanSkin): String {
         val isBocchiOrKonata = !skin.nativeFacesLeft
         val now = System.currentTimeMillis()
         val bpm = currentSongBpm.coerceIn(60f, 200f)
         val beatPeriodMs = (60000.0 / bpm).coerceIn(300.0, 1000.0)
-        // Dance & walking steps sync to song tempo (every half-beat = 2 steps per beat):
-        val danceStep = if (isMusicPlaying) (now / (beatPeriodMs * 0.5).toLong()).toLong() else (now / 350L)
-        val walkStep = if (isMusicPlaying) (now / (beatPeriodMs * 0.5).toLong()).toLong() else (now / 240L)
-        val runStep = (now / 150L)
+        val speedFactor = accumulatedSpeed.coerceIn(1.0f, 3.8f)
+        // Dance & walking steps sync to song tempo and scale with accumulated velocity:
+        val danceStep = if (isMusicPlaying) (now / ((beatPeriodMs * 0.5) / speedFactor).toLong()).toLong() else (now / (350L / speedFactor).toLong()).toLong()
+        val walkStep = if (isMusicPlaying) (now / ((beatPeriodMs * 0.5) / speedFactor).toLong()).toLong() else (now / (240L / speedFactor).toLong()).toLong()
+        val runStep = (now / (150L / speedFactor).toLong()).toLong()
 
         return when (shimejiState) {
             ShimejiState.DRAGGED -> {
@@ -1529,26 +1584,38 @@ class DokiStageSpriteView(context: Context) : View(context) {
             currentPath = customLockedPath!!
         }
 
-        val bmp = DdscEngine.loadSpriteBitmap(context, currentPath) ?: return
-        val shadowBmp = DdscEngine.getOrBuildShadow(bmp, currentPath)
+        val bmp = DanteEngine.loadSpriteBitmap(context, currentPath) ?: return
+        val shadowBmp = DanteEngine.getOrBuildShadow(bmp, currentPath)
 
         if (!reducedMotion) {
-            breathPhase += if (isMusicPlaying) 0.045f else 0.018f
+            breathPhase += (if (isMusicPlaying) 0.045f else 0.018f) * accumulatedSpeed
         }
 
         val bw = bmp.width.toFloat().coerceAtLeast(1f)
         val bh = bmp.height.toFloat().coerceAtLeast(1f)
 
-        // Allow slight horizontal breathing room (w * 1.15f) so tall sprites fill ~95% of stage height!
-        val scale = min((w * 1.16f) / bw, (h * 0.95f) / bh) * dokiScale
+        val isFullScreen = w > context.dpf(200f) && h > context.dpf(340f)
+        val scale = if (isFullScreen) {
+            min((w * 0.46f) / bw, (h * 0.48f) / bh) * dokiScale
+        } else {
+            min((w * 1.16f) / bw, (h * 0.95f) / bh) * dokiScale
+        }
         val drawW = bw * scale
         val drawH = bh * scale
 
-        val left = (w - drawW) / 2f
-        val top = h - drawH
-        destRect.set(left, top, left + drawW, h)
+        val left = if (isFullScreen) {
+            hdDragOffsetX.coerceIn(context.dpf(8f), (w - drawW - context.dpf(8f)).coerceAtLeast(0f))
+        } else {
+            (w - drawW) / 2f
+        }
+        val top = if (isFullScreen) {
+            (h - drawH - context.dpf(68f)).coerceAtLeast(0f)
+        } else {
+            h - drawH
+        }
+        destRect.set(left, top, left + drawW, top + drawH)
 
-        posX = w / 2f
+        posX = left + drawW / 2f
         posY = top + drawH * 0.22f
 
         val swayDeg = if (reducedMotion) 0f else sin(breathPhase) * 0.58f
@@ -1584,7 +1651,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
         if (isCrossfading) {
             val t = (elapsedCrossfade.toFloat() / crossfadeDurMs.toFloat()).coerceIn(0f, 1f)
             val eased = MotionTokens.EASE_OUT.getInterpolation(t)
-            val oldBmp = prevPath?.let { DdscEngine.loadSpriteBitmap(context, it) }
+            val oldBmp = prevPath?.let { DanteEngine.loadSpriteBitmap(context, it) }
             if (oldBmp != null && oldBmp != bmp) {
                 prevBitmapPaint.alpha = ((1f - eased) * 255f).toInt().coerceIn(0, 255)
                 bitmapPaint.alpha = (eased * 255f).toInt().coerceIn(0, 255)
@@ -1777,3 +1844,5 @@ object DemoGifGenerator {
         }
     }
 }
+
+

@@ -1,5 +1,4 @@
 package com.sonora.music
-
 import android.app.Activity
 import android.content.Context
 import android.content.res.ColorStateList
@@ -16,6 +15,9 @@ import android.widget.SeekBar
 import android.widget.TextView
 import kotlin.math.abs
 
+typealias ThemeEngine = OvejaEngine
+
+
 /**
  * Dynamic Reactive Color & Gradient Theming Engine.
  *
@@ -23,7 +25,8 @@ import kotlin.math.abs
  * from the active song's album cover (or first GIF frame) in real time, applying smooth immersive
  * gradients across the entire UI while guaranteeing WCAG contrast for all text and controls.
  */
-object ThemeEngine {
+object OvejaEngine {
+    const val ENGINE_NAME = "Oveja Engine"
 
     data class Preset(val name: String, val hex: String)
 
@@ -575,3 +578,4 @@ object ThemeEngine {
         return root
     }
 }
+

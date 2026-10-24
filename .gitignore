@@ -14,6 +14,8 @@ __pycache__/
 # Android & Gradle
 **/.gradle/
 **/build/
+**/.cxx/
+releases/
 local.properties
 *.apk
 *.aab

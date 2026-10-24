@@ -1,5 +1,4 @@
 package com.sonora.music
-
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -22,7 +21,15 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-object OtaUpdateEngine {
+typealias OtaUpdateEngine = JerryEngine
+
+
+/**
+ * Motor Jerry (Jerry Engine):
+ * High-speed local and remote OTA updater engine for DDMC.
+ */
+object JerryEngine {
+    const val ENGINE_NAME = "Jerry Engine"
 
     private const val PREF_PC_HOST = "ota_pc_host"
     private const val PREF_GIT_REPO = "ota_git_repo"
@@ -746,3 +753,5 @@ object OtaUpdateEngine {
         return scroll
     }
 }
+
+

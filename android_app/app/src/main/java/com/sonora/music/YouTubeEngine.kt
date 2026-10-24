@@ -1,5 +1,4 @@
 package com.sonora.music
-
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
@@ -20,6 +19,9 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+
+typealias YouTubeEngine = SkisoEngine
+
 
 data class YouTubeVideoItem(
     val videoId: String,
@@ -49,7 +51,8 @@ data class YouTubeResolvedStreams(
  * - Direct Audio (`m4a`/`opus`) + Video (`mp4`/`m3u8`) stream extraction via Innertube / Piped / Invidious APIs.
  * - Embedded WebView IFrame/Mobile fallback player so every YouTube video plays in both "Ver Video" and "Solo Escuchar" modes.
  */
-object YouTubeEngine {
+object SkisoEngine {
+    const val ENGINE_NAME = "Skiso Engine"
 
     private val PIPED_INSTANCES = listOf(
         "https://api.piped.private.coffee",
@@ -635,3 +638,5 @@ class YouTubeStageWebView(context: Context) : FrameLayout(context) {
         webView.loadUrl("about:blank")
     }
 }
+
+

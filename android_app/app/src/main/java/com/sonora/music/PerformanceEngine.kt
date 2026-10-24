@@ -1,11 +1,14 @@
 package com.sonora.music
-
 import android.app.ActivityManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Build
 
+typealias PerformanceEngine = CavifaxEngine
+
+
 /**
+ * Motor Cavifax (Cavifax Engine):
  * High-Efficiency Performance & Hardware Engine for DDMC.
  *
  * Provides specialized optimization presets without sacrificing features:
@@ -16,7 +19,9 @@ import android.os.Build
  * - [MODE_BALANCED]: 60 FPS standard smooth fidelity (Default).
  * - [MODE_ULTRA]: 90-120 FPS uncapped high-refresh rate mode for flagship hardware.
  */
-object PerformanceEngine {
+object CavifaxEngine {
+    const val ENGINE_NAME = "Cavifax Engine"
+
     const val MODE_POTATO = 0
     const val MODE_BALANCED = 1
     const val MODE_ULTRA = 2
@@ -130,9 +135,11 @@ object PerformanceEngine {
     }
 
     fun getShortLabel(mode: Int = currentMode): String = when (mode) {
-        MODE_POTATO -> "Rendimiento: Modo Patata (30 FPS)"
-        MODE_BALANCED -> "Rendimiento: Equilibrado (60 FPS)"
-        MODE_ULTRA -> "Rendimiento: Ultra (120 FPS)"
-        else -> "Rendimiento: Equilibrado"
+        MODE_POTATO -> "Motor Cavifax: Modo Patata (30 FPS)"
+        MODE_BALANCED -> "Motor Cavifax: Equilibrado (60 FPS)"
+        MODE_ULTRA -> "Motor Cavifax: Ultra (120 FPS)"
+        else -> "Motor Cavifax: Equilibrado"
     }
 }
+
+

@@ -27,6 +27,7 @@ import android.provider.OpenableColumns
 import android.text.InputType
 import android.view.GestureDetector
 import android.view.ScaleGestureDetector
+import android.view.WindowManager
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -250,10 +251,8 @@ class VisualizerView(context: Context) : View(context) {
 
     var isPlaying = false
         set(value) {
-            if (field != value) {
-                field = value
-                if (isShown) postInvalidateOnAnimation()
-            }
+            field = value
+            postInvalidateOnAnimation()
         }
     var visualMode = 0
 
@@ -276,22 +275,38 @@ class VisualizerView(context: Context) : View(context) {
         postInvalidateOnAnimation()
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        postInvalidateOnAnimation()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w > 0 && h > 0) {
+            postInvalidateOnAnimation()
+        }
+    }
+
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
-        if (visibility == VISIBLE && isShown) {
+        if (visibility == VISIBLE) {
             postInvalidateOnAnimation()
         }
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
-        if (visibility == VISIBLE && isShown) {
+        if (visibility == VISIBLE) {
             postInvalidateOnAnimation()
         }
     }
 
     fun currentVocalEnergy(): Float {
         if (!isPlaying) return 0f
+        if (DdmcNative.isAvailable) {
+            val v = DdmcNative.getVocalLevel()
+            if (v > 0.01f) return v.coerceIn(0f, 1f)
+        }
         return ((magnitudes[2] + magnitudes[5] + magnitudes[9] + magnitudes[14]) * 0.25f).coerceIn(0f, 1f)
     }
 
@@ -299,6 +314,7 @@ class VisualizerView(context: Context) : View(context) {
         rawFft = fft
         if (fft == null || fft.size < 8) {
             hasRealFftSignal = false
+            if (isPlaying) postInvalidateOnAnimation()
             return
         }
         val half = fft.size / 2
@@ -310,33 +326,35 @@ class VisualizerView(context: Context) : View(context) {
             if (m > maxEnergy) maxEnergy = m
         }
         hasRealFftSignal = maxEnergy > 2.2f
-        if (!hasRealFftSignal) return
 
-        for (i in 0 until bands) {
-            // Logarithmic frequency bin distribution (more resolution in bass/mids)
-            val ratio = i.toFloat() / bands.toFloat()
-            val binStart = (1 + (ratio * ratio * (half * 0.65f)).toInt()).coerceIn(1, half - 1)
-            val binEnd = (binStart + 2).coerceAtMost(half - 1)
-            var sum = 0f
-            var count = 0
-            for (b in binStart..binEnd) {
-                val r = fft[2 * b].toFloat()
-                val im = fft[2 * b + 1].toFloat()
-                sum += hypot(r, im)
-                count++
-            }
-            val avg = if (count > 0) sum / count else 0f
-            // Logarithmic dB boost so quiet and loud passages look vivid
-            val boost = 1f + ratio * 1.35f
-            val dbNorm = ((log10(1f + avg * boost) / 2.05f)).coerceIn(0.05f, 1.0f)
-            val prev = magnitudes[i]
-            magnitudes[i] = if (dbNorm > prev) (prev * 0.35f + dbNorm * 0.65f) else (prev * 0.78f + dbNorm * 0.22f)
-            if (magnitudes[i] >= peakCaps[i]) {
-                peakCaps[i] = magnitudes[i]
-            } else {
-                peakCaps[i] = (peakCaps[i] - 0.014f).coerceAtLeast(0.05f)
+        if (hasRealFftSignal) {
+            for (i in 0 until bands) {
+                // Logarithmic frequency bin distribution (more resolution in bass/mids)
+                val ratio = i.toFloat() / bands.toFloat()
+                val binStart = (1 + (ratio * ratio * (half * 0.65f)).toInt()).coerceIn(1, half - 1)
+                val binEnd = (binStart + 2).coerceAtMost(half - 1)
+                var sum = 0f
+                var count = 0
+                for (b in binStart..binEnd) {
+                    val r = fft[2 * b].toFloat()
+                    val im = fft[2 * b + 1].toFloat()
+                    sum += hypot(r, im)
+                    count++
+                }
+                val avg = if (count > 0) sum / count else 0f
+                // Logarithmic dB boost so quiet and loud passages look vivid
+                val boost = 1f + ratio * 1.35f
+                val dbNorm = ((log10(1f + avg * boost) / 2.05f)).coerceIn(0.05f, 1.0f)
+                val prev = magnitudes[i]
+                magnitudes[i] = if (dbNorm > prev) (prev * 0.35f + dbNorm * 0.65f) else (prev * 0.78f + dbNorm * 0.22f)
+                if (magnitudes[i] >= peakCaps[i]) {
+                    peakCaps[i] = magnitudes[i]
+                } else {
+                    peakCaps[i] = (peakCaps[i] - 0.014f).coerceAtLeast(0.05f)
+                }
             }
         }
+        postInvalidateOnAnimation()
     }
 
     fun updateWaveform(waveform: ByteArray?) {
@@ -351,6 +369,7 @@ class VisualizerView(context: Context) : View(context) {
             if (dev > maxDev) maxDev = dev
         }
         hasRealWaveSignal = maxDev > 3
+        postInvalidateOnAnimation()
     }
 
     private fun stepAcousticSimulation() {
@@ -456,9 +475,9 @@ class VisualizerView(context: Context) : View(context) {
             else -> drawMirrorBars(canvas, w, h)
         }
 
-        // Suspend animation loop when hidden, detached, or paused at rest
+        // Always sustain animation loop when view is visible and attached to window
         val settling = !isPlaying && magnitudes[0] > 0.055f
-        if (isShown && windowVisibility == VISIBLE && (isPlaying || settling) && !reducedMotion) {
+        if (visibility == VISIBLE && isAttachedToWindow && (isPlaying || settling || !hasRealFftSignal) && !reducedMotion) {
             if (PerformanceEngine.isPotatoMode) {
                 postInvalidateDelayed(PerformanceEngine.frameIntervalMs)
             } else {
@@ -560,23 +579,23 @@ class VisualizerView(context: Context) : View(context) {
         val cy = h / 2f
         val minDim = minOf(w, h)
         val bassAvg = (magnitudes[0] + magnitudes[1] + magnitudes[2] + magnitudes[3]) / 4f
-        val baseRadius = minDim * (0.24f + bassAvg * 0.08f)
-        val maxRay = minDim * 0.24f
+        val baseRadius = (minDim * (0.20f + bassAvg * 0.05f)).coerceAtLeast(context.dpf(16f))
+        val maxRay = (minDim * 0.44f - baseRadius).coerceAtLeast(context.dpf(20f))
 
         val acc = getAccentColor()
         val sec = getSecondaryColor()
 
         // Inner glowing ring
         radialPaint.color = sec and 0x00FFFFFF or 0x44000000
-        radialPaint.strokeWidth = 3f
+        radialPaint.strokeWidth = context.dpf(2f)
         canvas.drawCircle(cx, cy, baseRadius, radialPaint)
 
-        radialPaint.strokeWidth = 4.5f
+        radialPaint.strokeWidth = context.dpf(3.5f)
         for (i in 0 until bands) {
             val angle = (i.toFloat() / bands) * (Math.PI * 2.0) + phase * 0.15
             val mag = magnitudes[i].coerceIn(0.06f, 1.0f)
             val r0 = baseRadius
-            val r1 = baseRadius + maxRay * mag
+            val r1 = baseRadius + maxRay * (0.22f + mag * 0.78f)
             val x0 = cx + (cos(angle) * r0).toFloat()
             val y0 = cy + (sin(angle) * r0).toFloat()
             val x1 = cx + (cos(angle) * r1).toFloat()
@@ -898,68 +917,36 @@ class StageWindowFrame(
     var windowScale: Float = 1.0f
     var onScaleUpdate: ((Float, String) -> Unit)? = null
 
-    private var lastFocusX = 0f
-    private var lastFocusY = 0f
-    private var isTwoFingerGesture = false
+    private val isVizFrame = windowId == "viz"
 
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            if (!isVizFrame) return false
             parent?.requestDisallowInterceptTouchEvent(true)
-            lastFocusX = detector.focusX
-            lastFocusY = detector.focusY
-            isTwoFingerGesture = true
-            translationZ = (context.resources.displayMetrics.density * 16f)
             return true
         }
 
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            val focusX = detector.focusX
-            val focusY = detector.focusY
-            val dx = focusX - lastFocusX
-            val dy = focusY - lastFocusY
-            lastFocusX = focusX
-            lastFocusY = focusY
-
-            // Fluid 2D translation (continuous motion across the screen)
-            translationX += dx
-            translationY += dy
-
-            // Continuous fluid scaling (1.0x, 1.1x, 1.2x... with zero snapping jumps)
+            if (!isVizFrame) return false
             val factor = detector.scaleFactor
-            windowScale = (windowScale * factor).coerceIn(0.40f, 2.80f)
-            scaleX = windowScale
-            scaleY = windowScale
-            val rounded = String.format(java.util.Locale.US, "%.1fx", windowScale)
-            onScaleUpdate?.invoke(windowScale, rounded)
+            val isLand = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            if (isLand) {
+                var curVizW = SonoraStore.getFloat(context, "stage_viz_weight", 0.35f)
+                curVizW = (curVizW * factor).coerceIn(0.15f, 0.70f)
+                SonoraStore.putFloat(context, "stage_viz_weight", curVizW)
+                val pct = (curVizW * 100).toInt()
+                onScaleUpdate?.invoke(curVizW, "$pct%")
+            } else {
+                var curH = SonoraStore.getInt(context, "player_viz_height_dp", 76)
+                curH = (curH * factor).toInt().coerceIn(40, 260)
+                SonoraStore.putInt(context, "player_viz_height_dp", curH)
+                onScaleUpdate?.invoke(curH.toFloat(), "${curH}dp")
+            }
             return true
         }
 
         override fun onScaleEnd(detector: ScaleGestureDetector) {
             parent?.requestDisallowInterceptTouchEvent(false)
-            val density = context.resources.displayMetrics.density
-            animate()
-                .translationX(0f)
-                .translationY(0f)
-                .translationZ(0f)
-                .setDuration(240)
-                .setInterpolator(android.view.animation.PathInterpolator(0.22f, 1f, 0.36f, 1f))
-                .start()
-
-            if (windowScale >= 2.2f) {
-                windowScale = 1.0f
-                scaleX = 1.0f
-                scaleY = 1.0f
-                onMaximizeClick?.invoke()
-            } else if (windowScale <= 0.48f) {
-                windowScale = 1.0f
-                scaleX = 1.0f
-                scaleY = 1.0f
-                onMinimizeClick?.invoke()
-            } else if (windowScale in 0.92f..1.08f) {
-                windowScale = 1.0f
-                animate().scaleX(1.0f).scaleY(1.0f).setDuration(180).start()
-            }
-            isTwoFingerGesture = false
         }
     })
 
@@ -973,19 +960,23 @@ class StageWindowFrame(
     })
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
-        doubleTapDetector.onTouchEvent(ev)
-        if (ev.pointerCount >= 2) {
-            scaleDetector.onTouchEvent(ev)
-            return true
+        if (isVizFrame) {
+            doubleTapDetector.onTouchEvent(ev)
+            if (ev.pointerCount >= 2) {
+                scaleDetector.onTouchEvent(ev)
+                return true
+            }
         }
         return super.onInterceptTouchEvent(ev)
     }
 
     override fun onTouchEvent(ev: MotionEvent): Boolean {
-        doubleTapDetector.onTouchEvent(ev)
-        if (ev.pointerCount >= 2 || isTwoFingerGesture) {
-            scaleDetector.onTouchEvent(ev)
-            return true
+        if (isVizFrame) {
+            doubleTapDetector.onTouchEvent(ev)
+            if (ev.pointerCount >= 2) {
+                scaleDetector.onTouchEvent(ev)
+                return true
+            }
         }
         return super.onTouchEvent(ev)
     }
@@ -1046,6 +1037,7 @@ class MainActivity : AppCompatActivity(), RowHost {
     private lateinit var dokiWindowFrame: StageWindowFrame
     private var fullscreenWindowId: String? = null
     private var isCoverMinimizedPip = false
+    private lateinit var stageMediaBox: FrameLayout
 
     private lateinit var mainRootLayout: RelativeLayout
     private lateinit var mainContentFrame: FrameLayout
@@ -1055,6 +1047,12 @@ class MainActivity : AppCompatActivity(), RowHost {
     private lateinit var portraitToolsScroll: HorizontalScrollView
     private lateinit var portraitViewSelectorsRow: LinearLayout
     private lateinit var portraitLowerControlsBox: LinearLayout
+
+    // Auto-hide Player Controls on inactivity
+    private var isControlsAutoHideEnabled = false
+    private var areControlsHidden = false
+    private val inactivityHandler = Handler(Looper.getMainLooper())
+    private val autoHideControlsRunnable = Runnable { hidePlayerControls() }
 
     private lateinit var unifiedStageBlock: LinearLayout
     private lateinit var stageColumnsRow: LinearLayout
@@ -1160,7 +1158,7 @@ class MainActivity : AppCompatActivity(), RowHost {
     private val navIcons = mutableListOf<ImageView>()
     private val navLabels = mutableListOf<TextView>()
     private val navPlates = mutableListOf<FrameLayout>()
-    private val tabTitles = listOf("DDMC", "Biblioteca", "Listas", "YouTube", "Sonido", "Widgets")
+    private val tabTitles = listOf("DDMC", "Biblioteca", "Listas", "Sonido", "Widgets")
 
     // ---- library ----
     private enum class LibMode(val label: String, val icon: Int) {
@@ -1509,6 +1507,16 @@ class MainActivity : AppCompatActivity(), RowHost {
     // ==========================================================
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val lp = window.attributes
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            } else {
+                lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+            window.attributes = lp
+        }
         PerformanceEngine.init(this)
         GifImageSupport.ensure(this)
         ThemeEngine.apply(this)
@@ -1538,12 +1546,18 @@ class MainActivity : AppCompatActivity(), RowHost {
         isLandscapeMode = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
         buildUi()
+        reorderStageContainers()
         updateStageLayout()
+
+        try {
+            DdmcNative.initialize(if (PerformanceEngine.isPotatoMode) 0 else 1)
+        } catch (_: Throwable) {}
+        scheduleAutoHide()
 
         val dokiPrefs = getSharedPreferences("sonora_prefs", Context.MODE_PRIVATE)
         selectedDokiId = dokiPrefs.getString("doki_id", "natsuki") ?: "natsuki"
         selectedDokiPose = dokiPrefs.getString("doki_pose", "casual") ?: "casual"
-        selectedDokiExpr = dokiPrefs.getString("doki_expr_v2", "shimeji") ?: "shimeji"
+        selectedDokiExpr = dokiPrefs.getString("doki_expr", "idle") ?: "idle"
         updateDokiViews()
         applyOrientationLayout(isLandscapeMode)
         applyAccentLive()
@@ -1564,14 +1578,18 @@ class MainActivity : AppCompatActivity(), RowHost {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         val land = newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
-        if (land != isLandscapeMode) {
-            isLandscapeMode = land
-            applyOrientationLayout(land)
-        }
+        isLandscapeMode = land
+        applyOrientationLayout(land, instant = false)
     }
+
+    private var waitingForOverlayPermission = false
 
     override fun onResume() {
         super.onResume()
+        if (waitingForOverlayPermission && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && android.provider.Settings.canDrawOverlays(this)) {
+            waitingForOverlayPermission = false
+            toggleFloatingWindow()
+        }
         progressHandler.removeCallbacks(progressRunnable)
         progressHandler.post(progressRunnable)
         SleepTimer.onTick = { rem -> runOnUiThread { refreshSleepLabel(rem) } }
@@ -1585,6 +1603,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
         if (queueRestored) { refreshLibrary(); refreshPlaylists() }
         keepScreenOnIfNeeded()
+        scheduleAutoHide()
     }
 
     override fun onPause() {
@@ -1592,16 +1611,118 @@ class MainActivity : AppCompatActivity(), RowHost {
         progressHandler.removeCallbacks(progressRunnable)
         SleepTimer.onTick = null
         saveQueueState()
+        inactivityHandler.removeCallbacks(autoHideControlsRunnable)
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        inactivityHandler.removeCallbacks(autoHideControlsRunnable)
         stageCoverVideoPlayer?.release()
         stageCoverVideoPlayer = null
         exoPlayer.removeListener(playerListener)
         if (::playerView.isInitialized) playerView.player = null
         releaseVisualizer()
         // The player, effects and service intentionally outlive the Activity.
+    }
+
+    fun scheduleAutoHide(delayMs: Long = 3500L) {
+        inactivityHandler.removeCallbacks(autoHideControlsRunnable)
+        if (currentTab != 0 || isSeeking) return
+        if (!isLandscapeMode && !isControlsAutoHideEnabled) return
+        val effectiveDelay = if (isLandscapeMode) 2800L else delayMs
+        inactivityHandler.postDelayed(autoHideControlsRunnable, effectiveDelay)
+    }
+
+    fun showPlayerControls() {
+        inactivityHandler.removeCallbacks(autoHideControlsRunnable)
+        if (areControlsHidden) {
+            areControlsHidden = false
+            if (::topHeader.isInitialized && !isLandscapeMode) {
+                topHeader.visibility = View.VISIBLE
+                topHeader.animate().alpha(1f).translationY(0f).setDuration(220).start()
+            }
+            if (::bottomNavBar.isInitialized && !isLandscapeMode) {
+                bottomNavBar.visibility = View.VISIBLE
+                bottomNavBar.animate().alpha(1f).translationY(0f).setDuration(220).start()
+            }
+            if (::portraitLowerControlsBox.isInitialized && !isLandscapeMode) {
+                portraitLowerControlsBox.visibility = View.VISIBLE
+                portraitLowerControlsBox.animate().alpha(1f).translationY(0f).setDuration(220).start()
+            }
+            if (::portraitViewSelectorsRow.isInitialized && !isLandscapeMode) {
+                portraitViewSelectorsRow.visibility = View.VISIBLE
+                portraitViewSelectorsRow.animate().alpha(1f).translationY(0f).setDuration(220).start()
+            }
+            if (::landscapeBottomBar.isInitialized && isLandscapeMode) {
+                landscapeBottomBar.visibility = View.VISIBLE
+                if (::unifiedStageBlock.isInitialized) {
+                    unifiedStageBlock.layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.85f
+                    ).apply {
+                        setMargins(0, 0, 0, 0)
+                    }
+                    unifiedStageBlock.setPadding(0, 0, 0, 0)
+                }
+                landscapeBottomBar.animate().alpha(1f).translationY(0f).setDuration(220).start()
+            }
+        }
+        scheduleAutoHide()
+    }
+
+    fun hidePlayerControls() {
+        if (currentTab != 0 || isSeeking || areControlsHidden) return
+        if (!isLandscapeMode && !isControlsAutoHideEnabled) return
+
+        areControlsHidden = true
+        if (::topHeader.isInitialized) {
+            topHeader.animate().alpha(0f).translationY(-dpf(60f)).setDuration(340).start()
+        }
+        if (::bottomNavBar.isInitialized) {
+            bottomNavBar.animate().alpha(0f).translationY(dpf(80f)).setDuration(340).start()
+        }
+        if (::portraitLowerControlsBox.isInitialized && !isLandscapeMode) {
+            portraitLowerControlsBox.animate().alpha(0f).translationY(dpf(120f)).setDuration(340).withEndAction {
+                if (areControlsHidden) portraitLowerControlsBox.visibility = View.GONE
+            }.start()
+        }
+        if (::portraitViewSelectorsRow.isInitialized && !isLandscapeMode) {
+            portraitViewSelectorsRow.animate().alpha(0f).translationY(-dpf(20f)).setDuration(340).withEndAction {
+                if (areControlsHidden) portraitViewSelectorsRow.visibility = View.GONE
+            }.start()
+        }
+        if (::landscapeBottomBar.isInitialized && isLandscapeMode) {
+            landscapeBottomBar.animate().alpha(0f).translationY(dpf(80f)).setDuration(280).withEndAction {
+                if (areControlsHidden) {
+                    landscapeBottomBar.visibility = View.GONE
+                    if (::unifiedStageBlock.isInitialized) {
+                        unifiedStageBlock.layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f
+                        ).apply {
+                            setMargins(0, 0, 0, 0)
+                        }
+                        unifiedStageBlock.setPadding(0, 0, 0, 0)
+                    }
+                }
+            }.start()
+        }
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.action == MotionEvent.ACTION_DOWN) {
+            if (areControlsHidden && currentTab == 0) {
+                showPlayerControls()
+                return true
+            }
+            scheduleAutoHide()
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        if (!areControlsHidden) {
+            scheduleAutoHide()
+        }
     }
 
     private fun applyPlayerSettings() {
@@ -1649,29 +1770,52 @@ class MainActivity : AppCompatActivity(), RowHost {
     }
 
     private fun setupVisualizer() {
-        val sessionId = exoPlayer.audioSessionId
-        if (sessionId == 0 || audioVisualizer != null) return
+        if (audioVisualizer != null) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
-        try {
-            audioVisualizer = Visualizer(sessionId).apply {
-                captureSize = Visualizer.getCaptureSizeRange()[1]
-                setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
-                    override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, samplingRate: Int) {
-                        visualizerView.updateWaveform(waveform)
-                        if (::visualizerStripView.isInitialized) visualizerStripView.updateWaveform(waveform)
-                    }
-                    override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, samplingRate: Int) {
-                        visualizerView.updateFft(fft)
-                        if (::visualizerStripView.isInitialized) visualizerStripView.updateFft(fft)
-                        if (::dokiSpriteView.isInitialized) {
-                            dokiSpriteView.audioEnergy = visualizerView.currentVocalEnergy()
+        val rawSession = exoPlayer.audioSessionId
+        val sessionsToTry = if (rawSession != 0) listOf(rawSession, 0) else listOf(0)
+        for (sid in sessionsToTry) {
+            try {
+                audioVisualizer = Visualizer(sid).apply {
+                    captureSize = Visualizer.getCaptureSizeRange()[1]
+                    setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
+                        override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, samplingRate: Int) {
+                            if (waveform != null && waveform.isNotEmpty()) {
+                                if (::visualizerView.isInitialized) visualizerView.updateWaveform(waveform)
+                                if (FloatingPlayerService.isRunning) FloatingPlayerService.updateWaveform(waveform)
+                                if (DdmcNative.isAvailable) {
+                                    val count = minOf(waveform.size, 512)
+                                    val floats = FloatArray(count) { idx ->
+                                        ((waveform[idx].toInt() and 0xFF) - 128) / 128.0f
+                                    }
+                                    DdmcNative.feedAudioSamples(floats, count, 1)
+                                    DdmcNative.processSpectrum(0.016f, FloatArray(44), FloatArray(44), FloatArray(128))
+                                }
+                            }
                         }
-                    }
-                }, Visualizer.getMaxCaptureRate() / 2, true, true)
-                enabled = true
+                        override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, samplingRate: Int) {
+                            if (::visualizerView.isInitialized) {
+                                visualizerView.updateFft(fft)
+                                if (FloatingPlayerService.isRunning) FloatingPlayerService.updateFft(fft)
+                                if (::dokiSpriteView.isInitialized) {
+                                    val energy = visualizerView.currentVocalEnergy()
+                                    dokiSpriteView.audioEnergy = energy
+                                    if (DdmcNative.isAvailable && DdmcNative.isAudioBeat()) {
+                                        dokiSpriteView.addVelocityImpulse(0.20f)
+                                        dokiSpriteView.triggerBehavior("jump")
+                                    } else if (energy > 0.40f) {
+                                        dokiSpriteView.addVelocityImpulse(0.08f)
+                                    }
+                                }
+                            }
+                        }
+                    }, Visualizer.getMaxCaptureRate() / 2, true, true)
+                    enabled = true
+                }
+                if (audioVisualizer != null) break
+            } catch (_: Exception) {
+                audioVisualizer = null
             }
-        } catch (e: Exception) {
-            audioVisualizer = null
         }
     }
 
@@ -1695,6 +1839,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             )
         }
 
+        ensureStageBgImage()
         topHeader = buildHeader()
         bottomNavBar = buildNav()
         val savedNavPos = SonoraStore.getString(this, "tab_bar_position", "bottom")
@@ -2299,7 +2444,10 @@ class MainActivity : AppCompatActivity(), RowHost {
                 },
                 onMoreClick = { cycleVisualizerMode() }
             ).apply {
-                onScaleUpdate = { _, label -> showVizHudBadge("Visualizador: $label") }
+                onScaleUpdate = { _, label ->
+                    reorderStageContainers(instant = true)
+                    showVizHudBadge("Visualizador: $label")
+                }
             }
         }
         if (!::lyricsWindowFrame.isInitialized) {
@@ -2430,12 +2578,19 @@ class MainActivity : AppCompatActivity(), RowHost {
         return bar
     }
 
-    private fun reorderStageContainers() {
+    private fun adjustCoverCardLayout() {
+        if (!::stageExpandedCoverCard.isInitialized) return
+        val side = dp(coverSideDpEffective())
+        stageExpandedCoverCard.layoutParams = FrameLayout.LayoutParams(side, side, Gravity.CENTER)
+    }
+
+    private fun reorderStageContainers(instant: Boolean = false) {
         if (!::unifiedStageBlock.isInitialized) return
         ensureWindowFrames()
 
-        // Smooth home screen launcher spring physics transition
-        if (!MotionTokens.isReducedMotion(this) && unifiedStageBlock.isAttachedToWindow) {
+        if (instant) {
+            TransitionManager.endTransitions(unifiedStageBlock)
+        } else if (!MotionTokens.isReducedMotion(this) && unifiedStageBlock.isAttachedToWindow) {
             val transition = AutoTransition().apply {
                 duration = 320
                 interpolator = PathInterpolator(0.22f, 1f, 0.36f, 1f)
@@ -2449,8 +2604,15 @@ class MainActivity : AppCompatActivity(), RowHost {
         safeDetach(stageLyricsScroll)
         safeDetach(dokiLeftCol)
 
+        safeDetach(coverWindowFrame)
+        safeDetach(dokiWindowFrame)
+        safeDetach(lyricsWindowFrame)
+        safeDetach(vizWindowFrame)
+        unifiedStageBlock.removeAllViews()
+
+        val sideInit = if (isLandscapeMode) dp(340) else dp(300)
         stageExpandedCoverCard.layoutParams = FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            sideInit, sideInit, Gravity.CENTER
         )
         stageVideoCard.layoutParams = FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
@@ -2471,15 +2633,31 @@ class MainActivity : AppCompatActivity(), RowHost {
         lyricsWindowFrame.translationX = 0f; lyricsWindowFrame.translationY = 0f
         dokiWindowFrame.translationX = 0f; dokiWindowFrame.translationY = 0f
 
-        // Wrap actual views into window frames
-        val coverBox = FrameLayout(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            addView(stageExpandedCoverCard)
-            addView(stageVideoCard)
+        // Wrap actual views into window frames safely
+        if (!::stageMediaBox.isInitialized) {
+            stageMediaBox = FrameLayout(this).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                clipChildren = false
+                clipToPadding = false
+                addOnLayoutChangeListener { _, l, t, r, b, oldL, oldT, oldR, oldB ->
+                    if (r - l != oldR - oldL || b - t != oldB - oldT) {
+                        adjustCoverCardLayout()
+                    }
+                }
+            }
         }
-        coverWindowFrame.setContent(coverBox)
+        safeDetach(stageExpandedCoverCard)
+        safeDetach(stageVideoCard)
+        if (stageExpandedCoverCard.parent != stageMediaBox) {
+            stageMediaBox.addView(stageExpandedCoverCard)
+        }
+        if (stageVideoCard.parent != stageMediaBox) {
+            stageMediaBox.addView(stageVideoCard)
+        }
+        adjustCoverCardLayout()
+        coverWindowFrame.setContent(stageMediaBox)
         vizWindowFrame.setContent(vizDeckCard)
         lyricsWindowFrame.setContent(stageLyricsScroll)
         dokiWindowFrame.setContent(dokiLeftCol)
@@ -2500,107 +2678,218 @@ class MainActivity : AppCompatActivity(), RowHost {
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
                 )
                 unifiedStageBlock.addView(targetFrame)
-                updateStageLayout()
+                updateStageLayout(instant = instant)
                 return
             }
         }
 
-        // 2. MULTI-WINDOW GRID MODES
-        val currentGrid = SonoraStore.getInt(this, "stage_grid_snap_mode", 3)
-        when (currentGrid) {
-            0 -> { // 2x2 QUAD SNAP (Windows 4-corner snap)
-                val row1 = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply {
-                        bottomMargin = dp(4)
-                    }
-                }
-                val row2 = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
-                }
-                coverWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply { marginEnd = dp(4) }
-                dokiWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
-                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply { marginEnd = dp(4) }
-                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+        // ==================================================================
+        // REFERENCE LAYOUT (same in portrait and landscape):
+        //   - translucent audio wave docked behind everything at the bottom
+        //   - rounded square cover floating in the center / upper area
+        //   - optional lyrics next to (landscape) or under (portrait) the cover
+        //   - Doki standing on the wave (part of the visualizer deck)
+        // ==================================================================
+        unifiedStageBlock.orientation = LinearLayout.VERTICAL
+        val coverAtBottom = SonoraStore.getBool(this, "stage_cover_at_bottom", false)
+        val vizPos = SonoraStore.getInt(this, vizPosKey(), 0)
+        val vizTop = vizPos == 1
+        val vizCenter = vizPos == 2
+        val vizH = dp(vizHeightDpEffective())
+        val vizAsColumn = isLandscapeMode && showStageViz && vizHAlignEffective() != 0
+        val colW = 0.30f
+        val sideDp = coverSideDpEffective()
 
-                row1.addView(coverWindowFrame)
-                row1.addView(dokiWindowFrame)
-                row2.addView(vizWindowFrame)
-                row2.addView(lyricsWindowFrame)
+        val stage = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+            clipChildren = false
+            clipToPadding = false
+        }
 
-                unifiedStageBlock.addView(row1)
-                unifiedStageBlock.addView(row2)
+        // Visualizer wave: full width, behind the content
+        if (showStageViz) {
+            if (::visualizerView.isInitialized) {
+                visualizerView.layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                )
             }
-            1 -> { // SPLIT 50/50 (Dividido Izquierda / Derecha)
-                val splitRow = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
-                }
-                val leftCol = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply { marginEnd = dp(4) }
-                }
-                val rightCol = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
-                }
-                coverWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.55f).apply { bottomMargin = dp(4) }
-                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.45f)
-                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.60f).apply { bottomMargin = dp(4) }
-                dokiWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.40f)
-
-                leftCol.addView(coverWindowFrame)
-                leftCol.addView(vizWindowFrame)
-                rightCol.addView(lyricsWindowFrame)
-                rightCol.addView(dokiWindowFrame)
-
-                splitRow.addView(leftCol)
-                splitRow.addView(rightCol)
-                unifiedStageBlock.addView(splitRow)
-            }
-            2 -> { // BENTO PIP (Video minimizado en monitor PIP en la esquina, visualizador y letras amplios)
-                val topRow = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.40f).apply { bottomMargin = dp(4) }
-                }
-                dokiWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.55f).apply { marginEnd = dp(4) }
-                coverWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.45f)
-                topRow.addView(dokiWindowFrame)
-                topRow.addView(coverWindowFrame)
-
-                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.22f).apply { bottomMargin = dp(4) }
-                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.38f)
-
-                unifiedStageBlock.addView(topRow)
-                unifiedStageBlock.addView(vizWindowFrame)
-                unifiedStageBlock.addView(lyricsWindowFrame)
-            }
-            else -> { // CLASICO APILADO (Adaptativo a cualquier densidad de pantalla / S25 Ultra)
-                val coverWeight = if (isCoverMinimizedPip) 0.20f else 0.50f
-                coverWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, coverWeight).apply { bottomMargin = dp(4) }
-                unifiedStageBlock.addView(coverWindowFrame)
-
-                val bottomCols = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f - coverWeight)
-                }
-                dokiWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.39f).apply { marginEnd = dp(4) }
-                val rightStack = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.61f)
-                }
-                lyricsWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.65f).apply { bottomMargin = dp(4) }
-                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.35f)
-                rightStack.addView(lyricsWindowFrame)
-                rightStack.addView(vizWindowFrame)
-
-                bottomCols.addView(dokiWindowFrame)
-                bottomCols.addView(rightStack)
-                unifiedStageBlock.addView(bottomCols)
+            vizDeckCard.alpha = 0.85f
+            val vGrav = if (vizTop) Gravity.TOP else if (vizCenter) Gravity.CENTER_VERTICAL else Gravity.BOTTOM
+            val hAlign = vizHAlignEffective()
+            val dWpx = resources.displayMetrics.widthPixels
+            val vizW = if (hAlign == 0) ViewGroup.LayoutParams.MATCH_PARENT
+                else minOf((vizH * 1.6f).toInt(), (dWpx * 0.45f).toInt())
+            val hGrav = when (hAlign) { 1 -> Gravity.START; 2 -> Gravity.END; else -> Gravity.NO_GRAVITY }
+            if (vizAsColumn) {
+                vizWindowFrame.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, colW)
+            } else {
+                vizWindowFrame.layoutParams = FrameLayout.LayoutParams(vizW, vizH, vGrav or hGrav)
+                stage.addView(vizWindowFrame)
             }
         }
-        updateStageLayout()
+
+        // Cover geometry
+        val coverSidePx = dp(sideDp)
+        stageExpandedCoverCard.layoutParams = FrameLayout.LayoutParams(coverSidePx, coverSidePx, Gravity.CENTER)
+        stageMediaBox.layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        coverWindowFrame.layoutParams = FrameLayout.LayoutParams(coverSidePx, coverSidePx, Gravity.CENTER)
+
+        val content = LinearLayout(this).apply {
+            orientation = if (isLandscapeMode) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+            clipChildren = false
+            clipToPadding = false
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        val coverHolder = FrameLayout(this).apply {
+            clipChildren = false
+            clipToPadding = false
+        }
+        if (showStageCover) {
+            coverHolder.addView(coverWindowFrame)
+        }
+
+        val lyricsLp: LinearLayout.LayoutParams
+        if (isLandscapeMode) {
+            val avail = if (vizAsColumn) 1f - colW else 1f
+            val leftW = (if (showStageLyrics) 0.55f else 1f) * avail
+            coverHolder.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, leftW)
+            lyricsLp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, avail - leftW).apply {
+                marginStart = dp(8); marginEnd = dp(24)
+                topMargin = dp(8); bottomMargin = dp(8)
+            }
+        } else {
+            coverHolder.layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                if (showStageLyrics) ViewGroup.LayoutParams.WRAP_CONTENT else ViewGroup.LayoutParams.MATCH_PARENT,
+                0f
+            ).apply { topMargin = dp(8); bottomMargin = dp(6) }
+            if (showStageLyrics && showStageCover) {
+                coverWindowFrame.layoutParams = FrameLayout.LayoutParams(coverSidePx, coverSidePx, Gravity.CENTER_HORIZONTAL)
+            }
+            lyricsLp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply {
+                marginStart = dp(16); marginEnd = dp(16)
+                bottomMargin = if (showStageViz && !vizTop) (vizH * 0.45f).toInt() else 0
+                topMargin = if (showStageViz && vizTop) (vizH * 0.6f).toInt() else 0
+            }
+        }
+        lyricsWindowFrame.layoutParams = lyricsLp
+
+        val swapped = SonoraStore.getBool(this, "stage_columns_swapped", false)
+        val reverse = coverAtBottom && showStageLyrics
+        val first: View? = if (reverse) (if (showStageLyrics) lyricsWindowFrame else null) else coverHolder
+        val second: View? = if (reverse) coverHolder else (if (showStageLyrics) lyricsWindowFrame else null)
+        if (vizAsColumn && vizHAlignEffective() == 1) content.addView(vizWindowFrame)
+        if (first != null) content.addView(first)
+        if (second != null) content.addView(second)
+        if (vizAsColumn && vizHAlignEffective() == 2) content.addView(vizWindowFrame)
+        stage.addView(content)
+
+        unifiedStageBlock.addView(stage)
+
+        // Doki stands on the wave as part of the visualizer deck
+        if (::vizDeckCard.isInitialized && ::dokiSpriteView.isInitialized) {
+            vizDeckCard.clipChildren = false
+            vizDeckCard.clipToPadding = false
+            if (dokiSpriteView.parent != vizDeckCard) {
+                (dokiSpriteView.parent as? ViewGroup)?.removeView(dokiSpriteView)
+                vizDeckCard.addView(dokiSpriteView)
+            }
+            dokiSpriteView.layoutParams = FrameLayout.LayoutParams(
+                dp(160), dp(180),
+                Gravity.BOTTOM or (if (swapped) Gravity.START else Gravity.END)
+            ).apply { if (swapped) marginStart = dp(24) else marginEnd = dp(24) }
+            dokiSpriteView.setFullScreenMode(false)
+            dokiSpriteView.dokiScale = SonoraStore.getInt(this, "player_doki_scale_pct", 100) / 100f
+            dokiSpriteView.visibility = if (showStageDoki) View.VISIBLE else View.GONE
+        }
+
+        updateStageLayout(instant = instant)
+    }
+
+    private fun vizHAlignEffective(): Int =
+        SonoraStore.getInt(this, vizHAlignKey(), if (isLandscapeMode) 2 else 0)
+
+    private fun vizHAlignKey(): String =
+        if (isLandscapeMode) "stage_viz_halign_land" else "stage_viz_halign_port"
+
+    private fun vizPosKey(): String =
+        if (isLandscapeMode) "stage_viz_position_land" else "stage_viz_position_port"
+
+    private fun vizHeightDpEffective(): Int {
+        val saved = SonoraStore.getInt(this, "player_viz_height_dp", 0)
+        return if (saved > 0) saved.coerceIn(30, 360) else (if (isLandscapeMode) 200 else 230)
+    }
+
+    private fun coverSideDpEffective(): Int {
+        val saved = SonoraStore.getInt(this, "player_cover_height_dp", 0)
+        val density = resources.displayMetrics.density
+        val dW = resources.displayMetrics.widthPixels / density
+        val dH = resources.displayMetrics.heightPixels / density
+        val auto = if (isLandscapeMode) {
+            minOf(dH * 0.85f * 0.66f, dW * 0.30f)
+        } else {
+            minOf(dW - 72f, dH * 0.34f)
+        }
+        val maxSide = if (isLandscapeMode) dH * 0.78f else dW - 24f
+        val v = if (saved > 0) saved.toFloat() else auto
+        return v.coerceIn(120f, maxSide.coerceAtLeast(120f)).toInt()
+    }
+
+    // ---------------- Reactive / solid background (cover blur + transparency) ----------------
+    private var stageBgImage: ImageView? = null
+    private var stageBgSource: Bitmap? = null
+
+    private fun ensureStageBgImage() {
+        if (stageBgImage != null || !::mainRootLayout.isInitialized) return
+        stageBgImage = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            isClickable = false
+            isFocusable = false
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            visibility = View.GONE
+        }
+        mainRootLayout.addView(
+            stageBgImage, 0,
+            RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        )
+    }
+
+    /** bg_mode: 0 = solid material, 1 = cover. bg_blur 0..100, bg_opacity 5..100 (cover transparency over the solid). */
+    fun updateStageBackground(bmp: Bitmap? = stageBgSource) {
+        ensureStageBgImage()
+        val iv = stageBgImage ?: return
+        stageBgSource = bmp
+        val mode = SonoraStore.getInt(this, "bg_mode", 1)
+        val blur = SonoraStore.getInt(this, "bg_blur", 60).coerceIn(0, 100)
+        val opacity = SonoraStore.getInt(this, "bg_opacity", 55).coerceIn(5, 100)
+        if (mode != 1 || bmp == null) {
+            iv.visibility = View.GONE
+            iv.setImageDrawable(null)
+            return
+        }
+        iv.visibility = View.VISIBLE
+        iv.alpha = opacity / 100f
+        if (Build.VERSION.SDK_INT >= 31) {
+            iv.setImageBitmap(bmp)
+            iv.setRenderEffect(
+                if (blur <= 0) null
+                else {
+                    val r = (blur / 100f * 70f).coerceAtLeast(1f)
+                    android.graphics.RenderEffect.createBlurEffect(r, r, Shader.TileMode.CLAMP)
+                }
+            )
+        } else {
+            val f = 1f + blur / 100f * 24f
+            val w = (bmp.width / f).toInt().coerceAtLeast(8)
+            val h = (bmp.height / f).toInt().coerceAtLeast(8)
+            val small = try { Bitmap.createScaledBitmap(bmp, w, h, true) } catch (_: Exception) { bmp }
+            iv.setImageBitmap(small)
+        }
     }
 
     fun showVizHudBadge(textMsg: String) {
@@ -2651,13 +2940,21 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
-                val curH = card.layoutParams.height.takeIf { it > 0 } ?: dp(76)
-                val newH = (curH * detector.scaleFactor).toInt().coerceIn(dp(30), dp(320))
-                card.layoutParams.height = newH
-                card.requestLayout()
-                val dpVal = (newH / resources.displayMetrics.density).toInt()
-                showVizHudBadge("Visualizador: ${dpVal}dp")
-                SonoraStore.putInt(this@MainActivity, "player_viz_height_dp", dpVal)
+                var curVizW = SonoraStore.getFloat(this@MainActivity, "stage_viz_weight", 0.35f)
+                curVizW = (curVizW * detector.scaleFactor).coerceIn(0.18f, 0.70f)
+                SonoraStore.putFloat(this@MainActivity, "stage_viz_weight", curVizW)
+
+                if (isLandscapeMode) {
+                    val curLandLeftW = (1.0f - (0.30f + curVizW * 0.36f)).coerceIn(0.28f, 0.62f)
+                    SonoraStore.putFloat(this@MainActivity, "stage_land_left_weight", curLandLeftW)
+                } else {
+                    val curCoverW = (1.0f - curVizW * 0.45f).coerceIn(0.30f, 0.65f)
+                    SonoraStore.putFloat(this@MainActivity, "stage_cover_weight", curCoverW)
+                }
+
+                reorderStageContainers(instant = true)
+                val pct = (curVizW * 100).toInt()
+                showVizHudBadge("Visualizador: $pct%")
                 return true
             }
         })
@@ -2671,15 +2968,14 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
 
             override fun onDoubleTap(e: MotionEvent): Boolean {
-                val curPos = SonoraStore.getInt(this@MainActivity, "stage_viz_position", 0)
-                val nextPos = (curPos + 1) % 4
-                SonoraStore.putInt(this@MainActivity, "stage_viz_position", nextPos)
+                val curPos = SonoraStore.getInt(this@MainActivity, vizPosKey(), 0)
+                val nextPos = (curPos + 1) % 3
+                SonoraStore.putInt(this@MainActivity, vizPosKey(), nextPos)
                 reorderStageContainers()
                 val desc = when (nextPos) {
-                    1 -> "Visualizador arriba de letras"
-                    2 -> "Visualizador centro (ancho completo)"
-                    3 -> "Visualizador fondo (ancho completo)"
-                    else -> "Visualizador abajo de letras"
+                    1 -> "Visualizador: arriba"
+                    2 -> "Visualizador: centro"
+                    else -> "Visualizador: abajo"
                 }
                 showVizHudBadge(desc)
                 card.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
@@ -2691,19 +2987,18 @@ class MainActivity : AppCompatActivity(), RowHost {
                 val dx = e2.x - e1.x
                 val dy = e2.y - e1.y
                 if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > dp(30)) {
-                    val curPos = SonoraStore.getInt(this@MainActivity, "stage_viz_position", 0)
+                    val curPos = SonoraStore.getInt(this@MainActivity, vizPosKey(), 0)
                     val nextPos = if (dy < 0) {
-                        if (curPos == 0) 1 else 2
+                        if (curPos == 0) 2 else 1
                     } else {
-                        if (curPos == 1) 0 else 3
+                        if (curPos == 1) 2 else 0
                     }
-                    SonoraStore.putInt(this@MainActivity, "stage_viz_position", nextPos)
+                    SonoraStore.putInt(this@MainActivity, vizPosKey(), nextPos)
                     reorderStageContainers()
                     val desc = when (nextPos) {
-                        1 -> "Visualizador arriba de letras"
-                        2 -> "Visualizador centro (ancho completo)"
-                        3 -> "Visualizador fondo (ancho completo)"
-                        else -> "Visualizador abajo de letras"
+                        1 -> "Visualizador: arriba"
+                        2 -> "Visualizador: centro"
+                        else -> "Visualizador: abajo"
                     }
                     showVizHudBadge(desc)
                     card.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
@@ -2760,11 +3055,24 @@ class MainActivity : AppCompatActivity(), RowHost {
                     }
                     if (isLongPressResize) {
                         card.translationY = dy * 0.25f
-                        val newH = (initialHeight - dy.toInt()).coerceIn(dp(30), dp(320))
-                        card.layoutParams.height = newH
-                        card.requestLayout()
-                        val dpVal = (newH / resources.displayMetrics.density).toInt()
-                        showVizHudBadge("Visualizador: ${dpVal}dp")
+                        val deltaW = -dy / (resources.displayMetrics.heightPixels * 0.50f)
+                        val deltaX = dx / (resources.displayMetrics.widthPixels * 0.50f)
+                        if (isLandscapeMode) {
+                            var curLand = SonoraStore.getFloat(this@MainActivity, "stage_land_left_weight", 0.44f)
+                            curLand = (curLand - deltaX * 0.05f).coerceIn(0.28f, 0.65f)
+                            SonoraStore.putFloat(this@MainActivity, "stage_land_left_weight", curLand)
+                        }
+                        var curVizW = SonoraStore.getFloat(this@MainActivity, "stage_viz_weight", 0.35f)
+                        curVizW = (curVizW + deltaW * 0.05f).coerceIn(0.18f, 0.70f)
+                        SonoraStore.putFloat(this@MainActivity, "stage_viz_weight", curVizW)
+
+                        var curCoverW = SonoraStore.getFloat(this@MainActivity, "stage_cover_weight", 0.50f)
+                        curCoverW = (1.0f - curVizW * 0.45f).coerceIn(0.30f, 0.65f)
+                        SonoraStore.putFloat(this@MainActivity, "stage_cover_weight", curCoverW)
+
+                        reorderStageContainers()
+                        val pct = (curVizW * 100).toInt()
+                        showVizHudBadge("Visualizador: $pct%")
                         return@setOnTouchListener true
                     }
                 }
@@ -2782,10 +3090,9 @@ class MainActivity : AppCompatActivity(), RowHost {
                             .setDuration(260)
                             .setInterpolator(OvershootInterpolator(1.35f))
                             .start()
-                        val curH = card.layoutParams.height
-                        val dpVal = (curH / resources.displayMetrics.density).toInt()
-                        SonoraStore.putInt(this, "player_viz_height_dp", dpVal)
-                        showVizHudBadge("Visualizador: ${dpVal}dp (Guardado)")
+                        val curVizW = SonoraStore.getFloat(this, "stage_viz_weight", 0.35f)
+                        val pct = (curVizW * 100).toInt()
+                        showVizHudBadge("Visualizador: $pct% (Guardado)")
                         v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                         return@setOnTouchListener true
                     }
@@ -2800,7 +3107,6 @@ class MainActivity : AppCompatActivity(), RowHost {
         var startRawY = 0f
         var startRawX = 0f
         var initialScale = 1.0f
-        var initialTx = 0f
         var isLongPressResize = false
         val longPressHandler = Handler(Looper.getMainLooper())
 
@@ -2813,7 +3119,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             val prefs = getSharedPreferences("doki_prefs", Context.MODE_PRIVATE)
             prefs.edit().putString("doki_id", selectedDokiId).apply()
             updateDokiViews()
-            showVizHudBadge("${selectedDokiId.replaceFirstChar { it.uppercase() }} 💢")
+            showVizHudBadge(selectedDokiId.replaceFirstChar { it.uppercase() })
         }
 
         val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -2865,7 +3171,6 @@ class MainActivity : AppCompatActivity(), RowHost {
                     startRawY = event.rawY
                     startRawX = event.rawX
                     initialScale = spriteView.dokiScale
-                    initialTx = spriteView.translationX
                     isLongPressResize = false
                     longPressHandler.postDelayed(longPressRunnable, 320)
                     v.parent?.requestDisallowInterceptTouchEvent(true)
@@ -2904,7 +3209,8 @@ class MainActivity : AppCompatActivity(), RowHost {
                             val rawRatio = touchX / screenW
                             val newWeight = (if (isSwapped) (1f - rawRatio) else rawRatio).coerceIn(0.20f, 0.80f)
                             SonoraStore.putFloat(this@MainActivity, "stage_doki_weight", newWeight)
-                            updateStageLayout()
+                            reorderStageContainers()
+        updateStageLayout()
                             val dokiPct = (newWeight * 100).toInt()
                             val lyricsPct = 100 - dokiPct
                             showVizHudBadge("Distribución: ${dokiPct}% Doki | ${lyricsPct}% Letras")
@@ -2947,26 +3253,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
     }
 
-    private fun attachCoverTouchControls(card: FrameLayout, coverImg: ImageView) {
-        var startRawY = 0f
-        var startRawX = 0f
-        var initialHeight = 0
-        var isLongPressResize = false
-        val longPressHandler = Handler(Looper.getMainLooper())
-
-        val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScale(detector: ScaleGestureDetector): Boolean {
-                val curH = card.layoutParams.height.takeIf { it > 0 } ?: dp(228)
-                val newH = (curH * detector.scaleFactor).toInt().coerceIn(dp(120), dp(450))
-                card.layoutParams.height = newH
-                card.requestLayout()
-                val dpVal = (newH / resources.displayMetrics.density).toInt()
-                showVizHudBadge("Portada: ${dpVal}dp")
-                SonoraStore.putInt(this@MainActivity, "player_cover_height_dp", dpVal)
-                return true
-            }
-        })
-
+    private fun attachCoverTouchControls(card: FrameLayout, _coverImg: ImageView) {
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 showGifCoverOptionsSheet()
@@ -2999,122 +3286,18 @@ class MainActivity : AppCompatActivity(), RowHost {
                     return true
                 } else if (absY > absX && absY > dp(35)) {
                     if (diffY < 0) {
-                        // SWIPE UP -> QUEUE!
                         showQueueSheet()
                         showVizHudBadge("Cola de Reproducción")
                     } else {
-                        // SWIPE DOWN -> TRACK INFO
                         tracks.getOrNull(currentTrackIndex)?.let { showTrackDetails(it) } ?: toastNoTrack()
                     }
                     return true
                 }
                 return false
             }
-
-            override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
-                if (e1 == null) return false
-                val totalDy = e1.y - e2.y
-                if (totalDy > dp(70) && Math.abs(totalDy) > Math.abs(e1.x - e2.x) * 1.5f) {
-                    showQueueSheet()
-                    showVizHudBadge("Cola de Reproducción")
-                    return true
-                }
-                return false
-            }
         })
 
-        val longPressRunnable = Runnable {
-            isLongPressResize = true
-            card.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            card.animate()
-                .scaleX(1.04f)
-                .scaleY(1.04f)
-                .translationZ(dpf(18f))
-                .setDuration(180)
-                .setInterpolator(OvershootInterpolator(1.4f))
-                .start()
-            showVizHudBadge("Portada: Moviendo... Arrastra arriba/abajo")
-        }
-
-        card.setOnTouchListener { v, event ->
-            scaleDetector.onTouchEvent(event)
-            if (scaleDetector.isInProgress) {
-                longPressHandler.removeCallbacks(longPressRunnable)
-                isLongPressResize = false
-                return@setOnTouchListener true
-            }
-
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    startRawY = event.rawY
-                    startRawX = event.rawX
-                    initialHeight = card.layoutParams.height.takeIf { it > 0 } ?: dp(228)
-                    isLongPressResize = false
-                    longPressHandler.postDelayed(longPressRunnable, 320)
-                    v.parent?.requestDisallowInterceptTouchEvent(true)
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val dy = event.rawY - startRawY
-                    val dx = event.rawX - startRawX
-                    if (!isLongPressResize && (Math.abs(dy) > dp(8) || Math.abs(dx) > dp(8))) {
-                        longPressHandler.removeCallbacks(longPressRunnable)
-                    }
-                    if (isLongPressResize) {
-                        val screenH = resources.displayMetrics.heightPixels.toFloat()
-                        val screenW = resources.displayMetrics.widthPixels.toFloat()
-                        val atBottom = SonoraStore.getBool(this@MainActivity, "stage_cover_at_bottom", false)
-
-                        // Smooth home screen follow and tilt
-                        card.translationY = dy * 0.45f
-                        card.translationX = dx * 0.20f
-                        if (screenW > 0) {
-                            card.rotation = (dx / screenW * 6f).coerceIn(-5f, 5f)
-                        }
-
-                        if (!atBottom && event.rawY > screenH * 0.58f) {
-                            SonoraStore.putBool(this@MainActivity, "stage_cover_at_bottom", true)
-                            reorderStageContainers()
-                            showVizHudBadge("Portada reubicada abajo")
-                            v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                        } else if (atBottom && event.rawY < screenH * 0.42f) {
-                            SonoraStore.putBool(this@MainActivity, "stage_cover_at_bottom", false)
-                            reorderStageContainers()
-                            showVizHudBadge("Portada reubicada arriba")
-                            v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                        } else {
-                            val newH = (initialHeight - dy.toInt()).coerceIn(dp(120), dp(450))
-                            card.layoutParams.height = newH
-                            card.requestLayout()
-                            val dpVal = (newH / resources.displayMetrics.density).toInt()
-                            showVizHudBadge("Portada: ${dpVal}dp")
-                        }
-                        return@setOnTouchListener true
-                    }
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    longPressHandler.removeCallbacks(longPressRunnable)
-                    v.parent?.requestDisallowInterceptTouchEvent(false)
-                    if (isLongPressResize) {
-                        isLongPressResize = false
-                        card.animate()
-                            .scaleX(1.0f)
-                            .scaleY(1.0f)
-                            .translationX(0f)
-                            .translationY(0f)
-                            .rotation(0f)
-                            .translationZ(0f)
-                            .setDuration(260)
-                            .setInterpolator(OvershootInterpolator(1.35f))
-                            .start()
-                        val curH = card.layoutParams.height
-                        val dpVal = (curH / resources.displayMetrics.density).toInt()
-                        SonoraStore.putInt(this, "player_cover_height_dp", dpVal)
-                        showVizHudBadge("Portada: ${dpVal}dp (Guardado)")
-                        v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                        return@setOnTouchListener true
-                    }
-                }
-            }
+        card.setOnTouchListener { _, event ->
             gestureDetector.onTouchEvent(event)
             true
         }
@@ -3154,7 +3337,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                 return false
             }
         })
-        view.setOnTouchListener { v, ev ->
+        view.setOnTouchListener { _, ev ->
             gd.onTouchEvent(ev)
             false
         }
@@ -3339,7 +3522,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             root.addView(sheetTitle("Personalizar Reproductor", "Deslizadores continuos y gestos touch directos"))
 
             val hintCard = TextView(this).apply {
-                text = "TIP TOUCH DIRECTO:\n• Mantén presionado y arrastra: Portada (arriba/abajo), Doki (izq/der o tamaño), Visualizador (altura).\n• Doble toque: Cambia ubicación de Portada o Doki al instante.\n• Doble toque en Visualizador: Cambia su posición (arriba/abajo de letras o ancho completo)."
+                text = "TIP TOUCH DIRECTO:\n• Mantén presionado y arrastra: Portada (arriba/abajo), Doki (izq/der o tamaño), Visualizador (altura).\n• Doble toque en el Visualizador: cambia su posición (abajo / arriba)."
                 setTextColor(Color.parseColor(Pal.SUB))
                 textSize = 12f
                 setPadding(dp(12), dp(10), dp(12), dp(10))
@@ -3354,81 +3537,99 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
             root.addView(hintCard)
 
-            val gridTitle = TextView(this).apply {
-                text = "Cuadrícula y Ventanas (Windows Snap)"
+            // ---- Fondo: material solido o portada con blur / transparencia ----
+            val bgTitle = TextView(this).apply {
+                text = "Fondo del Reproductor"
                 setTextColor(Color.WHITE)
                 textSize = 14f
                 setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
                 setPadding(0, 0, 0, dp(6))
             }
-            root.addView(gridTitle)
+            root.addView(bgTitle)
 
-            val gridRow1 = LinearLayout(this).apply {
+            val bgModeRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                     bottomMargin = dp(6)
                 }
             }
-            val curSnap = SonoraStore.getInt(this, "stage_grid_snap_mode", 0)
-            val btn2x2 = Pill(this, if (curSnap == 0) "● Cuadrícula 2x2" else "Cuadrícula 2x2", R.drawable.ic_widgets, 34)
-            btn2x2.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
-            btn2x2.setOnClickListener {
-                SonoraStore.putInt(this@MainActivity, "stage_grid_snap_mode", 0)
-                fullscreenWindowId = null
-                reorderStageContainers()
-                showVizHudBadge("Cuadrícula 2x2 activada")
+            val bgSolidBtn = Pill(this, "Material solido", R.drawable.ic_widgets, 34)
+            val bgCoverBtn = Pill(this, "Portada", R.drawable.ic_album, 34)
+            bgSolidBtn.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
+            bgCoverBtn.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            val bgBlurLabel = TextView(this).apply {
+                setTextColor(Color.WHITE); textSize = 13f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
             }
-            val btnSplit = Pill(this, if (curSnap == 1) "● Dividido 50/50" else "Dividido 50/50", R.drawable.ic_sliders, 34)
-            btnSplit.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            btnSplit.setOnClickListener {
-                SonoraStore.putInt(this@MainActivity, "stage_grid_snap_mode", 1)
-                fullscreenWindowId = null
-                reorderStageContainers()
-                showVizHudBadge("Dividido 50/50 activado")
+            val bgOpLabel = TextView(this).apply {
+                setTextColor(Color.WHITE); textSize = 13f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
             }
-            gridRow1.addView(btn2x2)
-            gridRow1.addView(btnSplit)
-            root.addView(gridRow1)
+            val bgBlurSb = SeekBar(this)
+            val bgOpSb = SeekBar(this)
+            fun refreshBgControls() {
+                val m = SonoraStore.getInt(this@MainActivity, "bg_mode", 1)
+                bgSolidBtn.setActive(m == 0)
+                bgCoverBtn.setActive(m == 1)
+                val en = m == 1
+                bgBlurSb.isEnabled = en; bgOpSb.isEnabled = en
+                bgBlurSb.alpha = if (en) 1f else 0.4f
+                bgOpSb.alpha = if (en) 1f else 0.4f
+            }
+            bgSolidBtn.setOnClickListener {
+                SonoraStore.putInt(this@MainActivity, "bg_mode", 0)
+                updateStageBackground(); refreshBgControls()
+                showVizHudBadge("Fondo: material solido")
+            }
+            bgCoverBtn.setOnClickListener {
+                SonoraStore.putInt(this@MainActivity, "bg_mode", 1)
+                updateStageBackground(); refreshBgControls()
+                showVizHudBadge("Fondo: portada")
+            }
+            bgModeRow.addView(bgSolidBtn); bgModeRow.addView(bgCoverBtn)
+            root.addView(bgModeRow)
 
-            val gridRow2 = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                    bottomMargin = dp(14)
-                }
+            val curBlur = SonoraStore.getInt(this, "bg_blur", 60)
+            bgBlurLabel.text = "Desenfoque (blur): $curBlur%"
+            root.addView(bgBlurLabel)
+            bgBlurSb.apply {
+                max = 100; progress = curBlur
+                progressTintList = ColorStateList.valueOf(Color.parseColor(Pal.ACCENT))
+                thumbTintList = ColorStateList.valueOf(Color.WHITE)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                        bgBlurLabel.text = "Desenfoque (blur): $p%"
+                        SonoraStore.putInt(this@MainActivity, "bg_blur", p)
+                        if (fromUser) updateStageBackground()
+                    }
+                    override fun onStartTrackingTouch(sb: SeekBar?) {}
+                    override fun onStopTrackingTouch(sb: SeekBar?) { updateStageBackground() }
+                })
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(8) }
             }
-            val btnBento = Pill(this, if (curSnap == 2) "● Bento PIP" else "Bento PIP", R.drawable.ic_sparkles, 34)
-            btnBento.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
-            btnBento.setOnClickListener {
-                SonoraStore.putInt(this@MainActivity, "stage_grid_snap_mode", 2)
-                fullscreenWindowId = null
-                reorderStageContainers()
-                showVizHudBadge("Bento PIP activado")
-            }
-            val btnClassic = Pill(this, if (curSnap == 3) "● Clásico Apilado" else "Clásico Apilado", R.drawable.ic_list_music, 34)
-            btnClassic.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            btnClassic.setOnClickListener {
-                SonoraStore.putInt(this@MainActivity, "stage_grid_snap_mode", 3)
-                fullscreenWindowId = null
-                reorderStageContainers()
-                showVizHudBadge("Clásico Apilado activado")
-            }
-            gridRow2.addView(btnBento)
-            gridRow2.addView(btnClassic)
-            root.addView(gridRow2)
+            root.addView(bgBlurSb)
 
-            if (fullscreenWindowId != null) {
-                val restoreFullscreenBtn = Pill(this, "Restaurar Cuadrícula (Salir de Pantalla Completa)", R.drawable.ic_refresh, 36).apply {
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                        bottomMargin = dp(12)
+            val curOp = SonoraStore.getInt(this, "bg_opacity", 55)
+            bgOpLabel.text = "Opacidad de la portada: $curOp%"
+            root.addView(bgOpLabel)
+            bgOpSb.apply {
+                max = 95; progress = (curOp - 5).coerceIn(0, 95)
+                progressTintList = ColorStateList.valueOf(Color.parseColor(Pal.ACCENT))
+                thumbTintList = ColorStateList.valueOf(Color.WHITE)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                        val v = p + 5
+                        bgOpLabel.text = "Opacidad de la portada: $v%"
+                        SonoraStore.putInt(this@MainActivity, "bg_opacity", v)
+                        if (fromUser) updateStageBackground()
                     }
-                    setOnClickListener {
-                        fullscreenWindowId = null
-                        reorderStageContainers()
-                        showVizHudBadge("Cuadrícula restaurada")
-                    }
-                }
-                root.addView(restoreFullscreenBtn)
+                    override fun onStartTrackingTouch(sb: SeekBar?) {}
+                    override fun onStopTrackingTouch(sb: SeekBar?) { updateStageBackground() }
+                })
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(14) }
             }
+            root.addView(bgOpSb)
+            refreshBgControls()
 
             // Posición de Elementos (Toggles rápidos)
             val posTitle = TextView(this).apply {
@@ -3478,24 +3679,41 @@ class MainActivity : AppCompatActivity(), RowHost {
                     bottomMargin = dp(14)
                 }
             }
-            val curVizPos = SonoraStore.getInt(this, "stage_viz_position", 0)
+            val curVizPos = SonoraStore.getInt(this, vizPosKey(), 0)
             fun vizPosLabel(p: Int) = when (p) {
-                1 -> "Viz: Arriba Letras"
-                2 -> "Viz: Centro Dock"
-                3 -> "Viz: Fondo Dock"
-                else -> "Viz: Abajo Letras"
+                1 -> "Viz: Arriba"
+                2 -> "Viz: Centro"
+                else -> "Viz: Abajo"
             }
             val vizPosBtn = Pill(this, vizPosLabel(curVizPos), R.drawable.ic_waveform, 34)
             vizPosBtn.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             vizPosBtn.setOnClickListener {
-                val p = (SonoraStore.getInt(this@MainActivity, "stage_viz_position", 0) + 1) % 4
-                SonoraStore.putInt(this@MainActivity, "stage_viz_position", p)
+                val p = (SonoraStore.getInt(this@MainActivity, vizPosKey(), 0) + 1) % 3
+                SonoraStore.putInt(this@MainActivity, vizPosKey(), p)
                 reorderStageContainers()
                 vizPosBtn.labelView.text = vizPosLabel(p)
                 showVizHudBadge(vizPosLabel(p))
             }
             vizPosRow.addView(vizPosBtn)
             root.addView(vizPosRow)
+
+            fun vizHLabel(p: Int) = when (p) {
+                1 -> "Viz horizontal: Izquierda"
+                2 -> "Viz horizontal: Derecha"
+                else -> "Viz horizontal: Ancho completo"
+            }
+            val vizHBtn = Pill(this, vizHLabel(vizHAlignEffective()), R.drawable.ic_waveform, 34)
+            vizHBtn.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(14)
+            }
+            vizHBtn.setOnClickListener {
+                val p = (vizHAlignEffective() + 1) % 3
+                SonoraStore.putInt(this@MainActivity, vizHAlignKey(), p)
+                reorderStageContainers(instant = true)
+                vizHBtn.labelView.text = vizHLabel(p)
+                showVizHudBadge(vizHLabel(p))
+            }
+            root.addView(vizHBtn)
 
             val videoModeRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -3521,9 +3739,9 @@ class MainActivity : AppCompatActivity(), RowHost {
             videoModeRow.addView(videoModeBtn)
             root.addView(videoModeRow)
 
-            val coverCurH = SonoraStore.getInt(this, "player_cover_height_dp", 228)
+            val coverCurH = coverSideDpEffective()
             val coverLabel = TextView(this).apply {
-                text = "Altura de Portada: ${coverCurH}dp"
+                text = "Tamano de Portada: ${coverCurH}dp"
                 setTextColor(Color.WHITE)
                 textSize = 13f
                 setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
@@ -3537,10 +3755,9 @@ class MainActivity : AppCompatActivity(), RowHost {
                 setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                     override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                         val h = 120 + p
-                        coverLabel.text = "Altura de Portada: ${h}dp"
+                        coverLabel.text = "Tamano de Portada: ${h}dp"
                         SonoraStore.putInt(this@MainActivity, "player_cover_height_dp", h)
-                        stageExpandedCoverCard.layoutParams.height = dp(h)
-                        stageExpandedCoverCard.requestLayout()
+                        if (fromUser) reorderStageContainers(instant = true)
                     }
                     override fun onStartTrackingTouch(sb: SeekBar?) {}
                     override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -3551,7 +3768,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
             root.addView(coverSb)
 
-            val vizCurH = SonoraStore.getInt(this, "player_viz_height_dp", 76)
+            val vizCurH = vizHeightDpEffective()
             val vizLabel = TextView(this).apply {
                 text = "Altura del Visualizador: ${vizCurH}dp"
                 setTextColor(Color.WHITE)
@@ -3569,8 +3786,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                         val h = 30 + p
                         vizLabel.text = "Altura del Visualizador: ${h}dp"
                         SonoraStore.putInt(this@MainActivity, "player_viz_height_dp", h)
-                        vizDeckCard.layoutParams.height = dp(h)
-                        vizDeckCard.requestLayout()
+                        if (fromUser) reorderStageContainers(instant = true)
                     }
                     override fun onStartTrackingTouch(sb: SeekBar?) {}
                     override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -3612,16 +3828,17 @@ class MainActivity : AppCompatActivity(), RowHost {
 
             val resetBtn = Pill(this, "Restablecer Dimensiones", R.drawable.ic_trash, 38).apply {
                 setOnClickListener {
-                    SonoraStore.putInt(this@MainActivity, "player_cover_height_dp", 228)
-                    SonoraStore.putInt(this@MainActivity, "player_viz_height_dp", 76)
+                    SonoraStore.putInt(this@MainActivity, "player_cover_height_dp", 0)
+                    SonoraStore.putInt(this@MainActivity, "player_viz_height_dp", 0)
                     SonoraStore.putInt(this@MainActivity, "player_doki_scale_pct", 100)
                     SonoraStore.putFloat(this@MainActivity, "layout_doki_tx", 0f)
-                    stageExpandedCoverCard.layoutParams.height = dp(228)
-                    stageExpandedCoverCard.requestLayout()
-                    vizDeckCard.layoutParams.height = dp(76)
-                    vizDeckCard.requestLayout()
+                    SonoraStore.putInt(this@MainActivity, "bg_mode", 1)
+                    SonoraStore.putInt(this@MainActivity, "bg_blur", 60)
+                    SonoraStore.putInt(this@MainActivity, "bg_opacity", 55)
                     dokiSpriteView.dokiScale = 1.0f
                     dokiSpriteView.translationX = 0f
+                    reorderStageContainers(instant = true)
+                    updateStageBackground()
                     Toast.makeText(this@MainActivity, "Tamaños restablecidos", Toast.LENGTH_SHORT).show()
                     dialog.dismiss()
                 }
@@ -3651,7 +3868,7 @@ class MainActivity : AppCompatActivity(), RowHost {
 
             // Rendimiento & Optimización para celulares patata y gama alta
             val perfTitle = TextView(this).apply {
-                text = "Modo Rendimiento (Activar / Desactivar)"
+                text = "Motor Cavifax • Rendimiento y Optimización"
                 setTextColor(Color.WHITE)
                 textSize = 14f
                 setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
@@ -3660,7 +3877,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             root.addView(perfTitle)
 
             val perfSub = TextView(this).apply {
-                text = "Activa o desactiva la optimización para celulares modestos. Todas las funciones (visualizador, dokis, video covers y letras) se mantienen 100% activas."
+                text = "Motor Cavifax: Optimización inteligente para celulares gama de entrada y alta fidelidad. Dokis, visualizador y letras 100% activos."
                 setTextColor(Color.parseColor(Pal.SUB))
                 textSize = 11.5f
                 setPadding(0, 0, 0, dp(8))
@@ -3913,7 +4130,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                         dokiPrefs.edit()
                             .putString("doki_id", selectedDokiId)
                             .putString("doki_pose", selectedDokiPose)
-                            .putString("doki_expr_v2", selectedDokiExpr)
+                            .putString("doki_expr", selectedDokiExpr)
                             .apply()
                         dokiSpriteView.setDoki(selectedDokiId, selectedDokiPose, selectedDokiExpr)
                         updateDokiViews()
@@ -3999,12 +4216,34 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
     }
 
+    private fun showModernProgressDialog(msg: String): androidx.appcompat.app.AlertDialog {
+        return androidx.appcompat.app.AlertDialog.Builder(this)
+            .setView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(dp(24), dp(20), dp(24), dp(20))
+                gravity = Gravity.CENTER_VERTICAL
+                addView(ProgressBar(this@MainActivity).apply {
+                    indeterminateTintList = ColorStateList.valueOf(Color.parseColor(Pal.ACCENT))
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = msg
+                    setTextColor(Color.WHITE)
+                    textSize = 14f
+                    setPadding(dp(16), 0, 0, 0)
+                })
+            })
+            .setCancelable(false)
+            .create().apply {
+                window?.setBackgroundDrawable(GradientDrawable().apply {
+                    setColor(Color.parseColor("#1E293B"))
+                    cornerRadius = dpf(16f)
+                })
+                show()
+            }
+    }
+
     private fun executeMusicoletImportFile(f: File) {
-        val progressDialog = android.app.ProgressDialog(this).apply {
-            setMessage("Descifrando listas de Musicolet con Blowfish...")
-            setCancelable(false)
-            show()
-        }
+        val progressDialog = showModernProgressDialog("Descifrando listas de Musicolet con Blowfish...")
         Thread {
             try {
                 val res = MusicoletImporter.importBackupFile(this, f, localTracksList)
@@ -4027,11 +4266,7 @@ class MainActivity : AppCompatActivity(), RowHost {
     }
 
     private fun executeMusicoletImport(uri: Uri) {
-        val progressDialog = android.app.ProgressDialog(this).apply {
-            setMessage("Descifrando listas de Musicolet con Blowfish...")
-            setCancelable(false)
-            show()
-        }
+        val progressDialog = showModernProgressDialog("Descifrando listas de Musicolet con Blowfish...")
         Thread {
             try {
                 val res = MusicoletImporter.importBackupUri(this, uri, localTracksList)
@@ -4076,9 +4311,9 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
         val icons = listOf(
             R.drawable.ic_home, R.drawable.ic_folder, R.drawable.ic_list_music,
-            R.drawable.ic_radio, R.drawable.ic_sliders, R.drawable.ic_widgets
+            R.drawable.ic_sliders, R.drawable.ic_widgets
         )
-        val labels = listOf("Reproductor", "Biblioteca", "Listas", "Catálogo", "Sonido", "Widgets")
+        val labels = listOf("Reproductor", "Biblioteca", "Listas", "Sonido", "Widgets")
         for (i in icons.indices) {
             val item = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -4176,7 +4411,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         currentTab = index
         val views = listOf(
             playerTabContainer, localFilesTabContainer, playlistTabContainer,
-            onlineTabContainer, soundTabContainer, widgetTabContainer
+            soundTabContainer, widgetTabContainer
         )
         for (i in views.indices) {
             views[i].visibility = if (i == index) View.VISIBLE else View.GONE
@@ -4193,6 +4428,15 @@ class MainActivity : AppCompatActivity(), RowHost {
         applyOrientationLayout(isLandscapeMode)
         keepScreenOnIfNeeded()
         currentFocus?.let { (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(it.windowToken, 0) }
+
+        if (index == 0) {
+            showPlayerControls()
+        } else {
+            inactivityHandler.removeCallbacks(autoHideControlsRunnable)
+            if (areControlsHidden) {
+                showPlayerControls()
+            }
+        }
     }
 
     private fun showOtaUpdaterSheet() {
@@ -4284,6 +4528,14 @@ class MainActivity : AppCompatActivity(), RowHost {
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent): Boolean = true
 
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                if (isLandscapeMode) {
+                    if (areControlsHidden) showPlayerControls() else hidePlayerControls()
+                    return true
+                }
+                return false
+            }
+
             override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 if (e1 == null) return false
                 val diffX = e2.x - e1.x
@@ -4358,17 +4610,17 @@ class MainActivity : AppCompatActivity(), RowHost {
             private var currentScale = 1.0f
 
             override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-                currentScale = 1.0f
+                currentScale = targetView.scaleX
                 targetView.parent?.requestDisallowInterceptTouchEvent(true)
                 targetView.translationZ = dpf(16f)
                 return true
             }
 
             override fun onScale(detector: ScaleGestureDetector): Boolean {
-                currentScale = (currentScale * detector.scaleFactor).coerceIn(0.40f, 2.80f)
+                currentScale = (currentScale * detector.scaleFactor).coerceIn(0.40f, 3.0f)
                 targetView.scaleX = currentScale
                 targetView.scaleY = currentScale
-                val label = String.format(java.util.Locale.US, "%.1fx", currentScale)
+                val label = String.format(java.util.Locale.US, "%.2fx", currentScale)
                 showVizHudBadge("Escala: $label")
                 return true
             }
@@ -4376,32 +4628,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             override fun onScaleEnd(detector: ScaleGestureDetector) {
                 targetView.parent?.requestDisallowInterceptTouchEvent(false)
                 targetView.animate().translationZ(0f).setDuration(220).start()
-                if (currentScale >= 2.3f) {
-                    currentScale = 1.0f
-                    targetView.scaleX = 1.0f
-                    targetView.scaleY = 1.0f
-                    if (fullscreenWindowId == null) {
-                        fullscreenWindowId = "cover"
-                        showVizHudBadge("Pantalla Completa: Portada & Video")
-                        reorderStageContainers()
-                    }
-                } else if (currentScale <= 0.48f) {
-                    currentScale = 1.0f
-                    targetView.scaleX = 1.0f
-                    targetView.scaleY = 1.0f
-                    if (fullscreenWindowId != null) {
-                        fullscreenWindowId = null
-                        showVizHudBadge("Cuadrícula Restaurada")
-                        reorderStageContainers()
-                    } else {
-                        isCoverMinimizedPip = !isCoverMinimizedPip
-                        showVizHudBadge(if (isCoverMinimizedPip) "Portada minimizada a PIP" else "Portada restaurada")
-                        reorderStageContainers()
-                    }
-                } else if (currentScale in 0.92f..1.08f) {
-                    currentScale = 1.0f
-                    targetView.animate().scaleX(1.0f).scaleY(1.0f).setDuration(180).start()
-                }
+                // Free-form scaling: retains exactly the user's chosen scale
             }
         })
 
@@ -4440,6 +4667,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
         SonoraStore.putBool(this, "stage_show_lyrics", showStageLyrics)
         SonoraStore.putBool(this, "stage_show_viz", showStageViz)
+        reorderStageContainers()
         updateStageLayout()
     }
 
@@ -4447,7 +4675,6 @@ class MainActivity : AppCompatActivity(), RowHost {
         val t = tracks.getOrNull(currentTrackIndex) ?: run { toastNoTrack(); return }
         showSheet(fullHeight = true) { root, dialog ->
             val acc = try { Color.parseColor(Pal.ACCENT) } catch (_: Exception) { Color.parseColor("#38BDF8") }
-            val onAcc = Pal.contrastOn(acc)
 
             root.addView(
                 sheetTitle(
@@ -4468,7 +4695,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
             val bigCover = ImageView(this).apply {
                 layoutParams = FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(248),
                     dp(248),
                     Gravity.CENTER
                 )
@@ -4503,7 +4730,8 @@ class MainActivity : AppCompatActivity(), RowHost {
                     showStageCover = true
                     SonoraStore.putBool(this@MainActivity, "stage_cover_expanded", isStageCoverExpanded)
                     SonoraStore.putBool(this@MainActivity, "stage_show_cover", true)
-                    updateStageLayout()
+                    reorderStageContainers()
+        updateStageLayout()
                     dialog.dismiss()
                     Toast.makeText(
                         this@MainActivity,
@@ -4584,48 +4812,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                 }
             })
 
-            // 4. Paste direct URL of an image / GIF / WebP
-            val urlBox = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = dp(8) }
-            }
-            val urlInput = EditText(this).apply {
-                hint = "Pegar URL de foto/GIF (https://...jpg, .png, .gif, .webp)"
-                setHintTextColor(Color.parseColor(Pal.MUTED))
-                setTextColor(Color.WHITE)
-                textSize = 12.5f
-                isSingleLine = true
-                setBackgroundResource(R.drawable.bg_input_dark)
-                setPadding(dp(12), dp(10), dp(12), dp(10))
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
-            }
-            val applyUrlBtn = Pill(this, "Usar URL", R.drawable.ic_check, 38).apply {
-                setOnClickListener {
-                    val u = urlInput.text.toString().trim()
-                    if (u.startsWith("http://") || u.startsWith("https://")) {
-                        t.coverBitmap = null
-                        t.coverUrl = u
-                        SonoraStore.putString(this@MainActivity, "cover_gif_${t.key.hashCode()}", u)
-                        SonoraStore.saveEdit(this@MainActivity, t)
-                        for (item in (localTracksList + tracks).filter { it.key == t.key }) {
-                            item.coverBitmap = null
-                            item.coverUrl = u
-                        }
-                        bindNowPlaying()
-                        dialog.dismiss()
-                        Toast.makeText(this@MainActivity, "Portada por URL aplicada", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@MainActivity, "Pega un enlace http:// o https:// válido", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-            urlBox.addView(urlInput)
-            urlBox.addView(applyUrlBtn)
-            root.addView(urlBox)
+
 
             // 5. Demo GIF & Restore Original row
             val bottomRow = LinearLayout(this).apply {
@@ -4677,9 +4864,15 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
     }
 
-    private fun applyOrientationLayout(isLandscape: Boolean) {
+    private fun applyOrientationLayout(isLandscape: Boolean, instant: Boolean = false) {
         if (!::playerOuterLayout.isInitialized) return
         val onPlayerTab = currentTab == 0
+
+        if (instant) {
+            TransitionManager.endTransitions(unifiedStageBlock)
+            TransitionManager.endTransitions(playerOuterLayout)
+            if (::mainRootLayout.isInitialized) TransitionManager.endTransitions(mainRootLayout)
+        }
 
         if (isLandscape && onPlayerTab) {
             // Hide chrome for full immersive 16:9 landscape priority
@@ -4693,25 +4886,31 @@ class MainActivity : AppCompatActivity(), RowHost {
                 mainContentFrame.layoutParams = this
             }
 
-            // Move unifiedStageBlock directly into playerOuterLayout (85% height)
+            // Move unifiedStageBlock directly into playerOuterLayout
             if (unifiedStageBlock.parent != playerOuterLayout) {
                 (unifiedStageBlock.parent as? ViewGroup)?.removeView(unifiedStageBlock)
                 playerOuterLayout.addView(unifiedStageBlock, 0)
             }
             portraitInnerBox.visibility = View.GONE
             portraitScrollContainer.visibility = View.GONE
-            landscapeBottomBar.visibility = View.VISIBLE
+
+            val bottomBarVisible = !areControlsHidden
+            landscapeBottomBar.visibility = if (bottomBarVisible) View.VISIBLE else View.GONE
+            if (::landscapeCoverThumb.isInitialized) {
+                landscapeCoverThumb.visibility = if (showStageCover) View.GONE else View.VISIBLE
+            }
 
             unifiedStageBlock.layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.85f
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, if (bottomBarVisible) 0.85f else 1.0f
             ).apply {
-                setMargins(dp(10), dp(6), dp(10), dp(4))
+                setMargins(0, 0, 0, 0)
             }
-            unifiedStageBlock.setPadding(dp(14), dp(10), dp(14), 0)
+            unifiedStageBlock.setPadding(0, 0, 0, 0)
 
             landscapeBottomBar.layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.15f
             )
+            scheduleAutoHide(2800L)
         } else {
             // Portrait (or non-player tab): Fill 100% (4/4) of vertical screen height
             topHeader.visibility = View.VISIBLE
@@ -4728,7 +4927,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             if (unifiedStageBlock.parent != portraitInnerBox) {
                 (unifiedStageBlock.parent as? ViewGroup)?.removeView(unifiedStageBlock)
                 val idx = portraitInnerBox.indexOfChild(portraitViewSelectorsRow)
-                val insertAt = if (idx >= 0) idx + 1 else 0
+                val insertAt = (if (idx >= 0) idx + 1 else portraitInnerBox.childCount).coerceIn(0, portraitInnerBox.childCount)
                 portraitInnerBox.addView(unifiedStageBlock, insertAt)
             }
             portraitInnerBox.visibility = View.VISIBLE
@@ -4739,19 +4938,24 @@ class MainActivity : AppCompatActivity(), RowHost {
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
             ).apply {
                 topMargin = dp(2)
-                bottomMargin = dp(6)
+                bottomMargin = dp(4)
             }
-            unifiedStageBlock.setPadding(dp(12), dp(10), dp(12), 0)
+            unifiedStageBlock.setPadding(dp(8), dp(4), dp(8), 0)
         }
 
-        updateStageLayout()
+        reorderStageContainers(instant = instant)
+        updateStageLayout(instant = instant)
         updateLyricsTick(exoPlayer.currentPosition.coerceAtLeast(0L))
+        unifiedStageBlock.requestLayout()
+        playerOuterLayout.requestLayout()
     }
 
-    private fun updateStageLayout() {
+    private fun updateStageLayout(instant: Boolean = false) {
         if (!::unifiedStageBlock.isInitialized) return
 
-        if (!MotionTokens.isReducedMotion(this) && unifiedStageBlock.isAttachedToWindow) {
+        if (instant) {
+            TransitionManager.endTransitions(unifiedStageBlock)
+        } else if (!MotionTokens.isReducedMotion(this) && unifiedStageBlock.isAttachedToWindow) {
             val transition = android.transition.AutoTransition().apply {
                 duration = MotionTokens.DUR_FAST
                 interpolator = MotionTokens.EASE_OUT
@@ -4877,45 +5081,21 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
         }
 
-        // Left Column (Doki / Shimeji Companion):
-        // If Chibi Shimeji mode: runs full-screen via shimejiFullScreenOverlay, so dokiLeftCol is GONE and stage gets full width.
-        // If WebP VN sprite: confined to dokiLeftCol inside the stage.
-        val isChibi = if (::dokiSpriteView.isInitialized) dokiSpriteView.isChibiMode else false
-        val showDokiInStage = showStageDoki && !isChibi
-        if (::dokiLeftCol.isInitialized && ::lyricsRightCol.isInitialized) {
+        // Dokis are always overlayed on top of the stage via shimejiFullScreenOverlay!
+        if (::dokiLeftCol.isInitialized) {
+            dokiLeftCol.visibility = View.GONE
+        }
+        if (::lyricsRightCol.isInitialized) {
             val rightVisible = showStageLyrics || showStageViz || (!isStageCoverExpanded && showStageCover)
-            dokiLeftCol.visibility = if (showDokiInStage) View.VISIBLE else View.GONE
             lyricsRightCol.visibility = if (rightVisible) View.VISIBLE else View.GONE
-            stageColumnsRow.visibility = if (showDokiInStage || rightVisible) View.VISIBLE else View.GONE
-
-            val savedWeight = SonoraStore.getFloat(this, "stage_doki_weight", if (isLandscapeMode) 0.35f else 0.40f)
-            val leftWeight = savedWeight.coerceIn(0.20f, 0.80f)
-            val rightWeight = 1.0f - leftWeight
-
-            when {
-                showDokiInStage && rightVisible -> {
-                    dokiLeftCol.layoutParams = LinearLayout.LayoutParams(
-                        0, ViewGroup.LayoutParams.MATCH_PARENT, leftWeight
-                    ).apply { marginEnd = dp(6) }
-                    lyricsRightCol.layoutParams = LinearLayout.LayoutParams(
-                        0, ViewGroup.LayoutParams.MATCH_PARENT, rightWeight
-                    )
-                }
-                showDokiInStage && !rightVisible -> {
-                    dokiLeftCol.layoutParams = LinearLayout.LayoutParams(
-                        0, ViewGroup.LayoutParams.MATCH_PARENT, 1.0f
-                    )
-                }
-                else -> {
-                    lyricsRightCol.layoutParams = LinearLayout.LayoutParams(
-                        0, ViewGroup.LayoutParams.MATCH_PARENT, 1.0f
-                    )
-                }
-            }
+            stageColumnsRow.visibility = if (rightVisible) View.VISIBLE else View.GONE
+            lyricsRightCol.layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            )
         }
 
         if (::shimejiFullScreenOverlay.isInitialized) {
-            shimejiFullScreenOverlay.visibility = if (showStageDoki && isChibi) View.VISIBLE else View.GONE
+            shimejiFullScreenOverlay.visibility = if (showStageDoki) View.VISIBLE else View.GONE
         }
 
         // Right Column: Live Karaoke Lyrics + Audio Visualizer Card
@@ -4925,7 +5105,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             vizDeckCard.visibility = if (showStageViz) View.VISIBLE else View.GONE
             visualizerStripView.visibility = if (showStageViz) View.VISIBLE else View.GONE
 
-            val vizPos = SonoraStore.getInt(this, "stage_viz_position", 0)
+            val vizPos = SonoraStore.getInt(this, vizPosKey(), 0)
             val savedVizH = SonoraStore.getInt(this, "player_viz_height_dp", if (isLandscapeMode) 64 else 76)
             val vizH = dp(savedVizH)
 
@@ -5030,6 +5210,7 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         tools.addView(tool("Cola", R.drawable.ic_list_music) { showQueueSheet() })
         tools.addView(tool("YouTube", R.drawable.ic_video) { switchTab(3) })
+        tools.addView(tool("Flotante", R.drawable.ic_widgets) { toggleFloatingWindow() })
         tools.addView(tool("Portada HD/GIF", R.drawable.ic_album) { showGifCoverOptionsSheet() })
         tools.addView(tool("Espectro", R.drawable.ic_sliders) {
             tracks.getOrNull(currentTrackIndex)?.let { showSpectrumAnalyzerSheet(it) } ?: toastNoTrack()
@@ -5076,12 +5257,14 @@ class MainActivity : AppCompatActivity(), RowHost {
         toggleCoverBtn = makeToggleIconBtn(R.drawable.ic_album) {
             showStageCover = !showStageCover
             SonoraStore.putBool(this, "stage_show_cover", showStageCover)
-            updateStageLayout()
+            reorderStageContainers()
+        updateStageLayout()
         }
         toggleExpandCoverBtn = makeToggleIconBtn(R.drawable.ic_album) {
             stageMediaXL = !stageMediaXL
             SonoraStore.putBool(this, "stage_media_xl", stageMediaXL)
-            updateStageLayout()
+            reorderStageContainers()
+        updateStageLayout()
         }
         toggleStageVideoChip = makeToggleIconBtn(R.drawable.ic_video) {
             val cur = tracks.getOrNull(currentTrackIndex)
@@ -5094,23 +5277,27 @@ class MainActivity : AppCompatActivity(), RowHost {
             } else {
                 isVideoMode = !isVideoMode
                 updateMode()
-                updateStageLayout()
+                reorderStageContainers()
+        updateStageLayout()
             }
         }
         toggleLyricsBtn = makeToggleIconBtn(R.drawable.ic_lyrics) {
             showStageLyrics = !showStageLyrics
             SonoraStore.putBool(this, "stage_show_lyrics", showStageLyrics)
-            updateStageLayout()
+            reorderStageContainers()
+        updateStageLayout()
         }
         toggleDokiBtn = makeToggleIconBtn(R.drawable.ic_sparkles) {
             showStageDoki = !showStageDoki
             SonoraStore.putBool(this, "stage_show_doki", showStageDoki)
-            updateStageLayout()
+            reorderStageContainers()
+        updateStageLayout()
         }
         toggleVizBtn = makeToggleIconBtn(R.drawable.ic_waveform) {
             showStageViz = !showStageViz
             SonoraStore.putBool(this, "stage_show_viz", showStageViz)
-            updateStageLayout()
+            reorderStageContainers()
+        updateStageLayout()
         }
 
         val toggleChipsScroll = HorizontalScrollView(this).apply {
@@ -5197,7 +5384,17 @@ class MainActivity : AppCompatActivity(), RowHost {
         lyricCur = TextView(this)
         lyricNext = TextView(this)
 
-        dokiLeftCol.addView(dokiSpriteView)
+        if (::shimejiFullScreenOverlay.isInitialized) {
+            (dokiSpriteView.parent as? ViewGroup)?.removeView(dokiSpriteView)
+            shimejiFullScreenOverlay.addView(dokiSpriteView, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+            dokiSpriteView.setFullScreenMode(true)
+            shimejiFullScreenOverlay.visibility = if (showStageDoki) View.VISIBLE else View.GONE
+        } else {
+            dokiLeftCol.addView(dokiSpriteView)
+        }
 
         // ---- COLUMNA DERECHA: Letras en vivo + Visualizador ----
         lyricsRightCol = LinearLayout(this).apply {
@@ -5212,20 +5409,22 @@ class MainActivity : AppCompatActivity(), RowHost {
         stageCoverInsetCard = FrameLayout(this)
         stageContainer = stageCoverInsetCard
         ambientGlowImage = ImageView(this)
-        visualizerView = VisualizerView(this)
         coverImage = ImageView(this)
         stageModeSwitchChip = TextView(this)
         visualizerModeBadge = TextView(this)
 
-        // ---- FULL-STAGE-WIDTH LARGE COVER CARD (FIT_CENTER UNCROPPED - 228dp Grande / 320dp XL - BORDERLESS) ----
+        // ---- FULL-STAGE-WIDTH LARGE COVER CARD (Responsive - Floating 24dp Card) ----
         stageExpandedCoverCard = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(228)
-            ).apply {
-                topMargin = dp(2)
-                bottomMargin = dp(4)
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor(Pal.SURFACE_HI))
+                cornerRadius = dpf(24f)
             }
-            background = null
+            clipToOutline = true
+            outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+            elevation = dpf(6f)
             visibility = View.VISIBLE
         }
         stageExpandedCoverImage = ImageView(this).apply {
@@ -5236,25 +5435,25 @@ class MainActivity : AppCompatActivity(), RowHost {
             )
             scaleType = ImageView.ScaleType.CENTER_CROP
             isClickable = true
-            setOnClickListener { showGifCoverOptionsSheet() }
+            setOnClickListener {
+                if (areControlsHidden) {
+                    showPlayerControls()
+                } else {
+                    hidePlayerControls()
+                }
+            }
             setOnLongClickListener {
-                stageMediaXL = !stageMediaXL
-                SonoraStore.putBool(this@MainActivity, "stage_media_xl", stageMediaXL)
-                updateStageLayout()
-                Toast.makeText(this@MainActivity, if (stageMediaXL) "Portada XL" else "Portada Grande", Toast.LENGTH_SHORT).show()
+                showGifCoverOptionsSheet()
                 true
             }
         }
         stageExpandedCoverCard.addView(stageExpandedCoverImage)
 
-        // ---- DEDICATED FULL-STAGE-WIDTH VIDEO CONTAINER (240dp Grande / 335dp XL - BORDERLESS) ----
+        // ---- DEDICATED FULL-STAGE-WIDTH VIDEO CONTAINER (Responsive - Zero Franjas) ----
         stageVideoCard = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(240)
-            ).apply {
-                topMargin = dp(2)
-                bottomMargin = dp(4)
-            }
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            )
             background = null
             visibility = View.GONE
         }
@@ -5270,6 +5469,14 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
         youtubeStageWebView = YouTubeStageWebView(this)
         stageVideoCard.addView(playerView)
+
+        stageMediaBox = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            addView(stageExpandedCoverCard)
+            addView(stageVideoCard)
+        }
 
         // Live Synchronized Karaoke Lyrics ScrollView (Left-Aligned, Bold Sans-Serif, #FFFFFF active & 0.45 opacity inactive)
         stageLyricsScroll = ScrollView(this).apply {
@@ -5324,35 +5531,49 @@ class MainActivity : AppCompatActivity(), RowHost {
                 bottomMargin = dp(8)
             }
             background = null
+            alpha = 0.95f
             isClickable = true
             setOnClickListener { cycleVisualizerMode() }
             addPressFeedback(0.98f, haptic = true)
         }
-        visualizerStripView = VisualizerView(this).apply {
+        visualizerView = VisualizerView(this).apply {
             visualMode = 0 // Espectro Espejo Pro
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
+                dp(86),
+                Gravity.BOTTOM
             )
-            setPadding(dp(8), dp(6), dp(8), dp(6))
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            alpha = 0.95f
         }
-        vizDeckCard.addView(visualizerStripView)
+        visualizerStripView = visualizerView
+        vizDeckCard.addView(visualizerView)
+        vizDeckCard.clipChildren = false
+        vizDeckCard.clipToPadding = false
+        if (::dokiSpriteView.isInitialized && dokiSpriteView.parent != vizDeckCard) {
+            (dokiSpriteView.parent as? ViewGroup)?.removeView(dokiSpriteView)
+            val dokiW = dp(160)
+            val dokiH = dp(180)
+            vizDeckCard.addView(dokiSpriteView, FrameLayout.LayoutParams(
+                dokiW,
+                dokiH,
+                Gravity.BOTTOM or Gravity.END
+            ).apply { marginEnd = dp(24) })
+            dokiSpriteView.setFullScreenMode(false)
+            dokiSpriteView.visibility = if (showStageDoki) View.VISIBLE else View.GONE
+        }
         // Slots removed from middle to keep screen clean and spacious
         lyricsRightCol.addView(vizDeckCard)
 
         stageColumnsRow.addView(dokiLeftCol)
         stageColumnsRow.addView(lyricsRightCol)
 
-        // Add Full-Stage-Width Cover Card & Video Card at the TOP of unifiedStageBlock, above stageColumnsRow!
-        unifiedStageBlock.addView(stageExpandedCoverCard)
-        unifiedStageBlock.addView(stageVideoCard)
-        unifiedStageBlock.addView(stageColumnsRow)
         portraitInnerBox.addView(unifiedStageBlock)
 
         // Attach gesture navigation to the stage
         attachCoverTouchControls(stageExpandedCoverCard, stageExpandedCoverImage)
         attachDokiTouchControls(dokiLeftCol, dokiSpriteView)
-        attachVizTouchControls(vizDeckCard, visualizerStripView)
+        attachVizTouchControls(vizDeckCard, visualizerView)
         attachPlayerGestures(unifiedStageBlock)
         attachPlayerGestures(stageLyricsScroll)
 
@@ -5383,12 +5604,16 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         val titleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.CENTER
             setPadding(0, dp(6), 0, 0)
         }
+        val titleBalanceSpacer = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+        }
 
-        // Larger 64dp Multi-Format & Uncropped Album Cover Thumbnail next to direct metadata
+        // Larger 64dp Multi-Format & Uncropped Album Cover Thumbnail next to direct metadata (hidden when floating card is active)
         portraitMetaCoverThumb = ImageView(this).apply {
+            visibility = View.GONE
             layoutParams = LinearLayout.LayoutParams(dp(64), dp(64)).apply { marginEnd = dp(12) }
             scaleType = ImageView.ScaleType.FIT_CENTER
             background = GradientDrawable().apply {
@@ -5405,9 +5630,12 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         val metaBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
         titleText = TextView(this).apply {
+            gravity = Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
             textSize = 20f
             letterSpacing = -0.02f
             setTextColor(Color.WHITE)
@@ -5419,6 +5647,8 @@ class MainActivity : AppCompatActivity(), RowHost {
             isSingleLine = true
         }
         artistText = TextView(this).apply {
+            gravity = Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
             textSize = 14f
             setTextColor(Color.parseColor(Pal.SUB))
             setPadding(0, dp(2), 0, 0)
@@ -5426,6 +5656,8 @@ class MainActivity : AppCompatActivity(), RowHost {
             ellipsize = android.text.TextUtils.TruncateAt.END
         }
         albumText = TextView(this).apply {
+            gravity = Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
             textSize = 11.5f
             setTextColor(Color.parseColor(Pal.MUTED))
             setPadding(0, dp(1), 0, 0)
@@ -5445,6 +5677,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             setOnClickListener { toggleCurrentTrackFavorite() }
             addPressFeedback(0.94f)
         }
+        titleRow.addView(titleBalanceSpacer)
         titleRow.addView(portraitMetaCoverThumb)
         titleRow.addView(metaBox)
         titleRow.addView(favBtn)
@@ -5455,7 +5688,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         // ---- Badges: MP3 · Local, BPM, Provider ----
         val badgesRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.CENTER
             setPadding(0, dp(8), 0, dp(2))
         }
         fun badge(color: String) = TextView(this).apply {
@@ -5512,6 +5745,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                 exoPlayer.seekTo(target)
                 playerSeekBar.progress = target.toInt()
                 if (::landscapeSeekBar.isInitialized) landscapeSeekBar.progress = target.toInt()
+                scheduleAutoHide()
             }
         }
 
@@ -7038,9 +7272,9 @@ class MainActivity : AppCompatActivity(), RowHost {
                                 isSearchCancelled = true
                                 hideGlassSearchBanner()
                             })
-                            Thread {
+                            Thread resolveWorker@{
                                 val resolved = YouTubeEngine.resolveStreams(item.videoId)
-                                if (isSearchCancelled) return@Thread
+                                if (isSearchCancelled) return@resolveWorker
                                 val audioStream = resolved.audioStreamUrl.ifBlank { resolved.videoStreamUrl }
                                 val videoStream = resolved.videoStreamUrl.ifBlank { resolved.audioStreamUrl }
                                 val tr = SonoraStore.hydrate(
@@ -7058,8 +7292,8 @@ class MainActivity : AppCompatActivity(), RowHost {
                                         isLocal = false
                                     )
                                 )
-                                runOnUiThread {
-                                    if (isSearchCancelled) return@runOnUiThread
+                                runOnUiThread uiCallback@{
+                                    if (isSearchCancelled) return@uiCallback
                                     hideGlassSearchBanner()
                                     libraryByKey[tr.key] = tr
                                     enqueueEnd(listOf(tr))
@@ -7115,7 +7349,8 @@ class MainActivity : AppCompatActivity(), RowHost {
 
                 playList(listOf(tr), 0, autoPlay = true)
                 updateMode()
-                updateStageLayout()
+                reorderStageContainers()
+        updateStageLayout()
                 switchTab(0)
             }
         }.apply { start() }
@@ -8174,9 +8409,9 @@ class MainActivity : AppCompatActivity(), RowHost {
                 5 -> showSpectrumAnalyzerSheet(track)
                 6 -> enrichSingleTrack(track)
                 7 -> showAddToPlaylistSheet(track)
-                8 -> showTagEditorDialog(track)
-                9 -> showAudioTrimmerDialog(track)
-                10 -> {
+                9 -> showTagEditorDialog(track)
+                10 -> showAudioTrimmerDialog(track)
+                11 -> {
                     val list = localTracksList.filter { it.album.equals(track.album, ignoreCase = true) }
                     if (list.isNotEmpty()) {
                         libMode = LibMode.ALBUMS
@@ -8185,7 +8420,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                         refreshLibrary(scrollTop = true)
                     }
                 }
-                11 -> {
+                12 -> {
                     val list = localTracksList.filter { it.artist.equals(track.artist, ignoreCase = true) }
                     if (list.isNotEmpty()) {
                         libMode = LibMode.ARTISTS
@@ -8194,8 +8429,8 @@ class MainActivity : AppCompatActivity(), RowHost {
                         refreshLibrary(scrollTop = true)
                     }
                 }
-                12 -> showTrackAudioCustomizerDialog(track)
-                13 -> {
+                13 -> showTrackAudioCustomizerDialog(track)
+                14 -> {
                     pendingVideoTrack = track
                     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
@@ -8203,8 +8438,8 @@ class MainActivity : AppCompatActivity(), RowHost {
                     }
                     videoCoverPickerLauncher.launch(intent)
                 }
-                14 -> shareTrack(track)
-                15 -> showTrackDetails(track)
+                15 -> shareTrack(track)
+                16 -> showTrackDetails(track)
             }
         }
     }
@@ -8400,6 +8635,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         val items = listOf(
             SheetItem(R.drawable.ic_info, "Guía & Tutorial Completo"),
             SheetItem(R.drawable.ic_palette, "Temas & Liquid Glass"),
+            SheetItem(R.drawable.ic_widgets, "Ventana Emergente (Flotante sobre otras Apps)"),
             SheetItem(R.drawable.ic_widgets, "Tamaños & Posiciones Touch"),
             SheetItem(R.drawable.ic_sliders, "Panel de Notificación"),
             SheetItem(R.drawable.ic_download, "Importar desde Musicolet"),
@@ -8420,35 +8656,36 @@ class MainActivity : AppCompatActivity(), RowHost {
             when (which) {
                 0 -> showTutorialSheet()
                 1 -> showThemeCustomizerSheet()
-                2 -> showPlayerLayoutCustomizerSheet()
-                3 -> showLiveNotificationPanelSheet()
-                4 -> showMusicoletImportDialog()
-                5 -> showGifCoverOptionsSheet()
-                6 -> openFullSettings()
-                7 -> {
+                2 -> toggleFloatingWindow()
+                3 -> showPlayerLayoutCustomizerSheet()
+                4 -> showLiveNotificationPanelSheet()
+                5 -> showMusicoletImportDialog()
+                6 -> showGifCoverOptionsSheet()
+                7 -> openFullSettings()
+                8 -> {
                     val folderCount = localTracksList.map { it.provider }.distinct().size
                     MusicoletModals.showScannerModal(this, localTracksList.size, folderCount) {
                         performStorageScan(showToast = true)
                     }
                 }
-                8 -> batchEnrichLibrary()
-                9 -> {
+                9 -> batchEnrichLibrary()
+                10 -> {
                     val f = SonoraStore.createBackupFile(this)
                     Toast.makeText(this, "Copia de seguridad creada: ${f.name}", Toast.LENGTH_LONG).show()
                 }
-                10 -> openSystemFilePicker()
-                11 -> {
+                11 -> openSystemFilePicker()
+                12 -> {
                     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "*/*"
                     }
                     m3uPickerLauncher.launch(intent)
                 }
-                12 -> showSleepTimerSheet()
-                13 -> showSpeedSheet()
-                14 -> showQuickDokiSwitcherSheet()
-                15 -> showOtaUpdaterSheet()
-                16 -> {
+                13 -> showSleepTimerSheet()
+                14 -> showSpeedSheet()
+                15 -> showQuickDokiSwitcherSheet()
+                16 -> showOtaUpdaterSheet()
+                17 -> {
                     SonoraStore.clearHistory(this)
                     refreshLibrary()
                     Toast.makeText(this, "Historial limpiado", Toast.LENGTH_SHORT).show()
@@ -8627,6 +8864,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             if (bmp != null) {
                 t.coverBitmap = bmp
                 SonoraWidgetProvider.activeCoverBitmap = bmp
+                FloatingPlayerService.updateCover(bmp)
                 val file = getArtworkCacheFile(t)
                 if (!file.exists() || file.length() == 0L) {
                     try {
@@ -8719,6 +8957,8 @@ class MainActivity : AppCompatActivity(), RowHost {
                 if (resolvedBmp != null) {
                     t.coverBitmap = resolvedBmp
                     SonoraWidgetProvider.activeCoverBitmap = resolvedBmp
+                    updateStageBackground(resolvedBmp)
+                    FloatingPlayerService.updateCover(resolvedBmp)
                     val file = getArtworkCacheFile(t)
                     if (!file.exists() || file.length() == 0L) {
                         try {
@@ -8780,12 +9020,12 @@ class MainActivity : AppCompatActivity(), RowHost {
 
     private fun showEmptyPlayer() {
         titleText.text = "Selecciona una canción"
-        artistText.text = "Explora tu Biblioteca o YouTube en DDMC"
+        artistText.text = "Explora tu Biblioteca local en DDMC"
         albumText.text = "Doki Doki Music Club \u2022 Hi-Res"
         if (::landscapeTitleText.isInitialized) landscapeTitleText.text = "Selecciona una canción"
         if (::landscapeArtistText.isInitialized) landscapeArtistText.text = "Doki Doki Music Club"
         formatBadgeText.text = "SIN PISTA"
-        providerBadgeText.text = "LOCAL / YOUTUBE"
+        providerBadgeText.text = "AUDIO LOCAL"
         if (::bpmKeyBadgeText.isInitialized) bpmKeyBadgeText.text = "DSP 64-BIT"
         currentTimeText.text = "00:00"
         totalTimeText.text = "00:00"
@@ -8800,6 +9040,12 @@ class MainActivity : AppCompatActivity(), RowHost {
         coverImage.setImageResource(R.drawable.ic_music)
         coverImage.setPadding(dp(8), dp(8), dp(8), dp(8))
         coverImage.setColorFilter(Color.parseColor(Pal.MUTED))
+        if (::stageExpandedCoverImage.isInitialized) {
+            stageExpandedCoverImage.setImageResource(R.drawable.doki_monika)
+            stageExpandedCoverImage.scaleType = ImageView.ScaleType.CENTER_CROP
+            stageExpandedCoverImage.setPadding(0, 0, 0, 0)
+            stageExpandedCoverImage.clearColorFilter()
+        }
         ambientGlowImage.setImageDrawable(null)
         if (::portraitMetaCoverThumb.isInitialized) {
             portraitMetaCoverThumb.setImageResource(R.drawable.ic_music)
@@ -8810,7 +9056,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             stageLyricViews.forEach { it.text = "" }
             val c = if (stageLyricViews.size >= 11) 3 else 2
             stageLyricViews[c].text = "Letras en vivo sincronizadas"
-            stageLyricViews[c + 1].text = "Toca Biblioteca o YouTube para empezar a escuchar"
+            stageLyricViews[c + 1].text = "Toca Biblioteca para empezar a escuchar"
         }
         miniPlayerRoot.visibility = View.GONE
         updatePlayState()
@@ -8838,8 +9084,46 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
     }
 
+    fun toggleFloatingWindow() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
+            waitingForOverlayPermission = true
+            try {
+                val intent = android.content.Intent(
+                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:$packageName")
+                )
+                startActivity(intent)
+            } catch (_: Exception) {
+                try {
+                    startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(this, "Permiso de superposicion no disponible", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+            android.widget.Toast.makeText(this, "Activa 'Mostrar sobre otras apps' para DDMC", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        waitingForOverlayPermission = false
+        if (FloatingPlayerService.isRunning) {
+            FloatingPlayerService.stop(this)
+            android.widget.Toast.makeText(this, "Ventana emergente cerrada", android.widget.Toast.LENGTH_SHORT).show()
+        } else {
+            val currentTrack = tracks.getOrNull(currentTrackIndex)
+            val coverBmp = currentTrack?.coverBitmap ?: SonoraWidgetProvider.activeCoverBitmap
+            FloatingPlayerService.updateTrack(
+                currentTrack?.title ?: "DDMC",
+                currentTrack?.artist ?: "Reproductor",
+                coverBmp
+            )
+            FloatingPlayerService.updatePlayState(exoPlayer.isPlaying)
+            FloatingPlayerService.start(this)
+            android.widget.Toast.makeText(this, "Ventana emergente activada (Arrastra para mover)", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun updatePlayState() {
         val playing = exoPlayer.isPlaying
+        FloatingPlayerService.updatePlayState(playing)
         visualizerView.isPlaying = playing
         if (::visualizerStripView.isInitialized) visualizerStripView.isPlaying = playing
         if (::dokiSpriteView.isInitialized) dokiSpriteView.isPlayingMusic = playing
@@ -8899,6 +9183,17 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         updateLyricsTick(pos)
 
+        if (::visualizerView.isInitialized && exoPlayer.isPlaying) {
+            visualizerView.postInvalidateOnAnimation()
+            if (::dokiSpriteView.isInitialized) {
+                val energy = visualizerView.currentVocalEnergy()
+                dokiSpriteView.audioEnergy = energy
+                if (energy > 0.40f) {
+                    dokiSpriteView.addVelocityImpulse(0.06f)
+                }
+            }
+        }
+
         val now = System.currentTimeMillis()
         if (exoPlayer.isPlaying && now - lastQueueSave > 10_000L) {
             lastQueueSave = now
@@ -8911,43 +9206,12 @@ class MainActivity : AppCompatActivity(), RowHost {
     private fun loadLyricsFor(track: TrackItem, force: Boolean) {
         if (!force && lyricsKey == track.key) return
         lyricsKey = track.key
-        lyricsLines = emptyList()
-        lyricsSynced = false
         lastStageActiveLyricIdx = -1
 
-        if (stageLyricViews.size >= 7) {
-            stageLyricViews.forEach { it.text = "" }
-            val c = if (stageLyricViews.size >= 11) 3 else 2
-            stageLyricViews[c].text = "Buscando letra sincronizada..."
-            stageLyricViews[c + 1].text = "${track.title} \u2022 ${track.artist}"
-        }
-
-        Thread {
-            val res = Lyrics.fetch(this, track)
-            runOnUiThread {
-                if (tracks.getOrNull(currentTrackIndex)?.key != track.key) return@runOnUiThread
-                if (res == null || res.lines.isEmpty()) {
-                    // Build automatic rhythmic karaoke verses from track metadata so live lyrics stage is always rich
-                    val fallbackVerses = listOf(
-                        LyricLine(0L, "\u266A ${track.title}"),
-                        LyricLine(4000L, track.artist),
-                        LyricLine(8000L, track.album.ifBlank { "Estudio Hi-Res" }),
-                        LyricLine(12000L, "Modo inmersivo de letras en vivo"),
-                        LyricLine(16000L, "Toca aquí para importar o pegar archivo .LRC"),
-                        LyricLine(20000L, "Desliza en el escenario para cambiar de pista"),
-                        LyricLine(24000L, "Doble toque a los lados para retroceder o adelantar 10s"),
-                        LyricLine(28000L, "\u266B ${track.title} \u2014 ${track.artist}")
-                    )
-                    lyricsLines = fallbackVerses
-                    lyricsSynced = true
-                    updateLyricsTick(exoPlayer.currentPosition)
-                } else {
-                    lyricsLines = res.lines
-                    lyricsSynced = res.synced
-                    updateLyricsTick(exoPlayer.currentPosition)
-                }
-            }
-        }.start()
+        val res = Lyrics.fetch(this, track)
+        lyricsLines = res.lines
+        lyricsSynced = res.synced
+        updateLyricsTick(exoPlayer.currentPosition.coerceAtLeast(0L))
     }
 
     private var lastBgColors: IntArray? = null
@@ -9013,6 +9277,10 @@ class MainActivity : AppCompatActivity(), RowHost {
                     tv.alpha = targetAlpha
                     tv.scaleX = 1.0f
                     tv.scaleY = 1.0f
+                } else {
+                    tv.alpha = targetAlpha
+                    tv.scaleX = targetScale
+                    tv.scaleY = targetScale
                 }
             }
 
@@ -9104,6 +9372,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         val wasPlaying = exoPlayer.isPlaying
         loadedSig = 0
         if (tracks.isNotEmpty()) playList(tracks.toList(), currentTrackIndex, autoPlay = wasPlaying, startPosMs = pos)
+        reorderStageContainers()
         updateStageLayout()
     }
 
@@ -9365,7 +9634,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         // 3. Landscape 15% compact bottom bar tinted with darkest tone of the cover
         if (::landscapeBottomBar.isInitialized) {
             landscapeBottomBar.background = GradientDrawable().apply {
-                setColor(Color.parseColor(Pal.GRAD_DARKEST))
+                setColor((Color.parseColor(Pal.GRAD_DARKEST) and 0x00FFFFFF) or 0x66000000)
             }
         }
 
@@ -9403,6 +9672,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         if (::visualizerStripView.isInitialized) visualizerStripView.invalidate()
 
         applyShuffleRepeatUi()
+        reorderStageContainers()
         updateStageLayout()
         for (i in navIcons.indices) {
             val on = i == currentTab
@@ -9464,28 +9734,33 @@ class MainActivity : AppCompatActivity(), RowHost {
                 dokiSpriteView.setDoki(selectedDokiId, selectedDokiPose, selectedDokiExpr)
             }
 
-            if (::shimejiFullScreenOverlay.isInitialized && ::dokiLeftCol.isInitialized) {
-                val isChibi = dokiSpriteView.isChibiMode
-                if (isChibi) {
-                    if (dokiSpriteView.parent != shimejiFullScreenOverlay) {
-                        (dokiSpriteView.parent as? ViewGroup)?.removeView(dokiSpriteView)
-                        shimejiFullScreenOverlay.addView(dokiSpriteView, FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        ))
-                    }
-                    shimejiFullScreenOverlay.visibility = if (showStageDoki) View.VISIBLE else View.GONE
-                } else {
-                    if (dokiSpriteView.parent != dokiLeftCol) {
-                        (dokiSpriteView.parent as? ViewGroup)?.removeView(dokiSpriteView)
-                        dokiLeftCol.addView(dokiSpriteView, FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                        ))
-                    }
-                    shimejiFullScreenOverlay.visibility = View.GONE
+            if (::vizDeckCard.isInitialized) {
+                vizDeckCard.clipChildren = false
+                vizDeckCard.clipToPadding = false
+                if (dokiSpriteView.parent != vizDeckCard) {
+                    (dokiSpriteView.parent as? ViewGroup)?.removeView(dokiSpriteView)
+                    val dokiW = if (isLandscapeMode) dp(160) else dp(135)
+                    val dokiH = if (isLandscapeMode) dp(180) else dp(160)
+                    vizDeckCard.addView(dokiSpriteView, FrameLayout.LayoutParams(
+                        dokiW,
+                        dokiH,
+                        Gravity.BOTTOM or Gravity.END
+                    ).apply {
+                        marginEnd = if (isLandscapeMode) dp(24) else dp(12)
+                    })
                 }
+                dokiSpriteView.setFullScreenMode(false)
+                dokiSpriteView.visibility = if (showStageDoki) View.VISIBLE else View.GONE
+            } else if (::shimejiFullScreenOverlay.isInitialized) {
+                if (dokiSpriteView.parent != shimejiFullScreenOverlay) {
+                    (dokiSpriteView.parent as? ViewGroup)?.removeView(dokiSpriteView)
+                    shimejiFullScreenOverlay.addView(dokiSpriteView, FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    ))
+                }
+                dokiSpriteView.setFullScreenMode(true)
+                shimejiFullScreenOverlay.visibility = if (showStageDoki) View.VISIBLE else View.GONE
             }
         }
 
@@ -9493,6 +9768,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             val exprLabel = DdscEngine.EXPRESSIONS.find { it.first == selectedDokiExpr }?.second ?: "Normal"
             dokiFloatingBadge.text = "${doki.name} \u2022 $exprLabel \u25BE"
         }
+        reorderStageContainers()
         updateStageLayout()
         SonoraWidgetProvider.updateAllWidgets(this, SonoraWidgetProvider.activeCoverBitmap)
     }

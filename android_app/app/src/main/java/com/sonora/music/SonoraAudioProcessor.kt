@@ -1,5 +1,4 @@
 package com.sonora.music
-
 import android.content.Context
 import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
@@ -7,15 +6,20 @@ import androidx.media3.common.audio.BaseAudioProcessor
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+typealias SonoraAudioEngine = DoomentioEngine
+
+
 /**
  * Real-time digital PCM Audio Processor for Sonora / DDMC.
  *
- * Implements:
+ * Motor Doomentio (Doomentio Engine):
+ * High-performance 64-bit Audio DSP & Sound Processing Engine.
  * 1. Hardware-agnostic Stereo-to-Mono downmixing: (Left + Right) / 2
  * 2. Real Stereo Balance Pan: -100 (Full Left) to +100 (Full Right)
  * 3. Per-Track Digital Bass Boost and Gain Multiplier
  */
-object SonoraAudioEngine {
+object DoomentioEngine {
+    const val ENGINE_NAME = "Doomentio Engine"
     @Volatile var isMono: Boolean = false
     @Volatile var balancePan: Float = 0f // -100 to +100
     @Volatile var currentTrackBassBoostLevel: Int = 0 // -1000 to +1000 mB
@@ -103,10 +107,10 @@ class SonoraAudioProcessor : BaseAudioProcessor() {
         val rc = 1f / (2f * Math.PI.toFloat() * 150f)
         val alpha = (dt / (rc + dt)).coerceIn(0.01f, 0.5f)
 
-        val mono = SonoraAudioEngine.isMono
-        val pan = SonoraAudioEngine.balancePan
-        val gain = SonoraAudioEngine.currentTrackGainMultiplier
-        val bassMultiplier = SonoraAudioEngine.bassGainLinear
+        val mono = DoomentioEngine.isMono
+        val pan = DoomentioEngine.balancePan
+        val gain = DoomentioEngine.currentTrackGainMultiplier
+        val bassMultiplier = DoomentioEngine.bassGainLinear
 
         // Calculate stereo pan factors
         val leftPan = if (pan > 0f) (100f - pan) / 100f else 1.0f
@@ -179,3 +183,5 @@ class SonoraAudioProcessor : BaseAudioProcessor() {
         outBuffer.flip()
     }
 }
+
+

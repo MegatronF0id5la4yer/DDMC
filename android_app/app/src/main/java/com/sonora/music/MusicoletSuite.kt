@@ -2521,7 +2521,7 @@ object MusicoletSettingsCenter {
 
         // ---- SUB-SCREEN 3: AUDIO Y REPRODUCCIÓN (Audio + Playback) ----
         fun openAudioScreen() {
-            val (page, body) = buildSubScreenShell("Audio y Motor de Reproducción", "DSP 64-bit, Gapless, Crossfade, ReplayGain y Salida")
+            val (page, body) = buildSubScreenShell("Audio y Motor Doomentio", "Doomentio Engine • DSP 64-bit, Gapless, Crossfade, ReplayGain y Salida")
 
             addActionCard(body, "Abrir Ecualizador de 31 Bandas, Surround y Reverberación", "Configurar curvas ISO, ganancia de preamplificador, balance y sala", "#22D3EE") {
                 dialog.dismiss()
@@ -2869,10 +2869,10 @@ object MusicoletSettingsCenter {
             addSwitchItem(body, "Ignorar artículos iniciales al ordenar ('The', 'A', 'El', 'La', 'Los')", "Útil para ordenar 'The Beatles' en la B o 'Los Bunkers' en la B", "sort_ignore_articles", true)
             addCycleOptionItem(body, "Ordenación alfanumérica (Alphanumerische Sortierung)", "adv_alphanum_sort", listOf("Natural (Pista 1, Pista 2, Pista 10)", "ASCII estricto (Ninguna)"))
 
-            addSectionHeader(body, "Rendimiento y Optimización de Hardware")
+            addSectionHeader(body, "Motor Cavifax • Rendimiento y Optimización")
             addCycleOptionItem(
                 body,
-                "Perfil de Rendimiento (Sin perder funciones)",
+                "Perfil de Rendimiento (Motor Cavifax)",
                 PerformanceEngine.PREF_PERF_MODE,
                 listOf(
                     PerformanceEngine.getModeName(PerformanceEngine.MODE_POTATO),
@@ -2880,7 +2880,7 @@ object MusicoletSettingsCenter {
                     PerformanceEngine.getModeName(PerformanceEngine.MODE_ULTRA)
                 )
             )
-            addActionCard(body, "Auto-detectar hardware y aplicar perfil", "Evalúa núcleos CPU y memoria RAM disponible para configurar automáticamente") {
+            addActionCard(body, "Auto-detectar hardware y aplicar perfil (Motor Cavifax)", "Evalúa núcleos CPU y memoria RAM disponible para configurar automáticamente") {
                 val isPotato = PerformanceEngine.isLowEndHardware(activity)
                 val mode = if (isPotato) PerformanceEngine.MODE_POTATO else PerformanceEngine.MODE_BALANCED
                 PerformanceEngine.setMode(activity, mode)
@@ -3016,13 +3016,13 @@ object MusicoletSettingsCenter {
             ) { openLanguageScreen() },
             CatItem(
                 R.drawable.ic_sparkles,
-                "Interfaz, Tema y Personalización (Oberfläche)",
-                "Tema AMOLED, colores dinámicos, pestañas, animaciones, mosaicos y gestos"
+                "Interfaz y Tema (Motor Oveja)",
+                "Oveja Engine • Tema AMOLED, colores dinámicos, gradientes, paleta y acento"
             ) { openInterfaceScreen() },
             CatItem(
                 R.drawable.ic_sliders,
-                "Audio y Reproducción",
-                "Ecualizador de 31 bandas, Surround, Reverb de Sala, Gapless, Crossfade y ReplayGain"
+                "Audio y Reproducción (Motor Doomentio)",
+                "Doomentio Engine • DSP 64-bit, Ecualizador de 31 bandas, Reverb, Gapless y ReplayGain"
             ) { openAudioScreen() },
             CatItem(
                 R.drawable.ic_folder,
@@ -3054,8 +3054,8 @@ object MusicoletSettingsCenter {
             ) { openLockscreenScreen() },
             CatItem(
                 R.drawable.ic_wand,
-                "Avanzado y Rendimiento (Erweitert)",
-                "Comportamiento de colas, saltos rápidos, búsqueda externa, ordenación y caché"
+                "Avanzado y Rendimiento (Motor Cavifax)",
+                "Cavifax Engine • Optimización CPU/RAM, Modo Patata, 60/120 FPS y caché"
             ) { openAdvancedScreen() },
             CatItem(
                 R.drawable.ic_download,
