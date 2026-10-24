@@ -25,7 +25,6 @@ local.properties
 *.mp3
 *.wav
 *.mp4
-!assets/video_covers/*.mp4
 *.zip
 *.lock
 

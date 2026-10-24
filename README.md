@@ -63,18 +63,6 @@ DDMC includes built-in interactive companions that celebrate and dance to real a
 | **Bocchi (Hitori Gotoh)** | ![Bocchi Stand](./docs/characters/bocchi_stand.png) | ![Bocchi Guitar](./docs/characters/bocchi_guitar.png) | Bocchi the Rock! |
 | **Konata Izumi** | ![Konata Stand](./docs/characters/konata_stand.png) | ![Konata Guitar](./docs/characters/konata_guitar.png) | Lucky Star |
 
----
-
-## Bundled Video Covers (Lucky Star Series)
-
-The repository includes pre-cut video covers located in [`assets/video_covers/`](./assets/video_covers):
-- **`clip_01_konata.mp4`**: Konata Izumi looped sequence.
-- **`clip_02_kagami.mp4`**: Kagami Hiiragi gesture loop.
-- **`clip_03_akira.mp4`**: Akira Kogami idol performance.
-- **`clip_04_miyuki.mp4`**: Miyuki Takara portrait loop.
-- **`clip_05_tsukasa.mp4`**: Tsukasa Hiiragi reaction loop.
-
-All clips are encoded in H.264/AAC at 576x1024 (9:16 portrait) with zero letterboxing when rendered through the matrix center-crop engine.
 
 ---
 
