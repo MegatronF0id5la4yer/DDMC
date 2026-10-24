@@ -1,54 +1,21 @@
-# Privacy Policy
+# Privacy Policy for DDMC
 
-Sonora does not require an account and does not operate a service that stores users' music libraries, listening history, streaming credentials, or personal profiles.
+DDMC (Doki Doki Music Companion) is designed from the ground up as a fully offline, local-first music player and audio analysis environment.
 
-## Installation count
+## 1. Zero External Telemetry and Analytics
+DDMC does not collect, record, or transmit any user data, device identifiers, listening history, or usage statistics. There are no background telemetry services, tracking beacons, advertising networks, or analytics SDKs embedded in the application.
 
-Sonora sends an optional one-time installation report to our installation counter in order to estimate how many installations of the application have occurred.
+## 2. Local-Only Audio and Metadata Processing
+All audio playback, digital signal processing (DSP), Fast Fourier Transform (FFT) spectrum calculations, lyrics parsing, and cover rendering are performed entirely on the local device hardware. No audio signals or file information leave your device.
 
-The report only contains:
+## 3. Storage and Permissions
+- **Audio Access (`READ_MEDIA_AUDIO` / `READ_EXTERNAL_STORAGE`)**: Used solely by the local media scanner to discover and index audio files stored on your device storage.
+- **Microphone / Record Audio (`RECORD_AUDIO`)**: Optional legacy fallback for Android OS audio visualizer sessions. DDMC v2.0.5+ processes audio directly from the internal software decoder pipeline without accessing external microphone input.
+- **Network Access**: Used exclusively if the user manually checks for application updates through the built-in GitHub OTA updater. No personal or device data is transmitted during update checks.
 
-- application version
-- operating system
+## 4. No Cloud Accounts or Remote Storage
+DDMC requires no account registration, login credentials, or cloud synchronization services. Your playlists, favorites, custom equalizer presets, and application settings remain exclusively in local private app storage (`SharedPreferences` and local SQLite databases).
 
-Sonora does not assign an installation identifier, device identifier, streaming account identifier, listening history, music library information, or other application data in this request.
-
-The installation report is enabled by default. Users may opt out at their discretion. Opting out does not affect Sonora's functionality.
-
-As the case with any network request, hosting and network infrastructure (Cloudflare) may process standard connection metadata such as an IP address as necessary to deliver the request. Sonora does not include the IP address in the telemetry payload or use it as an application identifier.
-
-## Streaming and third-party services
-
-When you use Spotify, YouTube Music, lyrics providers, or other online integrations, Sonora communicates with those third-party services as necessary to provide the requested functionality.
-
-Data handled by those services is subject to their respective privacy policies and terms.
-
-## Authentication credentials
-
-Authentication credentials used by Sonora are stored locally on the user's device.
-
-Sonora does not transmit Spotify or YouTube Music credentials to Sonora-operated servers.
-
-Credentials are sent only to the relevant third-party service when required for authentication or API requests.
-
-## Local data
-
-Sonora stores application data locally on the user's device, including settings, playback state, provider credentials, local-library information, and other application state required for the application to function correctly.
-
-## Logs
-
-Sonora may write diagnostic logs locally on the user's device.
-
-These logs are not uploaded to Sonora-operated servers.
-
-Users may choose to share logs manually when reporting bugs or requesting support.
-
-## Changes to this policy
-
-Material changes to this privacy policy will be published in the Sonora source repository.
-
-## Contact
-
-Privacy-related questions may be submitted through the Sonora GitHub repository:
-
-https://github.com/sonorahq/sonora
+## 5. Contact
+Inquiries regarding privacy or the codebase may be submitted directly via GitHub:
+https://github.com/MegatronF0id5la4yer/DDMC

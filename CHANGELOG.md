@@ -7,6 +7,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.5] - 2026-10-23
+
+### Added
+- Real-time native C++ FFT audio engine sync: raw PCM decoded samples are intercepted in `SonoraAudioProcessor` and fed into `ddmc_fft.cpp` Cooley-Tukey Radix-2 FFT with Hann windowing and concurrency protection.
+- Eliminated dependency on Android OS `Visualizer` session and microphone permissions; visualizers now react 100% to live playback frequencies without artificial sine-wave simulation fallback.
+- Product flavor architecture: `standard` (`com.sonora.music`) and `troll` (`com.sonora.music.troll`) allowing side-by-side installation.
+- Troll Edition with comic micro-paywall dialogs (`FakePaywall.kt`) referencing Doomentio, NostraCoins, Oveja Plus, and Jerry Engine Pro.
+- Adaptive stage background modes: Material Solid (AMOLED / Deep) and real-time Gaussian blurred album art with dynamic opacity control.
+- Landscape visualizer column docking (left, right, center, bottom, top) preventing radial pulse visualizers from being obscured by album art.
+- Dedicated `releases/` folder with compiled production APKs.
+
+## [2.0.0] - 2026-10-21
+
+### Added
+- High-fidelity Android player with 10 hardware beat-reactive visualizer modes.
+- Doki Companion Engine featuring real-time 2D physics kinematics and audio beat drop reactivity.
+- Dynamic per-track video covers with matrix center-crop scaling.
+- Hardware Performance Engine with Potato Mode (30 FPS), Balanced Mode (60 FPS), and Ultra Mode (120 FPS).
+- Standalone pure C/C++ CLI player (`ddmc_cpp`).
+
 ## [0.43.0] - 2026-10-13
 
 ### Added
