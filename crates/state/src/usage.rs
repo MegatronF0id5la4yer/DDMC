@@ -7,12 +7,12 @@ use storage::Database;
 
 use crate::{Io, Session, SessionEvent, join};
 
-const ENDPOINT: &str = "https://sonora-stats.nolight.dev/install";
+const ENDPOINT: &str = "https://cavifax-stats.nolight.dev/install";
 const RUNNING: &str = env!("CARGO_PKG_VERSION");
 const AGENT: &str = concat!(
-    "sonora/",
+    "cavifax/",
     env!("CARGO_PKG_VERSION"),
-    " (https://github.com/sonorahq/sonora)"
+    " (https://github.com/cavifaxhq/cavifax)"
 );
 const REPORTED: &str = "reported_usage";
 const LOGGED_IN: &str = "logged_in_once";

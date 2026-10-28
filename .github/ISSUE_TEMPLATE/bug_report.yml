@@ -6,10 +6,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        A log turns a bug report into a fix. Sonora writes one to
-        `~/.local/state/sonora/sonora.log` on Linux, `~/Library/Caches/sonora/sonora.log` on macOS
-        and `%LOCALAPPDATA%\sonora\sonora.log` on Windows. Reproduce the problem first, then attach
-        the tail of that file. `SONORA_LOG=debug` on the command line makes it more detailed.
+        A log turns a bug report into a fix. Cavifax writes one to
+        `~/.local/state/cavifax/cavifax.log` on Linux, `~/Library/Caches/cavifax/cavifax.log` on macOS
+        and `%LOCALAPPDATA%\cavifax\cavifax.log` on Windows. Reproduce the problem first, then attach
+        the tail of that file. `CAVIFAX_LOG=debug` on the command line makes it more detailed.
 
   - type: textarea
     id: summary
@@ -33,7 +33,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Sonora version
+      label: Cavifax version
       description: The first line of the log file names it.
       placeholder: 0.29.0
     validations:
@@ -108,7 +108,7 @@ body:
     id: logs
     attributes:
       label: Log
-      description: The tail of sonora.log covering the moment it went wrong. Do not paste a screenshot of it.
+      description: The tail of cavifax.log covering the moment it went wrong. Do not paste a screenshot of it.
       render: text
     validations:
       required: true

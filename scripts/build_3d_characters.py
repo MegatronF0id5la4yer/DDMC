@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 from scipy.ndimage import distance_transform_edt, gaussian_filter
 
-ROOT = r"d:\music PP\sonora"
+ROOT = str(Path(__file__).resolve().parents[1])
 BLENDER_EXE = r"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
 BLENDER_SCRIPT = os.path.join(ROOT, "scripts", "blender_rig_and_render.py")
 SCRATCH_DIR = os.path.join(ROOT, "build_3d_tmp")

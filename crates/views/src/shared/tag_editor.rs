@@ -2,7 +2,7 @@ use gpui::prelude::*;
 use gpui::{App, Context, Div, Entity, FocusHandle, Global, Render, SharedString, Window, div};
 use i18n::t;
 use music::{Track, TrackTags};
-use state::{Io, Sonora, TagState, Tags};
+use state::{Io, Cavifax, TagState, Tags};
 use ui::{ActiveTheme as _, Button, Dismiss, FORM_CONTEXT, Input, Modal, Submit, TabBar, Text};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -170,9 +170,9 @@ impl Global for Installed {}
 impl TagEditor {
     pub fn entity(cx: &mut App) -> Entity<Self> {
         if cx.try_global::<Installed>().is_none() {
-            let sonora = Sonora::global(cx);
-            let session = sonora.session.clone();
-            let library = sonora.library.clone();
+            let cavifax = Cavifax::global(cx);
+            let session = cavifax.session.clone();
+            let library = cavifax.library.clone();
             let editor = cx.new(|cx| {
                 let io = Io::global(cx);
                 let tags = cx.new(|cx| Tags::new(session, library, io, cx));

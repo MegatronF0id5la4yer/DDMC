@@ -1,5 +1,5 @@
 //! The Windows and macOS hook that lets [`crate::AppSettings::window_rounding`] reach the real
-//! window. The `DwmSetWindowAttribute` and AppKit toolbar calls are platform code only `sonora`
+//! window. The `DwmSetWindowAttribute` and AppKit toolbar calls are platform code only `cavifax`
 //! links against, so it installs the closure here once at startup. `views` calls
 //! [`apply_window_rounding`] from `Root`'s render whenever the setting changes, so neither crate
 //! depends on the other's platform bindings. Linux and FreeBSD round their own chrome in `views`

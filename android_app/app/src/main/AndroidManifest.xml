@@ -22,7 +22,7 @@
         android:label="${appName}"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Sonora"
+        android:theme="@style/Theme.Cavifax"
         android:usesCleartextTraffic="true">
 
         <provider
@@ -45,7 +45,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
-            android:theme="@style/Theme.Sonora">
+            android:theme="@style/Theme.Cavifax">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -62,19 +62,26 @@
         </service>
 
         <receiver
-            android:name=".SonoraWidgetProvider"
+            android:name=".CavifaxWidgetProvider"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.sonora.music.ACTION_PLAY_PAUSE" />
-                <action android:name="com.sonora.music.ACTION_NEXT" />
-                <action android:name="com.sonora.music.ACTION_PREV" />
-                <action android:name="com.sonora.music.ACTION_FAVORITE" />
-                <action android:name="com.sonora.music.ACTION_UPDATE_PREFS" />
+                <action android:name="com.cavifax.bagresuko.ACTION_PLAY_PAUSE" />
+                <action android:name="com.cavifax.bagresuko.ACTION_NEXT" />
+                <action android:name="com.cavifax.bagresuko.ACTION_PREV" />
+                <action android:name="com.cavifax.bagresuko.ACTION_FAVORITE" />
+                <action android:name="com.cavifax.bagresuko.ACTION_REW" />
+                <action android:name="com.cavifax.bagresuko.ACTION_FF" />
+                <action android:name="com.cavifax.bagresuko.ACTION_REPEAT" />
+                <action android:name="com.cavifax.bagresuko.ACTION_DOKI_TAP" />
+                <action android:name="com.cavifax.bagresuko.ACTION_QUEUE_1" />
+                <action android:name="com.cavifax.bagresuko.ACTION_QUEUE_2" />
+                <action android:name="com.cavifax.bagresuko.ACTION_QUEUE_3" />
+                <action android:name="com.cavifax.bagresuko.ACTION_UPDATE_PREFS" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_sonora_info" />
+                android:resource="@xml/widget_cavifax_info" />
         </receiver>
 
         <service

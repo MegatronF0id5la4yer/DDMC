@@ -8,7 +8,7 @@ use gpui::{App, AppContext as _, Context, Entity, Global, Task};
 use music::Track;
 use tokio::sync::mpsc;
 
-use crate::{Cover, Io, Playback, PlaybackState, Queue, Repeat, Sonora, join};
+use crate::{Cover, Io, Playback, PlaybackState, Queue, Repeat, Cavifax, join};
 
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod mpris;
@@ -20,8 +20,8 @@ use self::souvlaki::Controls;
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use mpris::Controls;
 
-const BUS_NAME: &str = "sonora";
-const DISPLAY_NAME: &str = "Sonora";
+const BUS_NAME: &str = "cavifax";
+const DISPLAY_NAME: &str = "Cavifax";
 /// How far the position may stray from where steady playback would have put it before the
 /// widget is told the track was seeked.
 const SEEK_SLACK: Duration = Duration::from_secs(2);
@@ -66,10 +66,10 @@ pub fn attach(hwnd: Option<*mut c_void>, cx: &mut App) {
         }
     };
 
-    let sonora = Sonora::global(cx);
-    let playback = sonora.playback.clone();
-    let queue = sonora.queue.clone();
-    let cover = sonora.cover.clone();
+    let cavifax = Cavifax::global(cx);
+    let playback = cavifax.playback.clone();
+    let queue = cavifax.queue.clone();
+    let cover = cavifax.cover.clone();
     let io = Io::global(cx);
     let remote = cx.new(|cx| Remote::new(controls, receiver, playback, queue, cover, io, cx));
     remote.update(cx, |remote, cx| remote.publish(cx));
@@ -269,7 +269,7 @@ fn is_remote(cover: &str) -> bool {
 async fn artwork(url: &str) -> Result<PathBuf> {
     let dir = dirs::cache_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("sonora")
+        .join("cavifax")
         .join(ARTWORK);
     let mut hasher = DefaultHasher::new();
     url.hash(&mut hasher);

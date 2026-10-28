@@ -201,12 +201,12 @@ fn begin_environment(
     .context("cannot start the WebView2 environment")
 }
 
-/// Sonora's own cache folder for WebView2's browser state, as a wide string. WebView2 otherwise
+/// Cavifax's own cache folder for WebView2's browser state, as a wide string. WebView2 otherwise
 /// writes beside the executable, which an installed copy under Program Files cannot do.
 fn user_data_folder() -> Result<Vec<u16>> {
     let folder = dirs::cache_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("sonora")
+        .join("cavifax")
         .join("webview2");
     std::fs::create_dir_all(&folder)
         .with_context(|| format!("cannot create {}", folder.display()))?;
@@ -226,7 +226,7 @@ fn begin_controller(
         .context("the installed WebView2 runtime does not support private profiles")?;
     let options = unsafe { environment.CreateCoreWebView2ControllerOptions() }
         .context("cannot configure the private sign-in profile")?;
-    unsafe { options.SetProfileName(w!("Sonora Sign-In")) }
+    unsafe { options.SetProfileName(w!("Cavifax Sign-In")) }
         .context("cannot name the sign-in profile")?;
     unsafe { options.SetIsInPrivateModeEnabled(true) }
         .context("cannot make the sign-in profile private")?;
@@ -327,7 +327,7 @@ fn create_window(title: &str) -> Result<HWND> {
     let class = WNDCLASSW {
         lpfnWndProc: Some(window_proc),
         hInstance: HINSTANCE(instance.0),
-        lpszClassName: w!("SonoraSignInWebView"),
+        lpszClassName: w!("CavifaxSignInWebView"),
         ..Default::default()
     };
     unsafe { RegisterClassW(&class) };
@@ -348,7 +348,7 @@ fn create_window(title: &str) -> Result<HWND> {
     let hwnd = unsafe {
         CreateWindowExW(
             WINDOW_EX_STYLE(0),
-            w!("SonoraSignInWebView"),
+            w!("CavifaxSignInWebView"),
             PCWSTR(title.as_ptr()),
             WS_OVERLAPPEDWINDOW,
             x,

@@ -686,12 +686,12 @@ fn announced(total: Option<u64>) -> Option<usize> {
         .filter(|total| *total <= CEILING)
 }
 
-/// A file in Sonora's cache directory with no name, so nothing is left behind however the
+/// A file in Cavifax's cache directory with no name, so nothing is left behind however the
 /// process ends.
 fn spool_file() -> io::Result<File> {
     let folder = dirs::cache_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("sonora");
+        .join("cavifax");
     std::fs::create_dir_all(&folder)?;
     tempfile::tempfile_in(folder)
 }

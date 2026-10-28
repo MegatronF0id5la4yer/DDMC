@@ -1,4 +1,4 @@
-# sonora
+# cavifax
 
 A native music streaming client, built with Rust and [GPUI](https://github.com/zed-industries/zed)
 (Zed's UI framework). Cargo workspace, edition 2024, resolver 3.
@@ -7,7 +7,7 @@ A native music streaming client, built with Rust and [GPUI](https://github.com/z
 
 ```
 crates/
-  sonora/     binary: main, window, actions, asset registry, HTTP client shim, tray, dock
+  cavifax/     binary: main, window, actions, asset registry, HTTP client shim, tray, dock
   views/      screens, shells (Workspace, FullscreenView) and app chrome
   state/      GPUI entities holding app state, and all async orchestration
   music/      provider traits and models in the root, one submodule per provider (no GPUI)
@@ -25,7 +25,7 @@ crates/
 Dependency direction is strict. Do not create a back edge:
 
 ```
-sonora → views → state → music
+cavifax → views → state → music
          state, music → storage
          state → webview
          music → widevine
@@ -34,7 +34,7 @@ sonora → views → state → music
 ```
 
 - `state` and `views` see only the traits and models in the root of `music`, never a provider
-  module. Only `sonora/src/main.rs` names a concrete provider.
+  module. Only `cavifax/src/main.rs` names a concrete provider.
 - `music` never depends on `gpui`. `ui` never knows about `music`, `state` or playback. Widgets
   that need app state live in `views/src/chrome/`.
 - `music::engine` is the one playback engine and `music::stream` the one progressive download. A
@@ -83,7 +83,7 @@ sonora → views → state → music
 
 ```sh
 nix develop                    # or direnv allow
-cargo run --locked --package sonora
+cargo run --locked --package cavifax
 cargo fmt
 cargo check --workspace
 cargo test --workspace
@@ -117,7 +117,7 @@ module-local `type` alias rather than a `type_complexity` warning. The one `#[al
 
 Conventional Commits: `type(scope): description`, imperative, lowercase, no trailing period, no
 body. Scopes in use: `views`, `ui`, `music`, `state`, `playback`, `player`, `settings`, `router`,
-`local`, `sonora`, `nix`.
+`local`, `cavifax`, `nix`.
 
 ## Pull requests
 
@@ -136,5 +136,5 @@ Bullets are lowercase, imperative, one line each, and describe behaviour rather 
 
 `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Add to
 `## [Unreleased]` as features land, under `Added`, `Changed` or `Fixed`. Entries say what someone
-using Sonora can now do, in one or two short sentences, since the notes are posted to Discord.
-Leave out work no user can observe. Cutting a release is the `release-sonora` skill.
+using Cavifax can now do, in one or two short sentences, since the notes are posted to Discord.
+Leave out work no user can observe. Cutting a release is the `release-cavifax` skill.

@@ -8,7 +8,7 @@ use ui::{
 };
 
 actions!(
-    sonora,
+    cavifax,
     [
         Quit,
         SignOut,

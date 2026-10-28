@@ -1,4 +1,4 @@
-//! The CDM host process: the Sonora executable started with [`crate::HOST_ARG`]. It loads the
+//! The CDM host process: the Cavifax executable started with [`crate::HOST_ARG`]. It loads the
 //! module, answers [`crate::wire`] requests from stdin on stdout, and exits when stdin closes.
 //!
 //! Keeping the module out of the app is what lets its memory go. Widevine maps about 80 MiB the
@@ -173,7 +173,7 @@ fn answers() -> Result<io::Stdout> {
 /// otherwise show up as `exe`.
 #[cfg(target_os = "linux")]
 fn name_process() {
-    unsafe { libc::prctl(libc::PR_SET_NAME, c"sonora-widevine".as_ptr()) };
+    unsafe { libc::prctl(libc::PR_SET_NAME, c"cavifax-widevine".as_ptr()) };
 }
 
 #[cfg(not(target_os = "linux"))]

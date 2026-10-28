@@ -6,7 +6,7 @@ This directory contains the Android application source code for **DDMC (Doki Dok
 
 ## Architecture Overview
 
-- **Core Player**: Media3 ExoPlayer with a custom `SonoraAudioProcessor` in the audio rendering pipeline.
+- **Core Player**: Media3 ExoPlayer with a custom `CavifaxAudioProcessor` in the audio rendering pipeline.
 - **Native C++ Engine**: Interfaced via JNI (`native_bridge.cpp`) communicating with `ddmc_cpp/` for Cooley-Tukey Radix-2 FFT and Doki kinematics.
 - **Audio Routing**: Software decoding ensures PCM buffers are directly captured for FFT spectrum analysis, completely avoiding hardware offload silencing and permission bugs.
 - **UI Architecture**: Single-activity architecture (`MainActivity.kt`) featuring pure Kotlin dynamic layout inflation, zero XML layout bloat, and hardware-accelerated Canvas rendering.
@@ -18,13 +18,13 @@ This directory contains the Android application source code for **DDMC (Doki Dok
 The project defines two flavors under the `edition` flavor dimension in `app/build.gradle.kts`:
 
 ### 1. `standard`
-- **Application ID**: `com.sonora.music`
+- **Application ID**: `com.cavifax.bagresuko`
 - **App Name**: `DDMC`
 - **Troll Features**: Disabled (`IS_TROLL_EDITION = false`)
 - **Use Case**: Official production build.
 
 ### 2. `troll`
-- **Application ID**: `com.sonora.music.troll`
+- **Application ID**: `com.cavifax.bagresuko.troll`
 - **App Name**: `DDMC Version Troll`
 - **Troll Features**: Enabled (`IS_TROLL_EDITION = true`)
 - **Use Case**: Satirical version with comic Doomentio / NostraCoins paywall interceptor (`FakePaywall.kt`).

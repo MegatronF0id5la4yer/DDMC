@@ -1,9 +1,9 @@
 # Third-party licenses
 
-Sonora is licensed under the GNU General Public License v3.0 or later; the full
+Cavifax is licensed under the GNU General Public License v3.0 or later; the full
 text is in `COPYING`. GPUI pulls in `zlog`, `ztracing` and `ztracing_macro` from
 the Zed repository, which carry the same license. The complete corresponding
-source is the tagged commit of <https://github.com/sonorahq/sonora> together
+source is the tagged commit of <https://github.com/cavifaxhq/cavifax> together
 with the dependency revisions pinned in `Cargo.lock`.
 
 The binary embeds:
@@ -20,7 +20,7 @@ Symphonia decoders, `option-ext` and `priority-queue`. They are used unmodified;
 their source is available from the upstream repositories linked below and from
 <https://crates.io>.
 
-Where a dependency offers a choice of licenses, Sonora relies on the permissive
+Where a dependency offers a choice of licenses, Cavifax relies on the permissive
 option: Apache-2.0 for `self_cell`, MPL-2.0 for `priority-queue`.
 
 Each section lists the crates covered by that license and the copyright notices
@@ -1422,7 +1422,7 @@ Used by 17 crate(s):
 - [input 0.40.0](https://crates.io/crates/input) — Copyright © 2007 Free Software Foundation, Inc. <https://fsf.org/>; Copyright (C) <year> <name of author>
 - [music 0.40.0](https://crates.io/crates/music) — Copyright © 2007 Free Software Foundation, Inc. <https://fsf.org/>; Copyright (C) <year> <name of author>
 - [router 0.40.0](https://crates.io/crates/router) — Copyright © 2007 Free Software Foundation, Inc. <https://fsf.org/>; Copyright (C) <year> <name of author>
-- [sonora 0.40.0](https://crates.io/crates/sonora) — Copyright © 2007 Free Software Foundation, Inc. <https://fsf.org/>; Copyright (C) <year> <name of author>
+- [cavifax 0.40.0](https://crates.io/crates/cavifax) — Copyright © 2007 Free Software Foundation, Inc. <https://fsf.org/>; Copyright (C) <year> <name of author>
 - [state 0.40.0](https://crates.io/crates/state) — Copyright © 2007 Free Software Foundation, Inc. <https://fsf.org/>; Copyright (C) <year> <name of author>
 - [storage 0.40.0](https://crates.io/crates/storage) — Copyright © 2007 Free Software Foundation, Inc. <https://fsf.org/>; Copyright (C) <year> <name of author>
 - [ui 0.40.0](https://crates.io/crates/ui) — Copyright © 2007 Free Software Foundation, Inc. <https://fsf.org/>; Copyright (C) <year> <name of author>

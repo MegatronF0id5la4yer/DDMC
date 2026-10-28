@@ -135,7 +135,7 @@ async fn resolve(link: &str) -> Result<(Track, &'static str)> {
     let session = auth::restore(&AuthConfig::from_env())
         .await
         .context("cannot restore the cached session")?
-        .context("no cached credentials; sign in with sonora first")?;
+        .context("no cached credentials; sign in with cavifax first")?;
     let client = Arc::new(LibrespotClient::new(session));
 
     let track = match spotify_id(link) {

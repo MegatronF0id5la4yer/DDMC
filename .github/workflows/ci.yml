@@ -112,11 +112,11 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             arch: x64compatible
-            setup: Sonora-Setup
+            setup: Cavifax-Setup
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
             arch: arm64
-            setup: Sonora-Setup-arm64
+            setup: Cavifax-Setup-arm64
     steps:
       - uses: actions/checkout@v5
 
@@ -143,7 +143,7 @@ jobs:
           cache-on-failure: true
 
       - name: build
-        run: cargo build --release --locked --package sonora --target ${{ matrix.target }}
+        run: cargo build --release --locked --package cavifax --target ${{ matrix.target }}
 
       - name: sccache stats
         if: always()
@@ -157,8 +157,8 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           case "$RUNNER_OS" in
-            Windows) cp "target/$TARGET/release/sonora.exe" "dist/sonora-${GITHUB_SHA:0:7}-$TARGET.exe" ;;
-            *)       cp "target/$TARGET/release/sonora" "dist/sonora-${GITHUB_SHA:0:7}-$TARGET" ;;
+            Windows) cp "target/$TARGET/release/cavifax.exe" "dist/cavifax-${GITHUB_SHA:0:7}-$TARGET.exe" ;;
+            *)       cp "target/$TARGET/release/cavifax" "dist/cavifax-${GITHUB_SHA:0:7}-$TARGET" ;;
           esac
 
       - name: install Inno Setup
@@ -171,13 +171,13 @@ jobs:
         shell: pwsh
         env:
           TARGET: ${{ matrix.target }}
-          SONORA_ARCH: ${{ matrix.arch }}
-          SONORA_SETUP: ${{ matrix.setup }}
+          CAVIFAX_ARCH: ${{ matrix.arch }}
+          CAVIFAX_SETUP: ${{ matrix.setup }}
         run: |
-          $env:SONORA_VERSION = "0.0.0"
-          $env:SONORA_EXE = (Resolve-Path "target/$env:TARGET/release/sonora.exe").Path
-          $env:SONORA_DIST = (Resolve-Path "dist").Path
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "scripts/windows/sonora.iss"
+          $env:CAVIFAX_VERSION = "0.0.0"
+          $env:CAVIFAX_EXE = (Resolve-Path "target/$env:TARGET/release/cavifax.exe").Path
+          $env:CAVIFAX_DIST = (Resolve-Path "dist").Path
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "scripts/windows/cavifax.iss"
 
       # A convenience binary, not a release artefact: GitHub's artifact service times out often
       # enough that it must not be what turns a green build red.

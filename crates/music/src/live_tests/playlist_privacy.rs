@@ -6,7 +6,7 @@ use crate::spotify::SpotifyProvider;
 use crate::youtube::YouTubeProvider;
 use crate::{MusicApi, MusicProvider, ProviderSession};
 
-const NAME: &str = "Sonora live privacy test — safe to delete";
+const NAME: &str = "Cavifax live privacy test — safe to delete";
 const VERIFY_ATTEMPTS: usize = 30;
 
 #[tokio::test]
@@ -31,7 +31,7 @@ async fn connected(provider: &dyn MusicProvider) -> Result<ProviderSession> {
     let session = provider
         .restore()
         .await?
-        .with_context(|| format!("{} has no stored Sonora session", provider.name()))?;
+        .with_context(|| format!("{} has no stored Cavifax session", provider.name()))?;
     if !session.authenticated {
         bail!(
             "{} restored a guest session, not an account",

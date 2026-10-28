@@ -18,7 +18,7 @@ static std::unique_ptr<ddmc::CompanionEngine> s_companion;
 extern "C" {
 
 JNIEXPORT jboolean JNICALL
-Java_com_sonora_music_DdmcNative_nativeInit(JNIEnv* env, jclass clazz, jint perfMode) {
+Java_com_cavifax_bagresuko_DdmcNative_nativeInit(JNIEnv* env, jclass clazz, jint perfMode) {
     try {
         s_analyzer = std::make_unique<ddmc::FftAnalyzer>();
         s_analyzer->setPerfMode(static_cast<ddmc::PerfMode>(perfMode));
@@ -35,7 +35,7 @@ Java_com_sonora_music_DdmcNative_nativeInit(JNIEnv* env, jclass clazz, jint perf
 }
 
 JNIEXPORT void JNICALL
-Java_com_sonora_music_DdmcNative_nativeSetPerfMode(JNIEnv* env, jclass clazz, jint perfMode) {
+Java_com_cavifax_bagresuko_DdmcNative_nativeSetPerfMode(JNIEnv* env, jclass clazz, jint perfMode) {
     if (s_analyzer) {
         s_analyzer->setPerfMode(static_cast<ddmc::PerfMode>(perfMode));
     }
@@ -45,7 +45,7 @@ Java_com_sonora_music_DdmcNative_nativeSetPerfMode(JNIEnv* env, jclass clazz, ji
 }
 
 JNIEXPORT void JNICALL
-Java_com_sonora_music_DdmcNative_nativeFeedAudioSamples(
+Java_com_cavifax_bagresuko_DdmcNative_nativeFeedAudioSamples(
     JNIEnv* env, jclass clazz, jfloatArray samples, jint count, jint channels) {
     if (!s_analyzer || !samples || count <= 0 || channels <= 0) return;
 
@@ -57,7 +57,7 @@ Java_com_sonora_music_DdmcNative_nativeFeedAudioSamples(
 }
 
 JNIEXPORT void JNICALL
-Java_com_sonora_music_DdmcNative_nativeFeedFftBytes(
+Java_com_cavifax_bagresuko_DdmcNative_nativeFeedFftBytes(
     JNIEnv* env, jclass clazz, jbyteArray rawFft, jint count) {
     if (!s_analyzer || !rawFft || count < 8) return;
 
@@ -74,7 +74,7 @@ Java_com_sonora_music_DdmcNative_nativeFeedFftBytes(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_sonora_music_DdmcNative_nativeProcessFft(
+Java_com_cavifax_bagresuko_DdmcNative_nativeProcessFft(
     JNIEnv* env, jclass clazz,
     jfloat dtSec,
     jfloatArray outMagnitudes,
@@ -107,22 +107,22 @@ Java_com_sonora_music_DdmcNative_nativeProcessFft(
 }
 
 JNIEXPORT jfloat JNICALL
-Java_com_sonora_music_DdmcNative_nativeGetVocalEnergy(JNIEnv* env, jclass clazz) {
+Java_com_cavifax_bagresuko_DdmcNative_nativeGetVocalEnergy(JNIEnv* env, jclass clazz) {
     return s_analyzer ? s_analyzer->getSpectrum().vocalEnergy : 0.0f;
 }
 
 JNIEXPORT jfloat JNICALL
-Java_com_sonora_music_DdmcNative_nativeGetBassEnergy(JNIEnv* env, jclass clazz) {
+Java_com_cavifax_bagresuko_DdmcNative_nativeGetBassEnergy(JNIEnv* env, jclass clazz) {
     return s_analyzer ? s_analyzer->getSpectrum().bassEnergy : 0.0f;
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_sonora_music_DdmcNative_nativeIsBeat(JNIEnv* env, jclass clazz) {
+Java_com_cavifax_bagresuko_DdmcNative_nativeIsBeat(JNIEnv* env, jclass clazz) {
     return (s_analyzer && s_analyzer->getSpectrum().isBeat) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
-Java_com_sonora_music_DdmcNative_nativeUpdateCompanion(
+Java_com_cavifax_bagresuko_DdmcNative_nativeUpdateCompanion(
     JNIEnv* env, jclass clazz,
     jfloat dtSec, jfloat energy, jboolean isBeat,
     jfloatArray outData) {
@@ -141,17 +141,17 @@ Java_com_sonora_music_DdmcNative_nativeUpdateCompanion(
 }
 
 JNIEXPORT void JNICALL
-Java_com_sonora_music_DdmcNative_nativeTriggerJump(JNIEnv* env, jclass clazz) {
+Java_com_cavifax_bagresuko_DdmcNative_nativeTriggerJump(JNIEnv* env, jclass clazz) {
     if (s_companion) s_companion->triggerAction("jump");
 }
 
 JNIEXPORT void JNICALL
-Java_com_sonora_music_DdmcNative_nativeTriggerDance(JNIEnv* env, jclass clazz) {
+Java_com_cavifax_bagresuko_DdmcNative_nativeTriggerDance(JNIEnv* env, jclass clazz) {
     if (s_companion) s_companion->triggerAction("dance");
 }
 
 JNIEXPORT void JNICALL
-Java_com_sonora_music_DdmcNative_nativeSetCompanionCharacter(JNIEnv* env, jclass clazz, jint charId) {
+Java_com_cavifax_bagresuko_DdmcNative_nativeSetCompanionCharacter(JNIEnv* env, jclass clazz, jint charId) {
     if (s_companion) {
         s_companion->setCharacter(static_cast<ddmc::DokiCharacter>(charId));
     }

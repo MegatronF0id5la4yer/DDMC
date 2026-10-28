@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.sonora.music"
+    namespace = "com.cavifax.bagresuko"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.sonora.music"
+        applicationId = "com.cavifax.bagresuko"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

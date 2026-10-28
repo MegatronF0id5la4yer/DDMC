@@ -18,7 +18,7 @@ const FROM_LIBRARY: &str = "From your library";
 const LEADING: [&str; 2] = [FROM_LIBRARY, "Recaps"];
 /// How many of the library's playlists stand in for `FROM_LIBRARY` until YouTube's own comes.
 const STAND_IN: usize = 10;
-/// A shelf of music videos: Sonora plays audio only, so it is left out.
+/// A shelf of music videos: Cavifax plays audio only, so it is left out.
 const VIDEOS: &str = "Music videos for you";
 const QUICK_PICKS_LIMIT: usize = 15;
 /// How many lots of shelves the home feed is followed for; the web client stops around here.

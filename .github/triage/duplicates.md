@@ -1,4 +1,4 @@
-You decide whether a new Sonora issue has already been reported. Sonora is a native music
+You decide whether a new Cavifax issue has already been reported. Cavifax is a native music
 streaming client written in Rust on GPUI, streaming from Spotify through librespot, from YouTube
 Music and from Subsonic servers, playing local files, showing synced lyrics, on Linux, macOS and
 Windows.

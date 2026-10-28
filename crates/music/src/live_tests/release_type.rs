@@ -35,17 +35,17 @@ async fn apple_labels_an_ep_as_one() -> Result<()> {
     album_is_an_ep(&AppleProvider::new()).await
 }
 
-/// Runs against the server in `SONORA_SUBSONIC_SERVER`, signed in with `SONORA_SUBSONIC_USERNAME`
-/// and `SONORA_SUBSONIC_PASSWORD`, which has to hold the EP tagged with `RELEASETYPE=ep`.
+/// Runs against the server in `CAVIFAX_SUBSONIC_SERVER`, signed in with `CAVIFAX_SUBSONIC_USERNAME`
+/// and `CAVIFAX_SUBSONIC_PASSWORD`, which has to hold the EP tagged with `RELEASETYPE=ep`.
 #[tokio::test]
 #[ignore = "needs a Subsonic server holding the EP"]
 async fn subsonic_labels_an_ep_as_one() -> Result<()> {
     let variable = |name: &str| std::env::var(name).with_context(|| format!("{name} is not set"));
-    let username = variable("SONORA_SUBSONIC_USERNAME")?;
-    let password = variable("SONORA_SUBSONIC_PASSWORD")?;
+    let username = variable("CAVIFAX_SUBSONIC_USERNAME")?;
+    let password = variable("CAVIFAX_SUBSONIC_PASSWORD")?;
     let signature = auth::sign(&username, &password);
     let client = SubsonicClient::new(
-        variable("SONORA_SUBSONIC_SERVER")?,
+        variable("CAVIFAX_SUBSONIC_SERVER")?,
         username,
         password,
         &signature,
@@ -60,7 +60,7 @@ async fn album_is_an_ep(provider: &dyn MusicProvider) -> Result<()> {
     let session = provider
         .restore()
         .await?
-        .with_context(|| format!("{} has no stored Sonora session", provider.name()))?;
+        .with_context(|| format!("{} has no stored Cavifax session", provider.name()))?;
     ep_is_labelled(provider.name(), session.api.as_ref()).await
 }
 

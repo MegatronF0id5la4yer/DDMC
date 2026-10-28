@@ -1,6 +1,6 @@
 # DDMC (Doki Doki Music Companion)
 
-A high-fidelity, zero-telemetry Android music player and desktop audio suite featuring a real-time native C++ FFT spectrum engine, dynamic per-track video covers, interactive Doki companions with physics, adaptive stage layouts, and offline DSP audio engines.
+A high-fidelity, zero-telemetry Android music player and desktop audio suite powered by the **Cavifax**, **Chris Chan**, **Aimep3**, and **Bagresuko** engines, featuring a real-time native C++ FFT spectrum engine, dynamic per-track video covers, interactive 2D/3D Non-Chibi and Chibi Doki companions with Blender 5.2 skeletal animations, glassmorphic home screen widgets, adaptive stage layouts, and offline DSP audio processing.
 
 ---
 
@@ -8,11 +8,8 @@ A high-fidelity, zero-telemetry Android music player and desktop audio suite fea
 
 | Edition | Application ID | Target | Description | Download Link |
 |---|---|---|---|---|
-| **DDMC Standard Edition (v2.0.6)** | `com.sonora.music` | Android 8.0+ | Official clean release with zero interruptions, full DSP suite, 10 visualizers, and 2D/3D Blender Doki companions. | [Download DDMC.apk](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.6/DDMC.apk) |
-| **DDMC Version Troll (v2.0.6)** | `com.sonora.music.troll` | Android 8.0+ | Satirical edition with comic micro-paywalls (Plan Ario Honorario, NostraCoins, Oveja Plus) between actions and poverty bypass. | [Download DDMC_Version_Troll.apk](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.6/DDMC_Version_Troll.apk) |
+| **DDMC (v2.0.7)** | `com.cavifax.bagresuko` | Android 8.0+ | Official release with Cavifax/Chris Chan/Aimep3/Bagresuko suite, 10 visualizers, and Non-Chibi + Chibi 3D Blender Doki companions. | [Download DDMC.apk](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.7/DDMC.apk) |
 | **DDMC C/C++ Desktop Engine** | CLI Executable | Windows / Linux / macOS | Standalone zero-GC command-line player with miniaudio, Cooley-Tukey Radix-2 FFT, and ANSI TrueColor visualizer. | [Source in `ddmc_cpp/`](./ddmc_cpp) |
-
-Both Android editions can be installed simultaneously on the same device without package or provider collisions.
 
 All official releases, changelogs, and binary assets are published on [GitHub Releases](https://github.com/MegatronF0id5la4yer/DDMC/releases).
 
@@ -34,38 +31,27 @@ All official releases, changelogs, and binary assets are published on [GitHub Re
 
 ---
 
-### Troll Edition (Micro-Paywall Interceptions)
-
-| Paywall Modal Interceptor | 30s Mock Ad Countdown | Action Interception Toast |
-|:---:|:---:|:---:|
-| ![Troll Paywall Modal](./docs/screenshots/troll_paywall_modal.png) | ![Troll Ad Countdown](./docs/screenshots/troll_ad_countdown.png) | ![Troll Action Skip](./docs/screenshots/troll_action_interception.png) |
-| Doomentio Patreon, NostraCoins & comedy tiers | Colchones Perez mock ad timer | Intercepts play/pause, skips, and sound settings |
-
----
-
 ## Characters and Companions Showcase
 
-DDMC includes built-in interactive companions that celebrate and dance to real audio beats detected by the native C++ engine.
+DDMC includes built-in interactive companions that celebrate and dance to real audio beats detected by the native C++ engine, with a clean, streamlined selector (`Natsuki`, `Monika`, `Sayori`, `Yuri`, `Bocchi`, `Konata` in `Casual | Uniforme | Chibi`).
 
-### Doki Doki Literature Club
+### Non-Chibi 3D HD Dokis (Blender 5.2 Full-Scale Rig & Dance Animations)
 
-| Character | Classic | Casual | School | Snug |
-|---|:---:|:---:|:---:|:---:|
-| **Monika** | ![Monika Classic](./docs/characters/monika_classic.png) | - | ![Monika School](./docs/characters/monika_school.png) | ![Monika Snug](./docs/characters/monika_snug.png) |
-| **Sayori** | ![Sayori Classic](./docs/characters/sayori_classic.png) | ![Sayori Casual](./docs/characters/sayori_casual.png) | ![Sayori School](./docs/characters/sayori_school.png) | ![Sayori Snug](./docs/characters/sayori_snug.png) |
-| **Natsuki** | ![Natsuki Classic](./docs/characters/natsuki_classic.png) | ![Natsuki Casual](./docs/characters/natsuki_casual.png) | ![Natsuki School](./docs/characters/natsuki_school.png) | ![Natsuki Snug](./docs/characters/natsuki_snug.png) |
-| **Yuri** | ![Yuri Classic](./docs/characters/yuri_classic.png) | ![Yuri Casual](./docs/characters/yuri_casual.png) | ![Yuri School](./docs/characters/yuri_school.png) | ![Yuri Snug](./docs/characters/yuri_snug.png) |
+All 7 full-scale Non-Chibi HD Doki outfits (`Uniforme` and `Casual`) are rigged and animated in 3D via `uv` and headless **Blender 5.2** (`scripts/build_3d_hd_dokis.py` + `scripts/blender_rig_and_render_hd.py`) with 6-bone anatomical armatures (`root`, `hips`, `spine`, `chest`, `head`, `arms`), 5 full 3D animations (`idle`, `walk`, `dance`, `jump`, `action`), and exported glTF 2.0 (`.glb`) models:
 
-### Guest Companions
+| Character & Outfit | 3D HD Render (Blender 5.2) | 3D HD Dance Animation | 3D glTF Model (`.glb`) |
+|---|:---:|:---:|:---:|
+| **Monika (Uniforme)** | ![Monika School 3D](./docs/characters/3d_hd/monika_school_3d.png) | ![Monika School 3D Dance](./docs/characters/3d_hd/monika_school_3d_dance.gif) | [`monika_school_3d.glb`](./docs/models3d/monika_school_3d.glb) |
+| **Sayori (Uniforme)** | ![Sayori School 3D](./docs/characters/3d_hd/sayori_school_3d.png) | ![Sayori School 3D Dance](./docs/characters/3d_hd/sayori_school_3d_dance.gif) | [`sayori_school_3d.glb`](./docs/models3d/sayori_school_3d.glb) |
+| **Sayori (Casual)** | ![Sayori Casual 3D](./docs/characters/3d_hd/sayori_casual_3d.png) | ![Sayori Casual 3D Dance](./docs/characters/3d_hd/sayori_casual_3d_dance.gif) | [`sayori_casual_3d.glb`](./docs/models3d/sayori_casual_3d.glb) |
+| **Natsuki (Uniforme)** | ![Natsuki School 3D](./docs/characters/3d_hd/natsuki_school_3d.png) | ![Natsuki School 3D Dance](./docs/characters/3d_hd/natsuki_school_3d_dance.gif) | [`natsuki_school_3d.glb`](./docs/models3d/natsuki_school_3d.glb) |
+| **Natsuki (Casual)** | ![Natsuki Casual 3D](./docs/characters/3d_hd/natsuki_casual_3d.png) | ![Natsuki Casual 3D Dance](./docs/characters/3d_hd/natsuki_casual_3d_dance.gif) | [`natsuki_casual_3d.glb`](./docs/models3d/natsuki_casual_3d.glb) |
+| **Yuri (Uniforme)** | ![Yuri School 3D](./docs/characters/3d_hd/yuri_school_3d.png) | ![Yuri School 3D Dance](./docs/characters/3d_hd/yuri_school_3d_dance.gif) | [`yuri_school_3d.glb`](./docs/models3d/yuri_school_3d.glb) |
+| **Yuri (Casual)** | ![Yuri Casual 3D](./docs/characters/3d_hd/yuri_casual_3d.png) | ![Yuri Casual 3D Dance](./docs/characters/3d_hd/yuri_casual_3d_dance.gif) | [`yuri_casual_3d.glb`](./docs/models3d/yuri_casual_3d.glb) |
 
-| Character | Stand Pose | Guitar Action | Origin |
-|---|:---:|:---:|---|
-| **Bocchi (Hitori Gotoh)** | ![Bocchi Stand](./docs/characters/bocchi_stand.png) | ![Bocchi Guitar](./docs/characters/bocchi_guitar.png) | Bocchi the Rock! |
-| **Konata Izumi** | ![Konata Stand](./docs/characters/konata_stand.png) | ![Konata Guitar](./docs/characters/konata_guitar.png) | Lucky Star |
+### Chibi & Guest 3D Characters (Blender 5.2 + `uv` Skeletal Rig & Animations)
 
-### 3D Characters (Blender 5.2 + `uv` Skeletal Rig & Animations)
-
-All 6 companions include 3D rigged meshes generated from their cleaned sprites via `uv` and headless **Blender 5.2** (`scripts/build_3d_characters.py` + `scripts/blender_rig_and_render.py`), complete with skeletal armature animations (`idle`, `walk`, `dance`, `jump`, `action`) and exported glTF 2.0 (`.glb`) 3D models:
+All 6 companions also include Chibi/Guest 3D rigged meshes generated via `uv` and headless **Blender 5.2** (`scripts/build_3d_characters.py` + `scripts/blender_rig_and_render.py`):
 
 | Character | 3D Render (Blender 5.2) | 3D Dance Animation | 3D glTF Model (`.glb`) |
 |---|:---:|:---:|:---:|
@@ -76,18 +62,32 @@ All 6 companions include 3D rigged meshes generated from their cleaned sprites v
 | **Bocchi** | ![Bocchi 3D](./docs/characters/3d/bocchi_3d.png) | ![Bocchi 3D Dance](./docs/characters/3d/bocchi_3d_dance.gif) | [`bocchi_3d.glb`](./docs/models3d/bocchi_3d.glb) |
 | **Konata** | ![Konata 3D](./docs/characters/3d/konata_3d.png) | ![Konata 3D Dance](./docs/characters/3d/konata_3d_dance.gif) | [`konata_3d.glb`](./docs/models3d/konata_3d.glb) |
 
+### 2D Sprite Variants
+
+| Character | Classic | Casual | School | Snug |
+|---|:---:|:---:|:---:|:---:|
+| **Monika** | ![Monika Classic](./docs/characters/monika_classic.png) | - | ![Monika School](./docs/characters/monika_school.png) | ![Monika Snug](./docs/characters/monika_snug.png) |
+| **Sayori** | ![Sayori Classic](./docs/characters/sayori_classic.png) | ![Sayori Casual](./docs/characters/sayori_casual.png) | ![Sayori School](./docs/characters/sayori_school.png) | ![Sayori Snug](./docs/characters/sayori_snug.png) |
+| **Natsuki** | ![Natsuki Classic](./docs/characters/natsuki_classic.png) | ![Natsuki Casual](./docs/characters/natsuki_casual.png) | ![Natsuki School](./docs/characters/natsuki_school.png) | ![Natsuki Snug](./docs/characters/natsuki_snug.png) |
+| **Yuri** | ![Yuri Classic](./docs/characters/yuri_classic.png) | ![Yuri Casual](./docs/characters/yuri_casual.png) | ![Yuri School](./docs/characters/yuri_school.png) | ![Yuri Snug](./docs/characters/yuri_snug.png) |
 
 ---
 
 ## Core Architecture and Features
 
-### 1. Real-Time Native C++ FFT Engine
-- **Direct PCM Pipeline Integration**: Audio buffers are intercepted directly from the player software decoder pipeline via `SonoraAudioProcessor` and dispatched to the native C++ engine (`ddmc_fft.cpp`).
+### 1. Cavifax / Chris Chan / Aimep3 / Bagresuko Suite
+- **Cavifax Audio & Widget Engine (`CavifaxAudioProcessor`, `CavifaxWidgetProvider`, `CavifaxStore`)**: Direct PCM audio processor, custom-rendered glassmorphic home screen widget with true rounded corners, ambient equalizer wave bars, and interactive 3D Doki companion (`ACTION_DOKI_TAP`).
+- **Chris Chan Suite (`ChrisChanSuite`, `ChrisChanEqualizerBuilder`, `ChrisChanImporter`)**: Multi-band equalizer, backup/playlist importer, queue sheet, sleep timer, and speed/pitch controls.
+- **Aimep3 Modals (`Aimep3Modals`)**: Track lyrics, metadata editor, and audio analysis modals.
+- **Bagresuko Engine (`BagresukoEngine`, `BagresukoSettingsBuilder`)**: Lossless library tools, high-resolution audio scanner, and studio settings.
+
+### 2. Real-Time Native C++ FFT Engine
+- **Direct PCM Pipeline Integration**: Audio buffers are intercepted directly from the player software decoder pipeline via `CavifaxAudioProcessor` and dispatched to the native C++ engine (`ddmc_fft.cpp`).
 - **Zero OS Visualizer Dependency**: Bypasses Android OS `android.media.audiofx.Visualizer` limitations, hardware DSP offload silences, and audio record permission restrictions.
 - **Cooley-Tukey Radix-2 FFT**: Thread-safe spectral processing with Hann windowing, 44 logarithmic frequency bins, dynamic attack/decay smoothing, and floating peak caps with gravity physics.
 - **Real-Time Oscilloscope**: Continuous 128-sample raw PCM waveform extraction directly feeding dual neon wave renderers.
 
-### 2. 10 High-Precision Audio Visualizer Modes
+### 3. 10 High-Precision Audio Visualizer Modes
 1. **Mirror Spectrum Pro**: Dual-sided logarithmic frequency spectrum with floating peak pills and gravity decay.
 2. **Dual Neon Oscilloscope**: Real-time cubic spline interpolated waveform renderer.
 3. **Radial 360 Pulse**: Circular pulse visualizer with beat-reactive radius modulation and sub-bass resonance.
@@ -99,55 +99,12 @@ All 6 companions include 3D rigged meshes generated from their cleaned sprites v
 9. **Vortex Tunnel 3D**: Infinite depth perspective tunnel modulated by bass energy.
 10. **Liquid Aurora**: Flowing organic fluid ribbons with harmonic frequency dispersion.
 
-### 3. Adaptive Stage Layout and Background Controls
-- **Background Engine**:
-  - **Material Solid**: Pure black AMOLED or deep slate tone for maximum battery efficiency.
-  - **Album Cover with Real-Time Gaussian Blur**: Dynamic backdrop derived from track artwork with live blur radius and opacity sliders.
-- **Floating Artwork Card**: Centered square album art with smooth 24dp rounded corners and elevation shadows.
-- **Landscape Layout Flexibility**:
-  - Visualizer can be positioned as a dedicated side column (Left or Right) or docked (Bottom, Center, Top).
-  - Eliminates overlap between radial/circular visualizers and the album art card in horizontal tablet and landscape phone orientations.
-
-### 4. Doki Doki Companion Engine (2D & 3D Blender 5.2)
-- **Characters**: Natsuki, Sayori, Yuri, Monika, Bocchi, and Konata.
-- **3D Blender 5.2 Mode (`Modo 3D (Blender)`)**: Volumetric 3D rigged meshes generated via `uv` and headless Blender 5.2 (`scripts/build_3d_characters.py` and `scripts/blender_rig_and_render.py`) with 5 interactive 3D skeletal movements (`Idle 3D`, `Caminar 3D`, `Bailar 3D`, `Saltar 3D`, `Acción 3D`) and exported `.glb` models in `docs/models3d/`.
-- **Clean Cutouts & Feathering**: Zero sticker borders on Chibi sprites and smooth cosine bottom feathering on HD `.webp` sprites.
-- **Beat and Kinetic Physics**: Companions jump, dance, and celebrate in sync with real bass beat drops detected in C++.
-- **Stage Layering**: Companions anchor cleanly at the bottom of the stage in front of the cover card and waveform.
-
-### 5. Sound DSP Engines (Offline, Zero Cloud)
+### 4. Sound DSP Engines (Offline, Zero Cloud)
 - **Doomentio Audio Engine**: Software mono downmix, stereo balance pan, and independent digital gain per track.
 - **Cavifax Bass Booster**: 1st-order IIR low-pass filter with 150Hz cutoff frequency boost tailored for mobile and high-fidelity headphones.
 - **Dante Studio Equalizer**: Multi-band graphic equalizer with high-precision Q factor controls.
 - **Skiso Virtualizer & Reverb**: Spatial audio widening and room acoustics simulation.
-- **Jerry Engine Pro**: Dynamic loudness compensation and anti-clipping limiter.
-
-### 6. Product Flavors: Standard vs Troll Edition
-The project is organized into two Gradle product flavors under the `edition` dimension:
-- **`standard`**: `applicationId = "com.sonora.music"`, clean production interface.
-- **`troll`**: `applicationIdSuffix = ".troll"`, integrates `FakePaywall.kt` which comically intercepts playback actions (play/pause, skip, shuffle, favorite, equalizer) with parody paywall tiers (Plan Ario Honorario, Plan Oveja Plus, Plan Jerry Engine Pro), NostraCoins button, simulated 30-second ad countdown, and poverty bypass button.
-
-### 7. Hardware Optimization Engine (Potato to Ultra)
-- **Potato Mode (30 FPS)**: Halves FFT calculations (22 bands), enforces 16-bit RGB_565 bitmap decoding to cut memory footprint by 50%, throttles particle spawning, and caps rendering to 30 FPS for budget/older devices.
-- **Balanced Mode (60 FPS)**: Standard high-fidelity smooth rendering.
-- **Ultra Mode (120 FPS)**: Uncapped high-refresh rate mode for flagship screens.
-
-### 8. Dynamic Per-Track Video Covers
-- Plays looped MP4 and GIF video covers per individual track or globally.
-- Dynamic matrix center-crop scaling eliminates black bars across vertical 9:16, 16:9, 4:3, and 1:1 aspect ratios.
-- Internal storage isolation ensures smooth playback without Scoped Storage permission timeouts.
-
-### 9. Automatic In-App OTA Self-Updater
-- Checks for new releases and updates directly from the GitHub repository on application startup.
-- Downloads the latest package in the background and prompts the Android package installer for one-tap updates without requiring a PC or ADB connection.
-
-### 10. Standalone C/C++ Desktop Engine (`ddmc_cpp`)
-- Independent, high-performance C/C++ desktop version:
-  - Powered by `miniaudio.h` (single-header C, zero third-party library dependencies).
-  - Cooley-Tukey Radix-2 FFT analyzer with Hann windowing.
-  - Synced LRC lyric reader.
-  - ANSI TrueColor terminal renderer with non-flickering double buffering.
-  - Uses less than 10 MB RAM and zero garbage collection overhead.
+- **Jerry Engine Pro**: Dynamic loudness compensation, anti-clipping limiter, and OTA self-updater.
 
 ---
 
@@ -167,40 +124,10 @@ Clone the repository and enter the Android project root:
 cd android_app
 ```
 
-#### Build Standard Edition (Clean):
+#### Build APK:
 ```bash
 ./gradlew assembleStandardDebug
 # Output: android_app/app/build/outputs/apk/standard/debug/app-standard-debug.apk
-```
-
-#### Build Troll Edition (Satirical Paywall):
-```bash
-./gradlew assembleTrollDebug
-# Output: android_app/app/build/outputs/apk/troll/debug/app-troll-debug.apk
-```
-
-#### Build Both Simultaneously:
-```bash
-./gradlew assembleStandardDebug assembleTrollDebug
-```
-
-### C/C++ Desktop Engine
-
-Requirements: C++17 compiler (GCC, Clang, or MSVC) and CMake.
-
-```bash
-cd ddmc_cpp
-mkdir build
-cd build
-cmake ..
-cmake --build . --config Release
-```
-
-Or using Make on Linux / macOS:
-
-```bash
-cd ddmc_cpp
-make
 ```
 
 ---

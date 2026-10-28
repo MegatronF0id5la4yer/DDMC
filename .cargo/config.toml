@@ -2,5 +2,5 @@
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
 [alias]
-prof = "run --release --package sonora --features profiler"
+prof = "run --release --package cavifax --features profiler"
 prober = "run --package music --example lyrics-prober --"

@@ -70,7 +70,7 @@ pub(super) struct Look {
 /// Only what changed is read. The index holds every file's time, size and tags, and every
 /// folder's time, so a folder that has not been touched is listed from memory and the files in
 /// it are never opened. A folder's time moves when an entry is added, removed or renamed, so an
-/// edit in place hides from it: Sonora's own tag editor drops the file it wrote from the index,
+/// edit in place hides from it: Cavifax's own tag editor drops the file it wrote from the index,
 /// and the Rescan button drops every folder, which is what makes it thorough.
 pub fn scan(roots: &[PathBuf], cache_dir: &Path, index: &Index) -> Scanned {
     let started = std::time::Instant::now();
@@ -638,7 +638,7 @@ mod tests {
     #[test]
     fn ignores_non_audio_files() {
         let _scanning = alone();
-        let (dir, index) = scratch("sonora-scan-test-ignore");
+        let (dir, index) = scratch("cavifax-scan-test-ignore");
         touch(&dir.join("notes.txt"));
         let scanned = scan(std::slice::from_ref(&dir), &dir, &index);
         assert!(scanned.tracks.is_empty());
@@ -648,7 +648,7 @@ mod tests {
     #[test]
     fn empty_root_yields_nothing() {
         let _scanning = alone();
-        let (dir, index) = scratch("sonora-scan-test-missing");
+        let (dir, index) = scratch("cavifax-scan-test-missing");
         let scanned = scan(std::slice::from_ref(&dir), &dir, &index);
         assert!(scanned.tracks.is_empty());
         assert!(scanned.albums.is_empty());
@@ -669,7 +669,7 @@ mod tests {
     #[test]
     fn walks_nested_folders_for_stray_audio_files() {
         let _scanning = alone();
-        let (dir, _) = scratch("sonora-scan-test-stragglers");
+        let (dir, _) = scratch("cavifax-scan-test-stragglers");
         touch(&dir.join("top.mp3"));
         touch(&dir.join("a/b/c/deep.flac"));
         touch(&dir.join("a/b/c/notes.txt"));
@@ -706,7 +706,7 @@ mod tests {
     #[test]
     fn an_album_keeps_its_release_type_across_an_index_from_before_it() {
         let _scanning = alone();
-        let name = "sonora-scan-test-release-type";
+        let name = "cavifax-scan-test-release-type";
         let (dir, index) = scratch(name);
         let album = dir.join("Sylosis/The Path");
         fs::create_dir_all(&album).unwrap();

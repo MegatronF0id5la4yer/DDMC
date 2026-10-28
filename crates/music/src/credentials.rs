@@ -5,11 +5,11 @@ use anyhow::{Context as _, Result};
 /// The file every provider keeps its sign-in under, inside its own cache folder.
 pub(crate) const FILE: &str = "credentials.json";
 
-/// Sonora's cache root, `$XDG_CACHE_HOME/sonora`, falling back to the temp dir.
+/// Cavifax's cache root, `$XDG_CACHE_HOME/cavifax`, falling back to the temp dir.
 pub(crate) fn root() -> PathBuf {
     dirs::cache_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("sonora")
+        .join("cavifax")
 }
 
 /// A provider's own cache folder, named by its slug.

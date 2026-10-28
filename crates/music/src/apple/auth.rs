@@ -18,11 +18,11 @@ use crate::credentials;
 pub(crate) const PROOF: &[&str] = &["media-user-token"];
 
 /// An account token supplied by hand, for a headless run with no sign-in window.
-pub const USER_TOKEN_ENV: &str = "SONORA_APPLE_MEDIA_USER_TOKEN";
+pub const USER_TOKEN_ENV: &str = "CAVIFAX_APPLE_MEDIA_USER_TOKEN";
 
 /// A bearer token supplied by hand, which skips reading one off the page. Useful when Apple
 /// changes the page and the scrape below stops finding it.
-pub const BEARER_ENV: &str = "SONORA_APPLE_BEARER_TOKEN";
+pub const BEARER_ENV: &str = "CAVIFAX_APPLE_BEARER_TOKEN";
 
 /// What a browser calls itself. Apple's web endpoints answer a browser, and a bare reqwest
 /// agent gets a different page.

@@ -14,7 +14,7 @@ use crate::spectrum::{Spectrum, Tap};
 pub const RAMP: Duration = Duration::from_millis(25);
 const BUFFER: Duration = Duration::from_millis(50);
 
-/// The device stream every output in the process mixes into, so the sound server sees Sonora as
+/// The device stream every output in the process mixes into, so the sound server sees Cavifax as
 /// one client however many engines are running. It runs at the rate of whatever played last and
 /// closes when the last output on it drops.
 static SHARED: Mutex<Weak<Device>> = Mutex::new(Weak::new());
@@ -484,7 +484,7 @@ pub fn failing() -> bool {
     FAILING.load(Ordering::Acquire)
 }
 
-/// The sound server this session runs when ALSA has no plugin routing to it. Sonora then opens
+/// The sound server this session runs when ALSA has no plugin routing to it. Cavifax then opens
 /// the card the server already holds and plays nothing, which `pipewire-alsa` or
 /// `pulseaudio-alsa` fixes. Only ALSA's configuration is read, no device is opened.
 #[cfg(target_os = "linux")]

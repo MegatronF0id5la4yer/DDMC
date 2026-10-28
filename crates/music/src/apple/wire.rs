@@ -1,4 +1,4 @@
-//! Apple Music's JSON turned into Sonora's models.
+//! Apple Music's JSON turned into Cavifax's models.
 //!
 //! Every resource arrives in the same envelope: an `id`, a `type`, an `attributes` object and
 //! sometimes `relationships`. A library resource carries its own id (`i.`, `l.`, `r.`, `p.`)
@@ -1026,7 +1026,7 @@ pub fn library_artist(answer: &Answer<Search>, id: &str) -> Option<String> {
         .and_then(|row| row.id.as_str().map(str::to_owned))
 }
 
-/// The uri Sonora knows an Apple item by in the sidebar. It is Spotify-shaped on purpose: a
+/// The uri Cavifax knows an Apple item by in the sidebar. It is Spotify-shaped on purpose: a
 /// sidebar pin is built by taking what follows the last colon.
 pub fn pin_uri(kind: PinTargetKind, id: &str) -> Option<String> {
     let part = match kind {
@@ -1039,7 +1039,7 @@ pub fn pin_uri(kind: PinTargetKind, id: &str) -> Option<String> {
 }
 
 /// One library album, artist or playlist as an unpinned pin target, read with `catalog` as the
-/// catalog item behind it. An album or artist needs that item, whose id is the one Sonora opens.
+/// catalog item behind it. An album or artist needs that item, whose id is the one Cavifax opens.
 fn pin_target(value: &Resource, catalog: Option<&Resource>, owner: &str) -> Option<PinTarget> {
     let kind = value.kind.as_str()?;
     let attributes = value.attributes.as_ref()?;

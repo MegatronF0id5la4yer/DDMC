@@ -124,7 +124,7 @@ def wanted(slot):
 def fetch(prefix, names):
     query = urllib.parse.urlencode({"icons": ",".join(sorted(set(names)))})
     ask = urllib.request.Request(
-        f"{API}/{prefix}.json?{query}", headers={"User-Agent": "sonora-fetch-icons"}
+        f"{API}/{prefix}.json?{query}", headers={"User-Agent": "cavifax-fetch-icons"}
     )
     with urllib.request.urlopen(ask, timeout=60) as answer:
         return json.load(answer)

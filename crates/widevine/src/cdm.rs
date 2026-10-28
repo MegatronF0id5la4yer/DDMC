@@ -1,7 +1,7 @@
 //! The system CDM, hosted in a helper process the way a browser runs its CDM in a utility
 //! process.
 //!
-//! The module never maps into the app. [`Cdm::open`] starts the Sonora executable again as the
+//! The module never maps into the app. [`Cdm::open`] starts the Cavifax executable again as the
 //! host in [`crate::host`] and talks to it over its stdin and stdout, and every [`Cdm`] is a
 //! lease on that one process. There is one host at a time, every call to it is serialized, and
 //! its session accumulates content keys rather than replacing them, so more than one track can
@@ -303,7 +303,7 @@ mod host {
                 .map_err(|message| anyhow!(message))?;
             if version != wire::VERSION.as_bytes() {
                 bail!(
-                    "the cdm host is version {}, not {}, so sonora was replaced while running",
+                    "the cdm host is version {}, not {}, so cavifax was replaced while running",
                     String::from_utf8_lossy(&version),
                     wire::VERSION
                 );
@@ -519,7 +519,7 @@ mod host {
     /// replaced under the app is caught by the version in the host's first answer.
     #[cfg(not(target_os = "linux"))]
     fn executable() -> Result<PathBuf> {
-        std::env::current_exe().context("cannot find the sonora executable")
+        std::env::current_exe().context("cannot find the cavifax executable")
     }
 
     /// Waits for a host whose stdin has closed to exit, and kills it if it does not.

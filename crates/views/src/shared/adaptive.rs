@@ -1,5 +1,5 @@
 use gpui::{App, Context, Entity, Task};
-use state::{AppSettings, Playback, Queue, Reloaded, Sonora};
+use state::{AppSettings, Playback, Queue, Reloaded, Cavifax};
 use ui::{ActiveTheme as _, CoverPalette, Look, Theme, ThemeKind};
 
 /// Drives the theme's tint from the playing track's cover, and keeps the next
@@ -34,8 +34,8 @@ struct Ahead {
 
 impl Adaptive {
     pub fn new(playback: Entity<Playback>, cx: &mut Context<Self>) -> Self {
-        let sonora = Sonora::global(cx);
-        let (queue, settings) = (sonora.queue.clone(), sonora.settings.clone());
+        let cavifax = Cavifax::global(cx);
+        let (queue, settings) = (cavifax.queue.clone(), cavifax.settings.clone());
         cx.observe(&playback, |this, _, cx| this.sync(false, cx))
             .detach();
         cx.observe(&settings, |this, _, cx| this.sync(false, cx))
@@ -153,7 +153,7 @@ impl Adaptive {
         self.worn = Some(kind);
         self.painted = palette;
 
-        let settings = Sonora::global(cx).settings.clone();
+        let settings = Cavifax::global(cx).settings.clone();
         let (look, overrides) = {
             let settings = settings.read(cx);
             (

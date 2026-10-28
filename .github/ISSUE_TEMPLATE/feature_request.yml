@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest something Sonora should do
+description: Suggest something Cavifax should do
 labels: [enhancement, needs triage]
 
 body:
@@ -7,7 +7,7 @@ body:
     id: problem
     attributes:
       label: The problem
-      description: What you are trying to do today and where Sonora gets in the way.
+      description: What you are trying to do today and where Cavifax gets in the way.
     validations:
       required: true
 

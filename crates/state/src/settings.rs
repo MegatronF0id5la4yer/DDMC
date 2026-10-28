@@ -32,7 +32,7 @@ use ui::{
 
 use crate::pins::PinSort;
 use crate::queue::{Resume, gap_target};
-use crate::{Outcome, Repeat, Sonora, Toasts};
+use crate::{Outcome, Repeat, Cavifax, Toasts};
 
 /// Which panel the right sidebar shows.
 /// What the Discord status calls itself. `Provider` asks the provider the track came from, so
@@ -42,7 +42,7 @@ use crate::{Outcome, Repeat, Sonora, Toasts};
 #[serde(rename_all = "kebab-case")]
 pub enum DiscordName {
     #[default]
-    Sonora,
+    Cavifax,
     Provider,
     Music,
     Title,
@@ -52,7 +52,7 @@ pub enum DiscordName {
 
 impl DiscordName {
     pub const ALL: [Self; 6] = [
-        Self::Sonora,
+        Self::Cavifax,
         Self::Provider,
         Self::Music,
         Self::Title,
@@ -62,7 +62,7 @@ impl DiscordName {
 
     pub fn id(self) -> &'static str {
         match self {
-            Self::Sonora => "sonora",
+            Self::Cavifax => "cavifax",
             Self::Provider => "provider",
             Self::Music => "music",
             Self::Title => "title",
@@ -73,7 +73,7 @@ impl DiscordName {
 
     pub fn key(self) -> &'static str {
         match self {
-            Self::Sonora => "settings-discord-name-sonora",
+            Self::Cavifax => "settings-discord-name-cavifax",
             Self::Provider => "settings-discord-name-provider",
             Self::Music => "settings-discord-name-music",
             Self::Title => "settings-discord-name-title",
@@ -285,7 +285,7 @@ struct Values {
     discord_show_paused: bool,
     discord_badge: bool,
     discord_without_details: bool,
-    discord_sonora_button: bool,
+    discord_cavifax_button: bool,
     discord_provider_button: bool,
     artwork_for_local_files: bool,
     lyrics_for_local_files: bool,
@@ -437,11 +437,11 @@ impl Default for Values {
             equalizer_bands: vec![0.; equalizer::BANDS],
             sleep_timer: false,
             discord_presence: false,
-            discord_name: DiscordName::Sonora,
+            discord_name: DiscordName::Cavifax,
             discord_show_paused: false,
             discord_badge: false,
             discord_without_details: false,
-            discord_sonora_button: true,
+            discord_cavifax_button: true,
             discord_provider_button: true,
             artwork_for_local_files: true,
             lyrics_for_local_files: true,
@@ -796,9 +796,9 @@ impl AppSettings {
         self.values.discord_without_details
     }
 
-    /// Whether the Discord status carries a button that opens the Sonora project page.
-    pub fn discord_sonora_button(&self) -> bool {
-        self.values.discord_sonora_button
+    /// Whether the Discord status carries a button that opens the Cavifax project page.
+    pub fn discord_cavifax_button(&self) -> bool {
+        self.values.discord_cavifax_button
     }
 
     /// Whether the Discord status carries a button that opens the track on its provider.
@@ -994,7 +994,7 @@ impl AppSettings {
         }
     }
 
-    /// Whether the visualizer ignores Sonora's volume and draws the track at its own level.
+    /// Whether the visualizer ignores Cavifax's volume and draws the track at its own level.
     pub fn visualizer_absolute(&self) -> bool {
         self.values.appearance.visualizer_absolute
     }
@@ -1200,8 +1200,8 @@ impl AppSettings {
         self.schedule_save(cx);
     }
 
-    pub fn set_discord_sonora_button(&mut self, enabled: bool, cx: &mut Context<Self>) {
-        self.values.discord_sonora_button = enabled;
+    pub fn set_discord_cavifax_button(&mut self, enabled: bool, cx: &mut Context<Self>) {
+        self.values.discord_cavifax_button = enabled;
         self.schedule_save(cx);
     }
 
@@ -2090,7 +2090,7 @@ impl AppSettings {
 
 /// The saved window frame and its display, if its centre still lands on a connected display.
 pub fn window_placement(least: Size<Pixels>, cx: &App) -> Option<(WindowBounds, DisplayId)> {
-    let frame = Sonora::global(cx).settings.read(cx).state.window?;
+    let frame = Cavifax::global(cx).settings.read(cx).state.window?;
     if !frame.sane() {
         return None;
     }
@@ -2105,7 +2105,7 @@ pub fn window_placement(least: Size<Pixels>, cx: &App) -> Option<(WindowBounds, 
 
 /// Starts saving the window frame for the next launch.
 pub fn remember_window(window: &mut Window, cx: &mut App) {
-    let settings = Sonora::global(cx).settings.clone();
+    let settings = Cavifax::global(cx).settings.clone();
     settings.update(cx, |settings, cx| settings.watch_window(window, cx));
 }
 
@@ -2387,7 +2387,7 @@ fn absolute_path(path: &Path) -> PathBuf {
 fn settings_path() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("sonora")
+        .join("cavifax")
         .join("settings.json")
 }
 
@@ -2585,7 +2585,7 @@ mod tests {
     fn scratch(name: &str) -> PathBuf {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         std::env::temp_dir().join(format!(
-            "sonora-{name}-{}-{}",
+            "cavifax-{name}-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ))

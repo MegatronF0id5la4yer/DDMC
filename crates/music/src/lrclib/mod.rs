@@ -10,9 +10,9 @@ use crate::{Lyrics, LyricsHit, LyricsLine, LyricsProvider, LyricsQuery, LyricsWo
 const SOURCE: &str = "LrcLib";
 const ENDPOINT: &str = "https://lrclib.net/api/search";
 const AGENT: &str = concat!(
-    "sonora/",
+    "cavifax/",
     env!("CARGO_PKG_VERSION"),
-    " (https://github.com/sonorahq/sonora)"
+    " (https://github.com/cavifaxhq/cavifax)"
 );
 
 pub struct LrcLib {

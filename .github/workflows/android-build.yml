@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-apk:
-    name: Build Sonora Android APK
+    name: Build Cavifax Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -27,16 +27,16 @@ jobs:
           channel: 'stable'
 
       - name: Install Dependencies
-        working-directory: sonora_mobile
+        working-directory: cavifax_mobile
         run: flutter pub get
 
       - name: Build Release APK
-        working-directory: sonora_mobile
+        working-directory: cavifax_mobile
         run: flutter build apk --release
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sonora-android-release
-          path: sonora_mobile/build/app/outputs/flutter-apk/app-release.apk
+          name: cavifax-android-release
+          path: cavifax_mobile/build/app/outputs/flutter-apk/app-release.apk
 

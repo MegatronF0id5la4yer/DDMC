@@ -1,6 +1,6 @@
 //! Where the CDM comes from.
 //!
-//! A copy the user pointed at comes first, then the one Sonora fetched from Google into its own
+//! A copy the user pointed at comes first, then the one Cavifax fetched from Google into its own
 //! store, then a copy a browser on the machine already has. The store only holds a module the
 //! user accepted Google's terms for, so it outranks a browser's copy, which can be one the
 //! host cannot open.
@@ -13,7 +13,7 @@
 //! browser installed where no fixed path predicts: on NixOS the bundled module sits in the Nix
 //! store rather than under `/opt`. A Firefox-family browser names its profiles in
 //! `profiles.ini` and the version it unpacked in that profile's `prefs.js`. The one folder
-//! Sonora reads is its own store, which it wrote itself.
+//! Cavifax reads is its own store, which it wrote itself.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
@@ -49,11 +49,11 @@ pub(crate) const ARCH: &str = "";
 /// How a CDM was come by.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Origin {
-    /// Named by `SONORA_WIDEVINE_CDM`.
+    /// Named by `CAVIFAX_WIDEVINE_CDM`.
     Configured,
     /// A copy a browser on this machine already had.
     Installed,
-    /// Fetched from Google's update service into Sonora's own store.
+    /// Fetched from Google's update service into Cavifax's own store.
     Fetched,
 }
 
@@ -112,7 +112,7 @@ pub(crate) fn remember(found: Found) -> Found {
 }
 
 /// Settles on a module the user just installed, in place of a browser's copy the process
-/// settled on before. A module named by `SONORA_WIDEVINE_CDM` or an earlier one from the store
+/// settled on before. A module named by `CAVIFAX_WIDEVINE_CDM` or an earlier one from the store
 /// stays settled, as [`remember`] keeps it.
 pub(crate) fn prefer(found: Found) -> Found {
     let mut settled = settled();
@@ -122,7 +122,7 @@ pub(crate) fn prefer(found: Found) -> Found {
     }
 }
 
-/// Removes every module Sonora fetched from Google, store folder and all, and forgets the one
+/// Removes every module Cavifax fetched from Google, store folder and all, and forgets the one
 /// the process settled on so the next search starts over. A CDM already open stays open until
 /// the process ends: the file is unlinked, not unloaded.
 pub fn uninstall() -> Result<()> {
@@ -158,14 +158,14 @@ fn search() -> Option<Found> {
     })
 }
 
-/// The path `SONORA_WIDEVINE_CDM` names, if it names a file that is there.
+/// The path `CAVIFAX_WIDEVINE_CDM` names, if it names a file that is there.
 pub fn configured() -> Option<PathBuf> {
     let path = PathBuf::from(std::env::var_os(CDM_PATH)?);
     path.is_file().then_some(path)
 }
 
 /// The CDM a browser on this machine has, looked for in the order of [`places`]: the first
-/// place holding one answers. Nothing when `SONORA_WIDEVINE_SKIP_BROWSERS` is set.
+/// place holding one answers. Nothing when `CAVIFAX_WIDEVINE_SKIP_BROWSERS` is set.
 pub fn installed() -> Option<PathBuf> {
     if std::env::var_os(SKIP_BROWSERS).is_some_and(|value| !value.is_empty()) {
         log::debug!("widevine: skipping the browser search as asked");
@@ -225,16 +225,16 @@ fn gmp(profile: &Path) -> Option<PathBuf> {
     path.is_file().then_some(path)
 }
 
-/// Sonora's own folder for the module, `$XDG_CACHE_HOME/sonora/widevine`, holding one
+/// Cavifax's own folder for the module, `$XDG_CACHE_HOME/cavifax/widevine`, holding one
 /// subfolder per version fetched.
 pub fn store() -> PathBuf {
     dirs::cache_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("sonora")
+        .join("cavifax")
         .join("widevine")
 }
 
-/// The module of the newest version in the store. Sonora wrote every folder read here.
+/// The module of the newest version in the store. Cavifax wrote every folder read here.
 pub fn stored() -> Option<PathBuf> {
     std::fs::read_dir(store())
         .ok()?

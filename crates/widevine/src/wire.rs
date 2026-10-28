@@ -1,4 +1,4 @@
-//! The framing between Sonora and its CDM host process, over the host's stdin and stdout.
+//! The framing between Cavifax and its CDM host process, over the host's stdin and stdout.
 //!
 //! A request is an op byte, a little-endian `u32` payload length and the payload. An answer is
 //! a status byte, a length and a payload, and a failure carries its message as UTF-8. The host

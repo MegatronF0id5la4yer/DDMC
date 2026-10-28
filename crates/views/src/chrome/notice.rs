@@ -8,13 +8,13 @@ use gpui::{
 };
 use i18n::t;
 use music::SoundServer;
-use state::{AppSettings, Requirement, Requirements, Sonora, UpdateState, Updates};
+use state::{AppSettings, Requirement, Requirements, Cavifax, UpdateState, Updates};
 use ui::{ActiveTheme as _, Button, SMALL_INSET, Text};
 
 const ICON: Pixels = px(18.);
 const REACH: Pixels = px(340.);
-/// Where the README says what to install alongside Sonora.
-const INSTALL: &str = "https://github.com/sonorahq/sonora#linux";
+/// Where the README says what to install alongside Cavifax.
+const INSTALL: &str = "https://github.com/cavifaxhq/cavifax#linux";
 
 type Handler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
@@ -41,10 +41,10 @@ struct Card {
 
 impl AppNotice {
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let sonora = Sonora::global(cx);
-        let updates = sonora.updates.clone();
-        let requirements = sonora.requirements.clone();
-        let settings = sonora.settings.clone();
+        let cavifax = Cavifax::global(cx);
+        let updates = cavifax.updates.clone();
+        let requirements = cavifax.requirements.clone();
+        let settings = cavifax.settings.clone();
         cx.observe(&updates, |_, _, cx| cx.notify()).detach();
         cx.observe(&requirements, |_, _, cx| cx.notify()).detach();
         Self {

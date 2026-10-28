@@ -47,7 +47,7 @@ impl Scan {
     }
 
     pub fn global(cx: &App) -> Entity<Self> {
-        crate::Sonora::global(cx).scan.clone()
+        crate::Cavifax::global(cx).scan.clone()
     }
 
     /// The scan running right now, if one is.

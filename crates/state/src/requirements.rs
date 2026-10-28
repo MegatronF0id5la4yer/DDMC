@@ -1,4 +1,4 @@
-//! What the system around Sonora is missing for it to work fully: the ALSA plugin into the sound
+//! What the system around Cavifax is missing for it to work fully: the ALSA plugin into the sound
 //! server, an output device that opens, the browser engine for cookie sign-ins. Each is found
 //! here and drawn as a card by `views`, which can put it away for the run or for good.
 

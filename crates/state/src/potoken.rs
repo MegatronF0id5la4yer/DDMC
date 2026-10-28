@@ -21,7 +21,7 @@ const PAGE: &str = "https://www.youtube.com/";
 const LANDING: &str = "www.youtube.com";
 const DOMAIN: &str = "youtube.com";
 /// The cookie the page leaves its answer in.
-const COOKIE: &str = "SONORA_POT";
+const COOKIE: &str = "CAVIFAX_POT";
 /// What the page prefixes a failure with. A token is base64url and never starts with one.
 const FAILED: char = '!';
 /// How often the entity looks for an ask and polls a window it has open.

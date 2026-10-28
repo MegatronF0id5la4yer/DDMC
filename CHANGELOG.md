@@ -16,14 +16,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 - **Doki Cutout & Sticker Border Cleanup (`scripts/clean_all_doki_cutouts.py`)**: Removed baked-in white paper sticker borders and grey outer shadow rings from all Chibi sprites, replaced solid-background classic drawables with clean transparent cutouts, rebuilt `Konata/guitar1..3.png` without face-obscuring artifacts, and re-extracted all HD `school`/`casual` cutouts with zero hair clipping and smooth cosine bottom feathering.
-- **Stage Companion Layering & Avatar Centering (`MainActivity.kt`, `DdscEngine.kt`)**: Anchored `dokiSpriteView` to the bottom of the stage in front of the cover card (preventing mid-air thigh cuts behind the cover), centered circular face avatars on the upper head centroid (fixing off-center Monika ponytail crops), and unified `"sonora_prefs"` persistence.
+- **Stage Companion Layering & Avatar Centering (`MainActivity.kt`, `DdscEngine.kt`)**: Anchored `dokiSpriteView` to the bottom of the stage in front of the cover card (preventing mid-air thigh cuts behind the cover), centered circular face avatars on the upper head centroid (fixing off-center Monika ponytail crops), and unified `"cavifax_prefs"` persistence.
 
 ## [2.0.5] - 2026-10-23
 
 ### Added
-- Real-time native C++ FFT audio engine sync: raw PCM decoded samples are intercepted in `SonoraAudioProcessor` and fed into `ddmc_fft.cpp` Cooley-Tukey Radix-2 FFT with Hann windowing and concurrency protection.
+- Real-time native C++ FFT audio engine sync: raw PCM decoded samples are intercepted in `CavifaxAudioProcessor` and fed into `ddmc_fft.cpp` Cooley-Tukey Radix-2 FFT with Hann windowing and concurrency protection.
 - Eliminated dependency on Android OS `Visualizer` session and microphone permissions; visualizers now react 100% to live playback frequencies without artificial sine-wave simulation fallback.
-- Product flavor architecture: `standard` (`com.sonora.music`) and `troll` (`com.sonora.music.troll`) allowing side-by-side installation.
+- Product flavor architecture: `standard` (`com.cavifax.bagresuko`) and `troll` (`com.cavifax.bagresuko.troll`) allowing side-by-side installation.
 - Troll Edition with comic micro-paywall dialogs (`FakePaywall.kt`) referencing Doomentio, NostraCoins, Oveja Plus, and Jerry Engine Pro.
 - Adaptive stage background modes: Material Solid (AMOLED / Deep) and real-time Gaussian blurred album art with dynamic opacity control.
 - Landscape visualizer column docking (left, right, center, bottom, top) preventing radial pulse visualizers from being obscured by album art.
@@ -55,9 +55,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   small on a big screen. Small windows keep the size they had.
 - On Windows, the minimize, maximize, restore and close buttons now use Windows' own icons, so
   they match other Windows apps.
-- Sonora uses less memory while your Apple Music library loads at startup, and it no longer
+- Cavifax uses less memory while your Apple Music library loads at startup, and it no longer
   frees memory in the background every few seconds to stay small.
-- On Linux, Sonora tells you when it cannot be heard because pipewire-alsa or pulseaudio-alsa
+- On Linux, Cavifax tells you when it cannot be heard because pipewire-alsa or pulseaudio-alsa
   is missing, or when browser sign-in needs webkit2gtk-4.1, and names what to install.
 - Every notice in the corner, the update one included, has a Don't show again button. On the
   update notice it turns off Check for updates.
@@ -84,7 +84,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Signing in to Spotify on Windows on ARM no longer fails with "Spotify turned down the
   sign-in".
 - Spotify and Deezer accounts now show profile picture in Settings instead of initials.
-- Spotify playlists that someone else owns but lets you edit can now be edited in Sonora, so
+- Spotify playlists that someone else owns but lets you edit can now be edited in Cavifax, so
   you can add and remove their songs.
 - A song no longer gets stuck on plain lyrics because a lyrics source was down the first time
   it played. Sources that failed are asked again on the next play, and turning a source off
@@ -101,14 +101,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Sonora no longer freezes for a moment every second when your audio output cannot be opened.
+- Cavifax no longer freezes for a moment every second when your audio output cannot be opened.
   It waits quietly and picks the output up as soon as it works.
 - The queue's "From" line and the pause button on album, playlist and artist cards and pins now
   follow the track that is playing, so an album you queue after another one shows as the source
   once it starts. When radio takes over, the queue names the song the radio comes from.
 - On macOS, the title bar double-click action now follows System Settings instead of always zooming,
   and no longer fires when you double-click a button.
-- YouTube Music tracks no longer skip to the next song at 1:04 when they start before Sonora
+- YouTube Music tracks no longer skip to the next song at 1:04 when they start before Cavifax
   has its YouTube token ready.
 - Fullscreen shows a local song's own embedded cover instead of the cover of another song
   from the same album.
@@ -129,7 +129,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Wide blurs behind menus, lyrics and the fullscreen view look smoother and cost less to draw.
 - Opening and closing fullscreen now animates in the same way as switching between pages,
   instead of cutting straight to the new view.
-- Sonora uses about a third of the memory it did. On Linux it settles around 110 MiB instead of
+- Cavifax uses about a third of the memory it did. On Linux it settles around 110 MiB instead of
   400 MiB.
 
 ### Fixed
@@ -149,14 +149,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Sonora speaks Czech. Pick it in Language settings.
+- Cavifax speaks Czech. Pick it in Language settings.
 - Hovering a theme you cannot pick while the adaptive theme is on says why it is unavailable. The
   note appears as soon as you point at the theme and moves with the cursor.
 - In guest mode, Show on startup greys out Songs, Albums, Artists and Playlists, which stay empty
   without an account, and says why when you hover them.
 - Fullscreen opens on the tab you left it on, whether artwork, lyrics or queue, even after a
   restart.
-- On Windows, Sonora shows up in Settings > Apps > Default apps, so you can make it the default
+- On Windows, Cavifax shows up in Settings > Apps > Default apps, so you can make it the default
   player for your audio files and for spotify: links.
 
 ### Changed
@@ -164,14 +164,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The French translation is complete, so no screen falls back to English any more.
 - YouTube Music tracks start playing as soon as the first seconds arrive, instead of after the
   whole song has downloaded, so a slow connection no longer means a long wait before each song.
-- Once the current track has finished downloading, Sonora starts downloading the next one in the
+- Once the current track has finished downloading, Cavifax starts downloading the next one in the
   queue, so skipping ahead or moving on to the next song starts at once.
 
 ### Fixed
 
 - The local Songs page is titled Songs during the first library scan, rather than Favorites.
 - Pressing play after a long pause no longer jumps to the next track a moment later. After a pause
-  of five minutes or more, Sonora reloads the track where you left it.
+  of five minutes or more, Cavifax reloads the track where you left it.
 - Settings and custom theme files saved on Windows with a byte order mark, as Notepad and
   PowerShell can save them, now load instead of being reported as broken.
 - The Flatpak now offers the browser sign-in for YouTube, Apple Music and Deezer, and gets YouTube
@@ -182,7 +182,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Narrowing the window with both sidebars open no longer brings the left sidebar back once the right
   one hides. The left one folds away first and stays folded until the window is wide again.
 - Tracks you added to the queue no longer appear twice in it when you turn shuffle on or off after
-  restarting Sonora.
+  restarting Cavifax.
 - Opening an audio file from your file manager plays it at once, even while the local library is
   still scanning, instead of waiting for the scan to finish.
 
@@ -190,12 +190,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Custom color themes can live as separate JSON files in the config themes folder. Sonora lists them
+- Custom color themes can live as separate JSON files in the config themes folder. Cavifax lists them
   in Appearance settings and picks up edits, additions, and deletions without a restart.
 - Recently played now shows what you played on your other devices, such as your phone, read
-  from your Apple Music account. It refreshes each time you bring Sonora back to the front,
+  from your Apple Music account. It refreshes each time you bring Cavifax back to the front,
   rather than only after a restart.
-- Plays you start in Sonora now reach Apple Music's recently played on your other devices.
+- Plays you start in Cavifax now reach Apple Music's recently played on your other devices.
 - On Apple Music, Quick picks on Home open on the albums, playlists and songs you played last on
   any device, the same way they do for Spotify and YouTube Music. An album you played a single
   song from shows as that song.
@@ -205,7 +205,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The Spotify home page is now Spotify's own home feed rather than rows of mixes. Quick picks
   open on the albums, playlists and artists you played lately, and shelves such as Jump back in,
   Your favorite artists and Recommended for today follow.
-- When the queue runs out with repeat and radio off, Sonora goes back to its first track and waits
+- When the queue runs out with repeat and radio off, Cavifax goes back to its first track and waits
   paused, so pressing play starts the queue over.
 - Albums in Quick picks say whether they are an album, EP or single, the way songs and playlists
   already say what they are.
@@ -216,11 +216,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Pausing while a track fails to load now keeps playback paused. Sonora used to skip to the next
+- Pausing while a track fails to load now keeps playback paused. Cavifax used to skip to the next
   track and start playing it anyway.
-- Sonora stops after three tracks in a row fail to play and waits for you to press play, instead of
+- Cavifax stops after three tracks in a row fail to play and waits for you to press play, instead of
   skipping through the whole queue when the connection drops.
-- When Spotify rate-limits you for skipping through tracks quickly, Sonora says so and tries the
+- When Spotify rate-limits you for skipping through tracks quickly, Cavifax says so and tries the
   same track again after a short wait, instead of hanging for ten seconds and skipping it.
 - Album pages now say whether a release is an album, EP, single or compilation, instead of calling
   everything an album. Subsonic servers and local files that tag the release type are labelled the
@@ -231,7 +231,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   you have set one up, rather than only "Apple Music" and your country.
 - Artist pages show the artist's biography from Apple Music, titles in italics and all,
   rather than placeholder text.
-- Songs you have favorited on Apple Music now show as loved in Sonora. They are read from
+- Songs you have favorited on Apple Music now show as loved in Cavifax. They are read from
   your ratings, the same way your favorite albums and artists are, rather than from the
   Favorite Songs playlist an account can be set up without.
 
@@ -239,7 +239,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- The visualizer can ignore Sonora's volume. Turn on Ignore volume under Fullscreen in
+- The visualizer can ignore Cavifax's volume. Turn on Ignore volume under Fullscreen in
   Appearance settings and the bars stay full height when you turn the music down.
 - Album pages now carry recommendations wherever the provider offers them: related
   releases and similar artists under Albums and Artists tabs, and Apple Music artists
@@ -247,12 +247,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Album pages print the release's copyright line or record label under the tracks, on
   Apple Music, Spotify, Deezer and OpenSubsonic servers that list one.
 - Album and playlist pages hold placeholder rows while their tracks load, as many as the
-  release has when Sonora already knows the count, so the page no longer jumps when they arrive.
+  release has when Cavifax already knows the count, so the page no longer jumps when they arrive.
 - An album's menu has Add to playlist, which puts the whole album into a playlist and skips
   the tracks it already holds.
-- On Linux the desktop media widget shows Sonora's icon and has shuffle and repeat buttons that
+- On Linux the desktop media widget shows Cavifax's icon and has shuffle and repeat buttons that
   stay in step with the player bar.
-- Sonora keeps the computer awake while music plays and if the fullscreen view is active, keeps
+- Cavifax keeps the computer awake while music plays and if the fullscreen view is active, keeps
   the screen on as well. This can be disabled in settings.
 - Navidrome and other Subsonic servers now see what you play. The server's now-playing list
   shows where you are in the track and whether it's paused, and play counts and recently played
@@ -277,10 +277,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Loud tracks no longer flatten the top of the visualizer wave.
 - Secondary text and table headers in the Dark and Light themes are easier to read, and now
   meet the WCAG AA contrast minimum, with or without the adaptive theme.
-- On Linux, playerctl and the desktop media widget read Sonora's real volume instead of always
+- On Linux, playerctl and the desktop media widget read Cavifax's real volume instead of always
   seeing 100%.
 - A YouTube Music sign-in no longer runs out after about 40 minutes. Likes and playlist edits keep
-  working, and Sonora stays signed in across restarts.
+  working, and Cavifax stays signed in across restarts.
 - An LRC `[offset:]` tag is applied to every line, so a sheet that starts a few hundred
   milliseconds late or early stays in time.
 - An untagged song named like `01. Title - Artist` keeps the title without the track number,
@@ -298,10 +298,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The Add to playlist menu has a search field at the top. Type to narrow the list, then use the
   arrow keys and Enter to pick a playlist.
-- Sonora picks up changes to `settings.json` while it runs, so a script that rewrites your theme
+- Cavifax picks up changes to `settings.json` while it runs, so a script that rewrites your theme
   colours from the wallpaper recolours the app right away, without a restart. If the file has
-  an error, Sonora tells you which line and saves nothing until it is fixed.
-- Sonora plays every track at its own sample rate rather than resampling it to the device
+  an error, Cavifax tells you which line and saves nothing until it is fixed.
+- Cavifax plays every track at its own sample rate rather than resampling it to the device
   default, so a 96 kHz FLAC leaves the app at 96 kHz. Moving between tracks of different rates
   leaves a short pause.
 - Normalize loudness now works for Apple Music, Deezer, local files, and Navidrome and other
@@ -314,7 +314,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Keep playing when closed is now called Keep running in the background. A new Show in the system
-  tray switch next to it hides the tray icon, or the menu bar item on macOS, whether or not Sonora
+  tray switch next to it hides the tray icon, or the menu bar item on macOS, whether or not Cavifax
   keeps running after its window closes. Settings > General > Window
 
 - An artist page opens as soon as their profile and popular tracks arrive, and fills its
@@ -339,20 +339,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ASCII, such as ö, instead of failing with a 400 error.
 - Playback comes back on its own after your only output device disappears and returns, so a
   Bluetooth headset that drops its link and reconnects picks the track up again rather than
-  leaving Sonora silent until you restart it.
-- Apple Music plays with the Widevine module an older Chromium keeps, which Sonora found
+  leaving Cavifax silent until you restart it.
+- Apple Music plays with the Widevine module an older Chromium keeps, which Cavifax found
   before but could not open.
 - The Widevine row in Settings shows its whole explanation rather than cutting it off, and
   offers the download from Google even when a browser's copy was found. A copy downloaded that
-  way is the one Sonora uses from then on.
+  way is the one Cavifax uses from then on.
 - An empty Apple Music playlist opens as an empty playlist rather than a "Could not load" error.
 - The library shown at launch from the last session stays whole until the provider has sent
   all of it, rather than shrinking to the first page and filling back in.
-- Sonora shows up once in your system's audio mixer, rather than once for your streaming
+- Cavifax shows up once in your system's audio mixer, rather than once for your streaming
   service and again for local files.
 - Guest mode is remembered again, so choosing it no longer brings the welcome screen
   back on every launch.
-- YouTube Music tracks that stopped loading with a 403 now play: Sonora sends the
+- YouTube Music tracks that stopped loading with a 403 now play: Cavifax sends the
   proof-of-origin token YouTube asks for, minting it in a hidden browser window, and falls
   back to a second stream when the first one is refused.
 - Covers no longer swap places with each other while a grid is scrolled quickly.
@@ -361,12 +361,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Frosted menus and fields no longer turn grey under their own shadow on the light theme.
 - Menus and dialogs show their shadow from the moment they open rather than once they have
   settled.
-- The tray icon of the Flatpak and the AppImage shows the Sonora logo in trays such as Dank
+- The tray icon of the Flatpak and the AppImage shows the Cavifax logo in trays such as Dank
   Material Shell, which drew a missing-texture placeholder in its place.
-- Updating on Windows no longer puts the Sonora shortcut back on your desktop after you deleted
+- Updating on Windows no longer puts the Cavifax shortcut back on your desktop after you deleted
   it, or overwrites one you made yourself.
 - Apple Music pins sync both ways: what is pinned on music.apple.com joins the sidebar,
-  and pinning an album, artist or playlist in Sonora pins it there too.
+  and pinning an album, artist or playlist in Cavifax pins it there too.
 - Editing the track or disc number of a local MP3 now sticks, including in files that carry an
   ID3v1 tag or an older tag stacked behind the first. An ID3v2.3 file stays ID3v2.3, so other
   players and taggers see the new number too.
@@ -391,12 +391,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Sonora now notices the moment it loses the network and says so everywhere at once, rather than
+- Cavifax now notices the moment it loses the network and says so everywhere at once, rather than
   leaving each page to fail on its own. Search, home, albums, playlists, artists, songs and
   profiles show No connection over a crossed-out wifi mark with a Try again button, playing a
   streamed track says there is no connection instead of failing quietly, and the pages come back
   by themselves once the network does. Local music and an imported library keep working.
-- Losing the network no longer reads as a signed-out account. Sonora stays on your library and
+- Losing the network no longer reads as a signed-out account. Cavifax stays on your library and
   your local music with the account it has, and picks the account back up on its own once the
   network is there. The sign-in page now only appears when you really are signed out.
 - Your Library and Local Music open on the songs, albums, artists and playlists they held last
@@ -406,7 +406,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   still reads everything.
 - Removing a music folder stops a scan that is still reading it, instead of leaving it to finish
   for nothing.
-- The log file is now capped at 16 MiB while Sonora runs, not only at startup, so a fault that
+- The log file is now capped at 16 MiB while Cavifax runs, not only at startup, so a fault that
   logs without end can no longer fill the disk.
 - Add to queue and Play next now line tracks up right after the current one, ahead of the rest of
   the album or playlist, in the order you added them. The queue panel lists them under Next in
@@ -455,9 +455,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - An Apple Music library song whose catalog copy Apple has pulled is left out of Favorites,
   and the song count leaves it out too, instead of failing when played.
 - Pinning an Apple Music album, artist or playlist to the sidebar works again. The pin is kept
-  by Sonora, since Apple Music has no pins of its own.
+  by Cavifax, since Apple Music has no pins of its own.
 - Deezer playlists found by search show who made them.
-- A Spotify pin past Spotify's own limit is kept by Sonora instead of being refused, so the
+- A Spotify pin past Spotify's own limit is kept by Cavifax instead of being refused, so the
   sidebar can hold as many pins as you like.
 - A YouTube Music track whose download stalls is tried again and then skipped, instead of
   leaving the player silent until a restart.
@@ -479,12 +479,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - The AppImage can be updated through AppImageUpdate or an AppImage manager.
-- An Open log button under Settings > About opens the file Sonora logs to, for attaching to a
+- An Open log button under Settings > About opens the file Cavifax logs to, for attaching to a
   bug report.
 - Deezer as a provider: your favorites, playlists, albums and search, with FLAC playback where
   the account allows it.
 - Apple Music as a provider: your library, playlists, search and stations.
-  Playback needs Google's Widevine module. Sonora uses the copy a browser on your computer has,
+  Playback needs Google's Widevine module. Cavifax uses the copy a browser on your computer has,
   or offers to download it from Google and shows Google's terms first. Settings can remove a
   downloaded module again.
 - Local files are a lyrics provider for the synced or plain lyrics embedded in them or kept in a
@@ -493,14 +493,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - On Windows, the window minimizes, restores and closes with the system animations again.
-- On Windows, Sonora no longer keeps the installer's administrator privileges after an update,
+- On Windows, Cavifax no longer keeps the installer's administrator privileges after an update,
   so window managers like FancyZones can control it again.
 - A local album folder named like 10000 Days keeps its name instead of turning into 0 Days from
   the year 1000.
 - Lyrics from a provider no longer go missing when its synced sheet carries a timestamp too large
   to read.
-- Opening a file whose link has a `%` before a non-ASCII letter no longer crashes Sonora.
-- On Windows, launching Sonora while it sits in the tray brings the window back even when the
+- Opening a file whose link has a `%` before a non-ASCII letter no longer crashes Cavifax.
+- On Windows, launching Cavifax while it sits in the tray brings the window back even when the
   running copy was started with administrator privileges.
 - Saving the tag editor keeps the extra genres or artists and the full release date of fields
   you left alone.
@@ -511,16 +511,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Sonora is published as an AppImage for `x86_64` and `aarch64`, beside the Flatpak and the
+- Cavifax is published as an AppImage for `x86_64` and `aarch64`, beside the Flatpak and the
   plain binaries. Make it executable and run it; it needs no installation and stays a single
   file, but it does not update itself.
-- On Windows, hovering Sonora's taskbar button puts previous, play/pause and next under the
+- On Windows, hovering Cavifax's taskbar button puts previous, play/pause and next under the
   thumbnail preview, so a track can be paused or skipped without raising the window. The glyphs
   follow the icon pack chosen under Settings > Appearance.
 - Buttons on the Discord status, under Settings, Discord. Pick Provider to link the track on the
-  service it plays from, Sonora to link the project page, or both. Discord shows them to your
+  service it plays from, Cavifax to link the project page, or both. Discord shows them to your
   friends only, never to you, and the provider button stays off while Hide details is on.
-- Sonora scrobbles to Last.fm, Libre.fm, ListenBrainz and Maloja, under Settings > Integrations.
+- Cavifax scrobbles to Last.fm, Libre.fm, ListenBrainz and Maloja, under Settings > Integrations.
   Last.fm asks for your own API key and secret, Libre.fm only for approval in the browser,
   ListenBrainz for a user token and Maloja for a server address and one of its API keys. Connect as
   many as you like and every one of them gets the listen once you are halfway through a track. Each
@@ -528,14 +528,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Every language Sonora ships is translated in full. German, Spanish, French, Italian, Indonesian,
+- Every language Cavifax ships is translated in full. German, Spanish, French, Italian, Indonesian,
   Japanese, Russian, Ukrainian, Polish, Brazilian Portuguese, Chinese and Turkish no longer fall
   back to English for the equalizer, the sleep timer, the Discord status, pinned items or the
   fullscreen controls.
 
 ### Fixed
 
-- On Linux with an NVIDIA GPU, clicking Sign in on YouTube Music under Wayland closed Sonora with
+- On Linux with an NVIDIA GPU, clicking Sign in on YouTube Music under Wayland closed Cavifax with
   a Wayland protocol error. The sign-in window now paints through shared memory on that driver,
   the same as setting `WEBKIT_DISABLE_DMABUF_RENDERER=1` by hand. A value you export yourself is
   left alone.
@@ -560,7 +560,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Switching the theme back to System picks up the light or dark mode the system is in now, even
   if it changed while a fixed theme was selected.
 - On Linux under fractional scaling, a window whose size landed on half a device pixel showed a
-  thin strip of compositor blur along its right or bottom edge. Sonora now steps such a size down
+  thin strip of compositor blur along its right or bottom edge. Cavifax now steps such a size down
   by one pixel so the edge sits on the pixel grid.
 
 ## [0.34.4] - 2026-09-12
@@ -579,7 +579,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   on screen and rebuilds the list only when something in it changes.
 - On Nix, the YouTube Music sign-in no longer goes black after the email step. The package now
   gives WebKit the GStreamer plugins it needs to play a page's media.
-- On Windows, the sign-in window opens when Sonora is installed under Program Files. It used to
+- On Windows, the sign-in window opens when Cavifax is installed under Program Files. It used to
   fail with `0x80070005` because the browser it embeds tried to keep its data next to the program,
   where a normal user cannot write. That data now lives under your local app data.
 - In the fullscreen view, the volume slider is no longer cut off when you hover the speaker button
@@ -602,14 +602,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - You can choose to show the track's artist, title, or both as the Discord status name, in addition
-  to Sonora, Provider, and Music.
+  to Cavifax, Provider, and Music.
 
 - Discord status can be configured to stay or hide when the track is paused.
 
 ### Fixed
 
 - The Motion setting's System option now follows the operating system's reduced-motion preference
-  on Linux, macOS and Windows, refreshing when Sonora comes back to the foreground. Older Linux
+  on Linux, macOS and Windows, refreshing when Cavifax comes back to the foreground. Older Linux
   portals that do not expose the standardized setting safely keep normal animations.
 - Local M4A files show their embedded cover art.
 - On Linux under Wayland, the cookie sign-in window draws its page instead of staying blank.
@@ -627,20 +627,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Sonora shows up in Open With for audio files. Opening one plays it right away; opening several
+- Cavifax shows up in Open With for audio files. Opening one plays it right away; opening several
   queues them to play next, in order, right after whatever is already playing, whatever provider
   that came from.
 
-- Sonora can put what you are playing on your Discord profile. Turn on Show on Discord under
-  Settings > Integrations. The status is called Sonora by default, and can name the service the
+- Cavifax can put what you are playing on your Discord profile. Turn on Show on Discord under
+  Settings > Integrations. The status is called Cavifax by default, and can name the service the
   track came from or just say Music instead; it can carry a badge of that service, and it can hide
   the details and say only that music is playing. Cover art reaches Discord only from Spotify and
   YouTube Music, since Discord fetches the image itself and cannot read a local file or a
   self-hosted server.
 
-- Sonora speaks Turkish. Pick Türkçe under Settings > General > Language, or leave the language
+- Cavifax speaks Turkish. Pick Türkçe under Settings > General > Language, or leave the language
   on System and it follows a Turkish desktop on its own.
-- Sonora speaks Chinese. Pick 简体中文 under Settings > General > Language, or leave the language on
+- Cavifax speaks Chinese. Pick 简体中文 under Settings > General > Language, or leave the language on
   System and it follows a Chinese desktop on its own.
 
 - The sidebar keeps one Pinned section for everything you pin, whatever provider it came from, so
@@ -652,7 +652,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   already in the sidebar.
 
 - Pinning something from Spotify pins it in Spotify too, and anything pinned there turns up in
-  Sonora on its own.
+  Cavifax on its own.
 
 - The button beside Pinned sorts the section alphabetically or by type. Picking the same order
   again turns it around, and once more hands the list back to the order you dragged.
@@ -663,9 +663,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A Back to top button appears in the sidebar and in the queue once either is scrolled, and
   glides back rather than jumping.
 
-- YouTube Music signs in through a window Sonora opens itself, on macOS, Windows and Linux. Sign
-  in with Google there and Sonora takes the cookies it needs; the window keeps nothing, so
-  browsing YouTube or Gmail in your regular browser no longer signs Sonora out. On Linux it needs
+- YouTube Music signs in through a window Cavifax opens itself, on macOS, Windows and Linux. Sign
+  in with Google there and Cavifax takes the cookies it needs; the window keeps nothing, so
+  browsing YouTube or Gmail in your regular browser no longer signs Cavifax out. On Linux it needs
   webkit2gtk, which most desktops already have.
 
 ### Changed
@@ -675,7 +675,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Hovering the tray icon names the playing track, the way it already did on Linux.
 - The sleep timer lives under Settings > Playback. Turn it on there and a Configure button opens
   the slider; the moon button leaves the player bar.
-- Pasting a YouTube Music cookie header is gone. The sign-in window replaces it, and where Sonora
+- Pasting a YouTube Music cookie header is gone. The sign-in window replaces it, and where Cavifax
   cannot open one only Guest mode is offered.
 
 ### Fixed
@@ -699,7 +699,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Playlists with more than 200 tracks load in full again. The remaining pages arrive in the
   background after the first one shows.
 
-- Windows no longer draws its own minimize, maximize and close buttons beside the ones Sonora
+- Windows no longer draws its own minimize, maximize and close buttons beside the ones Cavifax
   draws in its title bar.
 
 - A maximized window on Windows stops at the taskbar instead of covering it.
@@ -709,13 +709,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Windows on ARM gets a native build: releases carry an `aarch64-pc-windows-msvc` executable and a
-  `Sonora-Setup-arm64.exe` installer, and the in-app updater fetches that one on an ARM machine.
+  `Cavifax-Setup-arm64.exe` installer, and the in-app updater fetches that one on an ARM machine.
 
 - A Shuffle button sits beside Play on every album, playlist, artist and library page. It turns
   shuffle on and starts the collection from a random track.
 
-- On macOS, Sonora follows the platform's shortcuts: `⌘W` closes the window, `⌘M` minimises it,
-  `⌃⌘F` toggles native full screen, `⌘H` and `⌥⌘H` hide Sonora or everything else, and `⌘[` / `⌘]`
+- On macOS, Cavifax follows the platform's shortcuts: `⌘W` closes the window, `⌘M` minimises it,
+  `⌃⌘F` toggles native full screen, `⌘H` and `⌥⌘H` hide Cavifax or everything else, and `⌘[` / `⌘]`
   step through history. Text fields take the Cocoa conventions too: `⌥` arrows and `⌥⌫` work by
   word, `⌘⌫` and `⌘⌦` clear to either end of the field, `⌘↑`/`⌘↓` jump to the ends, and the Emacs
   control keys (`⌃A`, `⌃E`, `⌃B`, `⌃F`, `⌃D`, `⌃H`, `⌃K`) do what they do everywhere else on a
@@ -732,7 +732,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Settings > Accounts with the server address, a username and a password. Your Library then lists
   the whole server, songs included, with a Favorites only filter for what you starred.
 
-- Sonora's own window corners can be rounded from Appearance, with the radius picked the same
+- Cavifax's own window corners can be rounded from Appearance, with the radius picked the same
   way as the UI corner radius: Square, Subtle, Rounded or Round. On Windows this maps onto DWM's
   own rounded presets; on Linux and FreeBSD it applies with client-side decorations, where the
   compositor otherwise leaves the window square.
@@ -748,12 +748,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - The Flatpak remote and the standalone bundles follow the repository to
-  `sonorahq.github.io/sonora`. A remote added before the move needs
-  `flatpak remote-modify --user --url=https://sonorahq.github.io/sonora/repo sonora` once.
+  `cavifaxhq.github.io/cavifax`. A remote added before the move needs
+  `flatpak remote-modify --user --url=https://cavifaxhq.github.io/cavifax/repo cavifax` once.
 - The Flatpak shows its tray icon on KDE Plasma and other StatusNotifier desktops, so Close to
-  tray keeps Sonora playing after the window closes. The sandbox forbids the well-known bus name
-  the tray used to claim, and Sonora now registers under its unique connection name instead.
-- A track that fails to load no longer stops playback. Sonora shows a toast, waits out the short
+  tray keeps Cavifax playing after the window closes. The sandbox forbids the well-known bus name
+  the tray used to claim, and Cavifax now registers under its unique connection name instead.
+- A track that fails to load no longer stops playback. Cavifax shows a toast, waits out the short
   back-off and moves on to the next track in the queue, skipping the broken one even in repeat-one.
 - Local track lists keep each row's own embedded cover art when the table is sorted or recycled.
 - Seeking, and starting a track, count as playing only once the audio actually comes out. The
@@ -763,7 +763,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   last. The play button follows what you asked for and flips the moment you press it.
 - On macOS, a socket file left behind by a crash no longer disables single-instance handling: the
   next launch notices nothing is listening, takes the socket over, and later launches and
-  `spotify:` links reach that window again instead of opening a second Sonora.
+  `spotify:` links reach that window again instead of opening a second Cavifax.
 - Local music now carries a date added, taken from when each file was last changed, so the Date
   added column fills in and sorting songs, albums and artists by it works.
 - A YouTube Music sign-in now keeps the cookies Google refreshes during a session, and writes them
@@ -774,11 +774,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Nix users can manage Sonora through Home Manager. The flake exposes `homeManagerModules.default`
-  with a `programs.sonora` option whose `settings` are merged into `settings.json` on each launch.
-- Sonora speaks Indonesian. Pick Bahasa Indonesia under Settings > General > Language, or leave the
+- Nix users can manage Cavifax through Home Manager. The flake exposes `homeManagerModules.default`
+  with a `programs.cavifax` option whose `settings` are merged into `settings.json` on each launch.
+- Cavifax speaks Indonesian. Pick Bahasa Indonesia under Settings > General > Language, or leave the
   language on System and it follows an Indonesian desktop on its own.
-- On Linux and FreeBSD, Sonora can switch between server-side and client-side window decorations
+- On Linux and FreeBSD, Cavifax can switch between server-side and client-side window decorations
   from Appearance and shows its own window controls automatically with client-side decorations.
 
 ### Changed
@@ -803,12 +803,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Closing the window no longer stops the music: Sonora stays in the system tray with play/pause,
+- Closing the window no longer stops the music: Cavifax stays in the system tray with play/pause,
   previous, next, show and quit at hand, and the Dock icon steps aside on macOS until the window
   is back. Turn it off under Settings → General → Window if you would rather it quit.
-- Sonora speaks Spanish. Pick Español under Settings > General > Language, or leave the language on
+- Cavifax speaks Spanish. Pick Español under Settings > General > Language, or leave the language on
   System and it follows a Spanish desktop on its own.
-- Sonora speaks Japanese. Pick 日本語 under Settings > General > Language, or leave the language on
+- Cavifax speaks Japanese. Pick 日本語 under Settings > General > Language, or leave the language on
   System and it follows a Japanese desktop on its own.
 - Lyrics have their own size, set separately for each surface. Settings > Playback > Lyrics size
   (panel) and Lyrics size (fullscreen) scale the lyrics text from 60% to 200% on top of the base
@@ -828,7 +828,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Playback now skips deleted or unavailable playlist songs when moving forward or backward.
-- Installing the standalone `.flatpak` bundle now registers the Sonora repository, so `flatpak update`
+- Installing the standalone `.flatpak` bundle now registers the Cavifax repository, so `flatpak update`
   keeps it current, and it can replace an install made from the repository.
 - Emoji in playlist, track, and artist names now render instead of falling back to missing-glyph
   boxes when the UI font has no emoji glyphs.
@@ -844,15 +844,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A track from a Subsonic server starts as soon as the first seconds have arrived, instead of
   after the whole file has downloaded. Seeking and skipping answer straight away, and the
   progress bar follows the sound rather than the decoder.
-- The system Now Playing widget reads cover art from Sonora's own cache, so a cover that fails to
+- The system Now Playing widget reads cover art from Cavifax's own cache, so a cover that fails to
   download no longer takes the app down on macOS, and the widget shows artwork offline.
 
 ## [0.29.0] - 2026-09-03
 
 ### Added
 
-- Sonora ships as a Flatpak. Every release attaches a bundle for x86_64 and aarch64, and adding
-  the Sonora repository once (`flatpak install --user https://sonorahq.github.io/sonora/sonora.flatpakref`)
+- Cavifax ships as a Flatpak. Every release attaches a bundle for x86_64 and aarch64, and adding
+  the Cavifax repository once (`flatpak install --user https://cavifaxhq.github.io/cavifax/cavifax.flatpakref`)
   keeps it current through `flatpak update`.
 - Italian and Brazilian Portuguese translations.
 
@@ -865,7 +865,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The fullscreen player's controls settle in and out on a spring when it wakes or goes idle.
 - Karaoke lines that overlap in time each keep sweeping until they finish, background vocals sing
   through in a softer tone, and a finished line fades to gray instead of snapping.
-- Windows uses Sonora's window controls without the native system control strip.
+- Windows uses Cavifax's window controls without the native system control strip.
 - The best match on the search page carries a play button whatever it is, so an album, artist or
   playlist starts from there just like a song. In the single-column layout it scrolls with the
   results instead of staying pinned above them.
@@ -875,16 +875,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Large Spotify libraries load again: track and album metadata is fetched in smaller batches
   that stay within what the service accepts.
 - Content no longer shows through an overlaid sidebar when window transparency is enabled.
-- Building Sonora on Windows no longer requires a separately installed SQLite library.
+- Building Cavifax on Windows no longer requires a separately installed SQLite library.
 - A sign-in failure in Settings now appears on the card of the service you were signing in to.
-- Running Sonora through Nix on a system other than NixOS finds a Vulkan driver and the ALSA
+- Running Cavifax through Nix on a system other than NixOS finds a Vulkan driver and the ALSA
   plugins it needs for audio.
 
 ## [0.28.1] - 2026-09-02
 
 ### Changed
 
-- Sonora now uses the SQLite library your system provides instead of compiling in its own copy, so
+- Cavifax now uses the SQLite library your system provides instead of compiling in its own copy, so
   SQLite fixes reach it through a normal system update. Windows still carries its own.
 
 ## [0.28.0] - 2026-09-01
@@ -902,7 +902,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Local Music stays in the sidebar before a folder is picked, and every one of its pages offers a
   Choose folder button so the library can be set up without opening Settings.
 - A toast that names an album, artist, playlist or song turns that name into a link to its page.
-- The sign-in screen carries a one-off checkbox that helps count how many people use Sonora. It is
+- The sign-in screen carries a one-off checkbox that helps count how many people use Cavifax. It is
   ticked by default and sends a single anonymous ping with your next action on that screen; untick
   it to send nothing. The checkbox never returns once you have signed in or answered it.
 
@@ -916,7 +916,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Navigating again while a page is still fading in restarts the fade instead of cutting it short.
 - Toasts block clicks on whatever sits under them, and stay up while the pointer is on them.
 - The artwork, lyrics and queue pill in fullscreen stays visible while the pointer is on it.
-- Episodes for Later no longer shows up among your YouTube Music playlists. Sonora does not play
+- Episodes for Later no longer shows up among your YouTube Music playlists. Cavifax does not play
   podcasts, so the container was never usable.
 
 ### Fixed
@@ -936,7 +936,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   machine.
 - Local playlists can be created, renamed, deleted and filled with imported songs; they are kept
   in a database beside the rest of the local library.
-- Imported songs can be retagged from a dialog with Song, Album and Details tabs. Sonora writes
+- Imported songs can be retagged from a dialog with Song, Album and Details tabs. Cavifax writes
   the file and rescans the folder.
 - An imported album picks up a cover.jpg sitting in the album folder, and an artist folder can
   carry a portrait: artist.jpg wins, then folder.jpg, then cover.jpg, in jpg, jpeg, png or webp.
@@ -1015,7 +1015,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Sonora keeps a listening history on this device: the last 500 tracks you played and when you
+- Cavifax keeps a listening history on this device: the last 500 tracks you played and when you
   played them. Open it from the sidebar, play anything back from it, drop a single play from its
   context menu, or clear the whole list.
 - The explicit badge sits next to the track title in the player bar and on the fullscreen now
@@ -1051,9 +1051,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   names in view, a few families per frame, rather than loading every one up front.
 - Enter picks the highlighted typeface, and filtering the list moves the highlight to the first
   match instead of leaving it on a row that is no longer there.
-- On Windows, dragging Sonora to a screen edge snaps it, hovering the maximize button opens Snap
+- On Windows, dragging Cavifax to a screen edge snaps it, hovering the maximize button opens Snap
   Layouts, and clicking its taskbar icon minimizes the window.
-- On Windows, a maximized Sonora no longer runs under the taskbar, so nothing is cut off at the
+- On Windows, a maximized Cavifax no longer runs under the taskbar, so nothing is cut off at the
   bottom of the screen.
 - The Windows installer offers to create a desktop shortcut with the box already ticked. Untick it
   before installing to go without.
@@ -1062,20 +1062,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- A battery saving setting under Appearance caps the frame rate of animations while Sonora is not
+- A battery saving setting under Appearance caps the frame rate of animations while Cavifax is not
   the focused window: light, medium or strong, for 90, 60 or 30 frames a second. It is off by
   default, and a change applies from the next launch.
 
 ### Changed
 
 - The karaoke sweep advances on a clock of its own instead of following the display refresh rate,
-  so a fast panel no longer spends frames on it, and battery saving paces it too while Sonora is in
+  so a fast panel no longer spends frames on it, and battery saving paces it too while Cavifax is in
   the background.
 
 ### Fixed
 
 - Switches appear already on or off when a screen opens, instead of sliding into place after it.
-- With the theme set to System, Sonora no longer opens as a light window and fades into the dark
+- With the theme set to System, Cavifax no longer opens as a light window and fades into the dark
   palette. It remembers what the system last reported and starts there.
 - On macOS the lyrics sheet showed only the lines around the one being sung. The rows it blurs
   above and below render again.
@@ -1094,7 +1094,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   guest sign-in is one button underneath rather than a row of them.
 - The lyrics sheet travels on a spring, overshooting a little and settling, where it used to ease to
   a stop. The rows still trail behind it one at a time.
-- On Windows the frame no longer carries the system window buttons, leaving only the ones Sonora
+- On Windows the frame no longer carries the system window buttons, leaving only the ones Cavifax
   draws.
 - Context menu entries that queue something now read "Add to queue" instead of naming the album or
   the artist a second time. The row you right-clicked already says what it is.
@@ -1116,7 +1116,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   when it flipped, and re-anchored the panel to the top left and slid it back under the window
   edge, on top of the menu it hangs off. A submenu now renders its panel directly and only the
   outer wrapper places it.
-- YouTube Music plays on an account without Premium again. Sonora asks for the guest audio streams
+- YouTube Music plays on an account without Premium again. Cavifax asks for the guest audio streams
   rather than the ones such an account cannot be handed.
 - Seeking far into a track scrolls the lyrics to the new verse. The sheet went blank for a moment and
   then dropped the verses in from off screen, because it moved to the destination at once and only
@@ -1182,7 +1182,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Lyrics settle once instead of improving in stages. Sonora asks every source at once, and used to
+- Lyrics settle once instead of improving in stages. Cavifax asks every source at once, and used to
   put up each answer that beat the last, so the words could change under you two or three times in
   the first seconds of a song. It now shows the first answer that has timings, and swaps at most once
   more: the moment a word-by-word sheet arrives, since nothing beats one, or else when every source
@@ -1222,15 +1222,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Sonora redraws far less of the window at once. A word-by-word lyric line, a melody break and a
+- Cavifax redraws far less of the window at once. A word-by-word lyric line, a melody break and a
   verse change each rebuilt the player bar, the sidebar and the toolbar on every frame they
   animated, and scrolling a busy screen rebuilt the same things again, so the two together could not
   keep pace. Scrolling Home or your songs while the lyrics move is smooth now.
-- Sonora looks for a newer version on Linux and macOS too, where the setting for it was already
+- Cavifax looks for a newer version on Linux and macOS too, where the setting for it was already
   offered but never did anything. It only tells you: installing in place stays a Windows-only path,
-  because that is the only build Sonora ships an installer for. The setting starts off there, since
+  because that is the only build Cavifax ships an installer for. The setting starts off there, since
   a distribution or a tap can trail a release by weeks and there is nothing to act on until it
-  catches up, and the notice says to update Sonora the way you installed it.
+  catches up, and the notice says to update Cavifax the way you installed it.
 
 ### Fixed
 
@@ -1251,19 +1251,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   title beside it did not.
 - Songs, albums, playlists and artists can be dropped straight onto the queue. Drop between two
   queued songs to slot them in there, or anywhere else in the pane to add them at the end.
-- Sonora tells you when a newer version is out. On Windows it asks GitHub once at startup and, if
+- Cavifax tells you when a newer version is out. On Windows it asks GitHub once at startup and, if
   a release is newer than the running build, floats a card in the top-left corner with the new
   version number, a link to what changed, and a choice between Later and Update. Update downloads
-  the installer, checks it against the release checksums, runs it and starts Sonora again when it
+  the installer, checks it against the release checksums, runs it and starts Cavifax again when it
   is done. The card appears once per launch and never nags mid-session, and the check can be turned
   off under Settings, About.
-- Sonora reopens at the size and position it had when you closed it, and maximized if you left it
+- Cavifax reopens at the size and position it had when you closed it, and maximized if you left it
   that way. A saved position that no longer lands on a connected display is dropped, so unplugging
   a monitor cannot leave the window off screen. Wayland does not hand a window its position, so
   there only the size and the maximized state come back.
 - Settings, Appearance can pick the interface font. The list is searchable and holds every font
   installed on the machine that can actually set the interface, so the script-only families a system
-  carries do not clutter it, and Bundled keeps the Inter that ships with Sonora.
+  carries do not clutter it, and Bundled keeps the Inter that ships with Cavifax.
 
 ### Changed
 
@@ -1313,7 +1313,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it crosses, which was dragging the visible edge back half a character at a time. A word followed
   by a rest also finishes where it is sung instead of drifting on through the silence.
 - Japanese, Chinese and Korean lyrics keep their spacing when a line's word timings do not line up
-  with its text. Sonora fell back to spacing the words out as if they were English, which put a gap
+  with its text. Cavifax fell back to spacing the words out as if they were English, which put a gap
   between every character.
 - Album covers no longer leave a thin line across the player bar as they scroll past it. Card grids
   and the shelves on Home were drawing one row beyond the edge of what you can see, and a single
@@ -1327,18 +1327,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   timed as its own word goes with it, so a line no longer wraps to leave a lone "?" or "," on the
   last row.
 - Turning volume normalisation or gapless playback on or off keeps the song you are on. Both
-  settings can only take effect on a fresh player, so Sonora used to drop the track and send you
+  settings can only take effect on a fresh player, so Cavifax used to drop the track and send you
   back to nothing; it now rebuilds the player and puts the song back where it was. A song that was
   paused stays paused rather than starting itself.
 - YouTube tracks no longer leave a short silence between them. The audio YouTube serves carries a
   fraction of a second of encoder padding at each end, which nothing in the decoding stack was
-  removing, so it played as a gap however early the next track was fetched. Sonora now reads how
+  removing, so it played as a gap however early the next track was fetched. Cavifax now reads how
   much to drop from the file itself and trims it.
 - Imported tracks run into one another with no gap. The next track was already decoded and waiting
-  behind the current one, but Sonora tore it down and started it again the moment the song changed,
+  behind the current one, but Cavifax tore it down and started it again the moment the song changed,
   so every boundary cost a stumble.
 - Spotify playback on Windows no longer hisses in the background, which was loudest at low volume.
-  Sonora asked the output device for a stream it could not give and settled for the poorest sample
+  Cavifax asked the output device for a stream it could not give and settled for the poorest sample
   format on offer instead of the one the device already runs at, so every track was played through
   a needlessly coarse output. It now opens the device at its own format, the way YouTube and
   imported tracks always have.
@@ -1366,7 +1366,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the way Apple Music lays them out, and their background vocals follow to that side. "Shallow",
   "Under Pressure", "Summer Nights" and "Ain't No Mountain High Enough" all split this way.
 - Musixmatch is asked second and covers songs Apple has no sheet for, such as YOASOBI's 夜に駆ける.
-  When Musixmatch decides the network is asking too often it stops answering, so Sonora leaves it
+  When Musixmatch decides the network is asking too often it stops answering, so Cavifax leaves it
   alone for ten minutes and the other sources carry on.
 
 ### Changed
@@ -1566,21 +1566,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A failed search no longer leaves its error on screen after signing out.
 - Disabled buttons no longer show tooltips.
 - Switches sit pixel-exact inside their track.
-- YouTube Music plays again. YouTube stopped serving the clients Sonora asked for: the download of
+- YouTube Music plays again. YouTube stopped serving the clients Cavifax asked for: the download of
   every track was refused part-way through, and the fallback it tried next was refused outright. A
   signed-in session now streams through the YouTube Music client itself, which also hands over a
-  better stream — 256 kbps instead of 128. Without an account Sonora asks as a headset would, with a
+  better stream — 256 kbps instead of 128. Without an account Cavifax asks as a headset would, with a
   visitor id issued by YouTube rather than one it made up.
 - Playing without a YouTube account says so once instead of failing track after track. YouTube now
-  turns anonymous listeners away from most music, and Sonora used to work through the whole queue,
+  turns anonymous listeners away from most music, and Cavifax used to work through the whole queue,
   waiting six seconds between refusals. It now stops at the first one and asks you to sign in.
-- A signed-in YouTube session survives a restart. Sonora used to keep the cookies it copied from
+- A signed-in YouTube session survives a restart. Cavifax used to keep the cookies it copied from
   your browser the day you signed in, and YouTube rotates those every few hours, so your library
-  quietly went missing. When you signed in through a browser, Sonora now re-reads its cookies each
+  quietly went missing. When you signed in through a browser, Cavifax now re-reads its cookies each
   time it starts and keeps the copy fresh.
 - Playing after the app had been open for a long time no longer says the track cannot be played.
-  Suspending the machine, or any long enough network break, killed Sonora's connection to Spotify for
-  good and every track after that failed to load. Sonora now notices the connection went stale and
+  Suspending the machine, or any long enough network break, killed Cavifax's connection to Spotify for
+  good and every track after that failed to load. Cavifax now notices the connection went stale and
   reconnects on its own, keeping the track you were on and resuming it where it stopped.
 
 ## [0.15.0] - 2026-08-16
@@ -1588,7 +1588,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Appearance settings carry a Reduce motion choice — follow the system, always or never — so you can
-  decide up front whether Sonora animates its interface.
+  decide up front whether Cavifax animates its interface.
 - Appearance settings also carry an Animation speed choice — slow, standard or quick — that stretches
   or tightens every interface animation to taste.
 - Fullscreen is a real player now: large artwork that swaps to the album's high-resolution cover as
@@ -1615,8 +1615,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Signing in with an account that has no Spotify Premium closed Sonora outright, and it kept closing
-  on every launch until the cached session was deleted by hand. Sonora now stays open, forgets that
+- Signing in with an account that has no Spotify Premium closed Cavifax outright, and it kept closing
+  on every launch until the cached session was deleted by hand. Cavifax now stays open, forgets that
   session and explains on the login screen that streaming needs Premium.
 - The volume percentage now sits above the slider handle instead of trailing the pointer, so it
   reads as a label on the handle you are dragging.
@@ -1642,7 +1642,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Sonora sat redrawing the window as fast as the screen allowed whenever the lyrics panel was open,
+- Cavifax sat redrawing the window as fast as the screen allowed whenever the lyrics panel was open,
   heating the machine and draining the battery while nothing on screen was moving. It now rests when
   there is nothing to draw.
 - When Spotify ships a new build of its web player, album, artist and search pages recover on the
@@ -1652,7 +1652,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Sonora remembers what you were listening to. Reopen it and the track you left off on is waiting,
+- Cavifax remembers what you were listening to. Reopen it and the track you left off on is waiting,
   paused where you stopped, with the rest of the queue and the tracks you already heard still in
   place. It is readied silently in the background, so press play and the music starts from that
   second at once, without the progress bar sliding into place first.
@@ -1673,7 +1673,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Switching music service, or signing out, now clears the queue, the history and the current track,
   so nothing from one service is left sitting in the player when you move to another. Music from
   your imported folder keeps playing.
-- YouTube tracks that refused to play now do. When YouTube turns down the quick route, Sonora
+- YouTube tracks that refused to play now do. When YouTube turns down the quick route, Cavifax
   works out the stream signature itself and plays the track anyway, often at a higher bitrate.
 - Pinned items now belong to the service they came from, so switching service shows that service's
   pins alongside your imported ones instead of dead rows that failed to open. Switching back brings
@@ -1717,7 +1717,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   sinking the moment the service answers.
 - Artist names in the narrow search layout are links again, and a table column stays hidden when
   no row carries a value for it.
-- Sonora describes itself as a music streaming client rather than a Spotify client.
+- Cavifax describes itself as a music streaming client rather than a Spotify client.
 
 ### Fixed
 
@@ -1727,14 +1727,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Genre pages that carry nothing playable, and podcast-only entries, disappear from the grid by
   themselves.
 - The Nix package installs the released binary instead of wrapping the loader, so audio mixers and
-  process lists show Sonora rather than ld-linux.
+  process lists show Cavifax rather than ld-linux.
 
 ## [0.11.0] - 2026-08-13
 
 ### Added
 
 - Importing a YouTube Music session, or pasting cookies, now asks which Google account to use when
-  the session is signed in to more than one, and Sonora stays on the account that was picked.
+  the session is signed in to more than one, and Cavifax stays on the account that was picked.
 - The "Paste cookies manually" dialog spells out where the value comes from — which request to open
   in the developer tools, which header to copy, and which cookies the value has to carry.
 
@@ -1774,7 +1774,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   no longer signs you out of the service you were already using.
 - Waiting for a browser authorization can be cancelled instead of leaving the app stuck until it is
   restarted, and cancelling now shuts the callback server down. Signing in again used to fail with
-  "Address already in use" until Sonora was restarted.
+  "Address already in use" until Cavifax was restarted.
 - Cancelling a sign-in no longer flashes the empty library behind the login screen.
 - Artwork that does not arrive square — an artist portrait, a cover embedded in a local file — is
   cropped to its middle instead of spilling out of its frame, so a round portrait is round again.
@@ -1817,7 +1817,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Sonora can play the music already on this device: point it at a folder in the settings and its
+- Cavifax can play the music already on this device: point it at a folder in the settings and its
   files show up as tracks, albums and artists next to the streaming services.
 - The right sidebar shows the lyrics of the playing track next to the queue, switched with a pair of
   floating pills at its foot. Timed lyrics highlight the line being sung, scroll along with it, and
@@ -1834,7 +1834,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Sonora can now sign in to YouTube Music as an alternative to Spotify. The login screen offers
+- Cavifax can now sign in to YouTube Music as an alternative to Spotify. The login screen offers
   both services; YouTube Music can be browsed as a guest, connected by importing an existing
   browser session, or connected by pasting cookies, and the whole library — liked songs,
   playlists, albums, artists, search, and radio — works through the same interface.
@@ -1878,15 +1878,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Sonora keeps a log file at `$XDG_STATE_HOME/sonora/sonora.log`, so a problem noticed after hours of
+- Cavifax keeps a log file at `$XDG_STATE_HOME/cavifax/cavifax.log`, so a problem noticed after hours of
   use can still be diagnosed without having started the app from a terminal.
 - Playback failures explain themselves: a track that cannot be played is named in a toast, and if
-  Spotify refuses the account playback keys entirely, Sonora says so once and stops instead of
+  Spotify refuses the account playback keys entirely, Cavifax says so once and stops instead of
   failing through track after track.
 
 ### Fixed
 
-- Sonora holds on to far less memory during long listening sessions: cover art it has not shown for
+- Cavifax holds on to far less memory during long listening sessions: cover art it has not shown for
   a while is released instead of being kept until the app closes, and cover art whose page was left
   before the download finished no longer stays in memory for the rest of the session.
 - The left sidebar keeps the width you gave it. A window too narrow to fit it now hides it and brings
@@ -1900,15 +1900,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Sonora answers the system media controls: media keys, the desktop's now-playing widget and
+- Cavifax answers the system media controls: media keys, the desktop's now-playing widget and
   lock-screen controls can play, pause, skip, seek and set the volume, and they show the current
   track with its cover art.
-- Spotify links open in Sonora: a `spotify:` link to a track, album, playlist or artist opens that
+- Spotify links open in Cavifax: a `spotify:` link to a track, album, playlist or artist opens that
   page, handing it to the window already running instead of starting a second one.
 
 ### Changed
 
-- The app presents itself as Sonora rather than sonora, in the window title, the application menu
+- The app presents itself as Cavifax rather than cavifax, in the window title, the application menu
   and the Windows file properties.
 
 ## [0.5.0] - 2026-08-09
@@ -2057,7 +2057,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Licensing.** Sonora is now released under the GNU General Public License version 3 or later.
+- **Licensing.** Cavifax is now released under the GNU General Public License version 3 or later.
   Earlier releases carried no license file at all, which left them undistributable; GPUI depends on
   `zlog` and `ztracing` from the Zed repository, both GPL-3.0-or-later, so every binary ever built
   from this tree was already covered by the GPL. Versions 0.1.0 and 0.1.1 are therefore to be read
@@ -2090,63 +2090,63 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Initial release: a native Spotify client with playback, an interactive queue, the saved library,
 search, album, playlist, artist and song pages, context menus and adaptive theming.
 
-[unreleased]: https://github.com/sonorahq/sonora/compare/v0.43.0...HEAD
-[0.43.0]: https://github.com/sonorahq/sonora/compare/v0.42.2...v0.43.0
-[0.42.2]: https://github.com/sonorahq/sonora/compare/v0.42.1...v0.42.2
-[0.42.1]: https://github.com/sonorahq/sonora/compare/v0.42.0...v0.42.1
-[0.42.0]: https://github.com/sonorahq/sonora/compare/v0.41.0...v0.42.0
-[0.41.0]: https://github.com/sonorahq/sonora/compare/v0.40.0...v0.41.0
-[0.40.0]: https://github.com/sonorahq/sonora/compare/v0.39.0...v0.40.0
-[0.39.0]: https://github.com/sonorahq/sonora/compare/v0.38.0...v0.39.0
-[0.38.0]: https://github.com/sonorahq/sonora/compare/v0.37.0...v0.38.0
-[0.37.0]: https://github.com/sonorahq/sonora/compare/v0.36.0...v0.37.0
-[0.36.0]: https://github.com/sonorahq/sonora/compare/v0.35.0...v0.36.0
-[0.35.0]: https://github.com/sonorahq/sonora/compare/v0.34.4...v0.35.0
-[0.34.4]: https://github.com/sonorahq/sonora/compare/v0.34.3...v0.34.4
-[0.34.3]: https://github.com/sonorahq/sonora/compare/v0.34.2...v0.34.3
-[0.34.2]: https://github.com/sonorahq/sonora/compare/v0.34.1...v0.34.2
-[0.34.1]: https://github.com/sonorahq/sonora/compare/v0.34.0...v0.34.1
-[0.34.0]: https://github.com/sonorahq/sonora/compare/v0.33.0...v0.34.0
-[0.33.0]: https://github.com/sonorahq/sonora/compare/v0.32.0...v0.33.0
-[0.32.0]: https://github.com/sonorahq/sonora/compare/v0.31.0...v0.32.0
-[0.31.0]: https://github.com/sonorahq/sonora/compare/v0.30.0...v0.31.0
-[0.30.0]: https://github.com/sonorahq/sonora/compare/v0.29.0...v0.30.0
-[0.29.0]: https://github.com/sonorahq/sonora/compare/v0.28.1...v0.29.0
-[0.28.1]: https://github.com/sonorahq/sonora/compare/v0.28.0...v0.28.1
-[0.28.0]: https://github.com/sonorahq/sonora/compare/v0.27.0...v0.28.0
-[0.27.0]: https://github.com/sonorahq/sonora/compare/v0.26.0...v0.27.0
-[0.26.0]: https://github.com/sonorahq/sonora/compare/v0.25.0...v0.26.0
-[0.25.0]: https://github.com/sonorahq/sonora/compare/v0.24.1...v0.25.0
-[0.24.1]: https://github.com/sonorahq/sonora/compare/v0.24.0...v0.24.1
-[0.24.0]: https://github.com/sonorahq/sonora/compare/v0.23.0...v0.24.0
-[0.23.0]: https://github.com/sonorahq/sonora/compare/v0.22.0...v0.23.0
-[0.22.0]: https://github.com/sonorahq/sonora/compare/v0.21.0...v0.22.0
-[0.21.0]: https://github.com/sonorahq/sonora/compare/v0.20.0...v0.21.0
-[0.20.0]: https://github.com/sonorahq/sonora/compare/v0.19.1...v0.20.0
-[0.19.1]: https://github.com/sonorahq/sonora/compare/v0.19.0...v0.19.1
-[0.19.0]: https://github.com/sonorahq/sonora/compare/v0.18.0...v0.19.0
-[0.18.0]: https://github.com/sonorahq/sonora/compare/v0.17.1...v0.18.0
-[0.17.1]: https://github.com/sonorahq/sonora/compare/v0.17.0...v0.17.1
-[0.17.0]: https://github.com/sonorahq/sonora/compare/v0.16.3...v0.17.0
-[0.16.3]: https://github.com/sonorahq/sonora/compare/v0.16.2...v0.16.3
-[0.16.2]: https://github.com/sonorahq/sonora/compare/v0.16.1...v0.16.2
-[0.16.1]: https://github.com/sonorahq/sonora/compare/v0.16.0...v0.16.1
-[0.16.0]: https://github.com/sonorahq/sonora/compare/v0.15.0...v0.16.0
-[0.15.0]: https://github.com/sonorahq/sonora/compare/v0.14.0...v0.15.0
-[0.14.0]: https://github.com/sonorahq/sonora/compare/v0.13.0...v0.14.0
-[0.13.0]: https://github.com/sonorahq/sonora/compare/v0.12.1...v0.13.0
-[0.12.1]: https://github.com/sonorahq/sonora/compare/v0.12.0...v0.12.1
-[0.12.0]: https://github.com/sonorahq/sonora/compare/v0.11.0...v0.12.0
-[0.11.0]: https://github.com/sonorahq/sonora/compare/v0.10.0...v0.11.0
-[0.10.0]: https://github.com/sonorahq/sonora/compare/v0.9.0...v0.10.0
-[0.9.0]: https://github.com/sonorahq/sonora/compare/v0.8.0...v0.9.0
-[0.8.0]: https://github.com/sonorahq/sonora/compare/v0.7.0...v0.8.0
-[0.7.0]: https://github.com/sonorahq/sonora/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/sonorahq/sonora/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/sonorahq/sonora/compare/v0.4.1...v0.5.0
-[0.4.1]: https://github.com/sonorahq/sonora/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/sonorahq/sonora/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/sonorahq/sonora/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/sonorahq/sonora/compare/v0.1.1...v0.2.0
-[0.1.1]: https://github.com/sonorahq/sonora/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/sonorahq/sonora/releases/tag/v0.1.0
+[unreleased]: https://github.com/cavifaxhq/cavifax/compare/v0.43.0...HEAD
+[0.43.0]: https://github.com/cavifaxhq/cavifax/compare/v0.42.2...v0.43.0
+[0.42.2]: https://github.com/cavifaxhq/cavifax/compare/v0.42.1...v0.42.2
+[0.42.1]: https://github.com/cavifaxhq/cavifax/compare/v0.42.0...v0.42.1
+[0.42.0]: https://github.com/cavifaxhq/cavifax/compare/v0.41.0...v0.42.0
+[0.41.0]: https://github.com/cavifaxhq/cavifax/compare/v0.40.0...v0.41.0
+[0.40.0]: https://github.com/cavifaxhq/cavifax/compare/v0.39.0...v0.40.0
+[0.39.0]: https://github.com/cavifaxhq/cavifax/compare/v0.38.0...v0.39.0
+[0.38.0]: https://github.com/cavifaxhq/cavifax/compare/v0.37.0...v0.38.0
+[0.37.0]: https://github.com/cavifaxhq/cavifax/compare/v0.36.0...v0.37.0
+[0.36.0]: https://github.com/cavifaxhq/cavifax/compare/v0.35.0...v0.36.0
+[0.35.0]: https://github.com/cavifaxhq/cavifax/compare/v0.34.4...v0.35.0
+[0.34.4]: https://github.com/cavifaxhq/cavifax/compare/v0.34.3...v0.34.4
+[0.34.3]: https://github.com/cavifaxhq/cavifax/compare/v0.34.2...v0.34.3
+[0.34.2]: https://github.com/cavifaxhq/cavifax/compare/v0.34.1...v0.34.2
+[0.34.1]: https://github.com/cavifaxhq/cavifax/compare/v0.34.0...v0.34.1
+[0.34.0]: https://github.com/cavifaxhq/cavifax/compare/v0.33.0...v0.34.0
+[0.33.0]: https://github.com/cavifaxhq/cavifax/compare/v0.32.0...v0.33.0
+[0.32.0]: https://github.com/cavifaxhq/cavifax/compare/v0.31.0...v0.32.0
+[0.31.0]: https://github.com/cavifaxhq/cavifax/compare/v0.30.0...v0.31.0
+[0.30.0]: https://github.com/cavifaxhq/cavifax/compare/v0.29.0...v0.30.0
+[0.29.0]: https://github.com/cavifaxhq/cavifax/compare/v0.28.1...v0.29.0
+[0.28.1]: https://github.com/cavifaxhq/cavifax/compare/v0.28.0...v0.28.1
+[0.28.0]: https://github.com/cavifaxhq/cavifax/compare/v0.27.0...v0.28.0
+[0.27.0]: https://github.com/cavifaxhq/cavifax/compare/v0.26.0...v0.27.0
+[0.26.0]: https://github.com/cavifaxhq/cavifax/compare/v0.25.0...v0.26.0
+[0.25.0]: https://github.com/cavifaxhq/cavifax/compare/v0.24.1...v0.25.0
+[0.24.1]: https://github.com/cavifaxhq/cavifax/compare/v0.24.0...v0.24.1
+[0.24.0]: https://github.com/cavifaxhq/cavifax/compare/v0.23.0...v0.24.0
+[0.23.0]: https://github.com/cavifaxhq/cavifax/compare/v0.22.0...v0.23.0
+[0.22.0]: https://github.com/cavifaxhq/cavifax/compare/v0.21.0...v0.22.0
+[0.21.0]: https://github.com/cavifaxhq/cavifax/compare/v0.20.0...v0.21.0
+[0.20.0]: https://github.com/cavifaxhq/cavifax/compare/v0.19.1...v0.20.0
+[0.19.1]: https://github.com/cavifaxhq/cavifax/compare/v0.19.0...v0.19.1
+[0.19.0]: https://github.com/cavifaxhq/cavifax/compare/v0.18.0...v0.19.0
+[0.18.0]: https://github.com/cavifaxhq/cavifax/compare/v0.17.1...v0.18.0
+[0.17.1]: https://github.com/cavifaxhq/cavifax/compare/v0.17.0...v0.17.1
+[0.17.0]: https://github.com/cavifaxhq/cavifax/compare/v0.16.3...v0.17.0
+[0.16.3]: https://github.com/cavifaxhq/cavifax/compare/v0.16.2...v0.16.3
+[0.16.2]: https://github.com/cavifaxhq/cavifax/compare/v0.16.1...v0.16.2
+[0.16.1]: https://github.com/cavifaxhq/cavifax/compare/v0.16.0...v0.16.1
+[0.16.0]: https://github.com/cavifaxhq/cavifax/compare/v0.15.0...v0.16.0
+[0.15.0]: https://github.com/cavifaxhq/cavifax/compare/v0.14.0...v0.15.0
+[0.14.0]: https://github.com/cavifaxhq/cavifax/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/cavifaxhq/cavifax/compare/v0.12.1...v0.13.0
+[0.12.1]: https://github.com/cavifaxhq/cavifax/compare/v0.12.0...v0.12.1
+[0.12.0]: https://github.com/cavifaxhq/cavifax/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/cavifaxhq/cavifax/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/cavifaxhq/cavifax/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/cavifaxhq/cavifax/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/cavifaxhq/cavifax/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/cavifaxhq/cavifax/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/cavifaxhq/cavifax/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/cavifaxhq/cavifax/compare/v0.4.1...v0.5.0
+[0.4.1]: https://github.com/cavifaxhq/cavifax/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/cavifaxhq/cavifax/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/cavifaxhq/cavifax/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/cavifaxhq/cavifax/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/cavifaxhq/cavifax/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/cavifaxhq/cavifax/releases/tag/v0.1.0

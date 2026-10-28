@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 from scipy.ndimage import label, binary_dilation
 
-ROOT = r"d:\music PP\sonora"
+ROOT = str(Path(__file__).resolve().parents[1])
 ASSETS_SKINS = os.path.join(ROOT, "android_app", "app", "src", "main", "assets", "skins")
 ASSETS_DDSC = os.path.join(ROOT, "android_app", "app", "src", "main", "assets", "ddsc")
 RES_DRAWABLE = os.path.join(ROOT, "android_app", "app", "src", "main", "res", "drawable")

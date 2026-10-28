@@ -12,6 +12,6 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "Sonora"
+rootProject.name = "Cavifax"
 include(":app")
 

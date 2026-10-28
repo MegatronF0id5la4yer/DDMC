@@ -258,7 +258,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         workdir = Path(tmp)
 
-        scalable = assets / "linux" / "sonora.svg"
+        scalable = assets / "linux" / "cavifax.svg"
         scalable.parent.mkdir(parents=True, exist_ok=True)
         scalable.write_text(round_svg(master, 512), encoding="utf-8")
 
@@ -275,7 +275,7 @@ def main():
                 / "hicolor"
                 / f"{pixels}x{pixels}"
                 / "apps"
-                / "sonora.png"
+                / "cavifax.png"
             )
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(blob)
@@ -288,7 +288,7 @@ def main():
                     squircle_svg(master, pixels), pixels, workdir, f"m{pixels}"
                 )
             icns.append((kind, rendered[pixels]))
-        write_icns(icns, assets / "macos" / "sonora.icns")
+        write_icns(icns, assets / "macos" / "cavifax.icns")
 
         ico = [
             (
@@ -299,14 +299,14 @@ def main():
         ]
         windows = assets / "windows"
         windows.mkdir(parents=True, exist_ok=True)
-        write_ico(ico, windows / "sonora.ico")
+        write_ico(ico, windows / "cavifax.ico")
 
         tray = assets / "tray"
         tray.mkdir(parents=True, exist_ok=True)
         for pixels in TRAY_SIZES:
             blob = rasterize(template_svg(master), pixels, workdir, f"t{pixels}")
             (tray / f"template-{pixels}.png").write_bytes(blob)
-        (tray / "sonora.png").write_bytes(
+        (tray / "cavifax.png").write_bytes(
             rasterize(round_svg(master, 32), 32, workdir, "tray")
         )
 

@@ -102,7 +102,7 @@ impl Io {
             .worker_threads(WORKERS)
             .max_blocking_threads(BLOCKING)
             .thread_keep_alive(LINGER)
-            .thread_name("sonora-io")
+            .thread_name("cavifax-io")
             .enable_all()
             .build()?;
 
@@ -164,7 +164,7 @@ pub(crate) fn settled<T>(result: Result<T>, cx: &mut gpui::App) -> std::result::
     }
 }
 
-pub struct Sonora {
+pub struct Cavifax {
     pub session: Entity<Session>,
     pub cover: Entity<Cover>,
     pub drm: Entity<Drm>,
@@ -187,9 +187,9 @@ pub struct Sonora {
     pub wake: Entity<Wake>,
 }
 
-impl Global for Sonora {}
+impl Global for Cavifax {}
 
-impl Sonora {
+impl Cavifax {
     pub fn global(cx: &App) -> &Self {
         cx.global()
     }
@@ -280,7 +280,7 @@ pub fn init(
         cx,
     );
 
-    cx.set_global(Sonora {
+    cx.set_global(Cavifax {
         session,
         cover,
         drm,

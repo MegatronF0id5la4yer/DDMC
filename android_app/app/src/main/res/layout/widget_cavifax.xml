@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent">
+
+    <!-- Dynamic Glassmorphic Rounded Backdrop + Audio Spectrum Canvas -->
+    <ImageView
+        android:id="@+id/widget_bg_canvas"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_background_rounded" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:paddingStart="12dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="10dp">
+
+        <!-- Row 1: Album Cover + Track Metadata + Interactive 3D Doki Companion -->
+        <RelativeLayout
+            android:id="@+id/widget_top_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <ImageView
+                android:id="@+id/widget_cover"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="11dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/doki_natsuki" />
+
+            <!-- Interactive 3D Doki Companion on Right Side -->
+            <ImageView
+                android:id="@+id/widget_doki_companion"
+                android:layout_width="52dp"
+                android:layout_height="62dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="6dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/doki_natsuki" />
+
+            <LinearLayout
+                android:id="@+id/widget_meta_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toStartOf="@id/widget_doki_companion"
+                android:layout_toEndOf="@id/widget_cover"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="3dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/widget_doki_avatar"
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
+                        android:layout_marginEnd="5dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/doki_natsuki" />
+
+                    <TextView
+                        android:id="@+id/widget_quality_badge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/widget_badge_flac"
+                        android:paddingStart="6dp"
+                        android:paddingTop="1dp"
+                        android:paddingEnd="6dp"
+                        android:paddingBottom="1dp"
+                        android:text="HI-RES AUDIO"
+                        android:textColor="#38BDF8"
+                        android:textSize="8.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/widget_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Doki Doki Music Club"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_artist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Toca para reproducir"
+                    android:textColor="#CBD5E1"
+                    android:textSize="11.5sp" />
+            </LinearLayout>
+        </RelativeLayout>
+
+        <!-- Row 2: Progress Bar + Timestamps -->
+        <LinearLayout
+            android:id="@+id/widget_progress_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_time_elapsed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="00:00"
+                android:textColor="#CBD5E1"
+                android:textSize="9.5sp"
+                android:textStyle="bold" />
+
+            <ProgressBar
+                android:id="@+id/widget_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="0dp"
+                android:layout_height="4dp"
+                android:layout_weight="1"
+                android:max="1000"
+                android:progress="0"
+                android:progressBackgroundTint="#33FFFFFF"
+                android:progressTint="#38BDF8" />
+
+            <TextView
+                android:id="@+id/widget_time_total"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="00:00"
+                android:textColor="#94A3B8"
+                android:textSize="9.5sp" />
+        </LinearLayout>
+
+        <!-- Row 3: Full-Width Modern Transport Controls Row -->
+        <LinearLayout
+            android:id="@+id/widget_controls_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/widget_fav_btn"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:padding="7dp"
+                android:src="@drawable/ic_heart"
+                android:tint="#E2E8F0" />
+
+            <ImageView
+                android:id="@+id/widget_rew_btn"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:padding="7dp"
+                android:src="@drawable/ic_chevron_left"
+                android:tint="#CBD5E1" />
+
+            <ImageView
+                android:id="@+id/widget_prev_btn"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:padding="7dp"
+                android:src="@drawable/ic_skip_prev"
+                android:tint="#FFFFFF" />
+
+            <ImageView
+                android:id="@+id/widget_play_btn"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_play_circle"
+                android:padding="10dp"
+                android:src="@drawable/ic_play_filled"
+                android:tint="#0F172A" />
+
+            <ImageView
+                android:id="@+id/widget_next_btn"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:padding="7dp"
+                android:src="@drawable/ic_skip_next"
+                android:tint="#FFFFFF" />
+
+            <ImageView
+                android:id="@+id/widget_ff_btn"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:padding="7dp"
+                android:src="@drawable/ic_chevron_right"
+                android:tint="#CBD5E1" />
+
+            <ImageView
+                android:id="@+id/widget_playlist_btn"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:padding="7dp"
+                android:src="@drawable/ic_repeat"
+                android:tint="#E2E8F0" />
+        </LinearLayout>
+
+        <!-- Row 4: Optional Current Queue Preview Section -->
+        <LinearLayout
+            android:id="@+id/widget_queue_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/widget_queue_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="2dp"
+                android:text="SIGUIENTE EN COLA"
+                android:textColor="#94A3B8"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_queue_item_1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:text="1. —"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_queue_item_2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:text="2. —"
+                android:textColor="#CBD5E1"
+                android:textSize="10.5sp" />
+
+            <TextView
+                android:id="@+id/widget_queue_item_3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:text="3. —"
+                android:textColor="#94A3B8"
+                android:textSize="10.5sp" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

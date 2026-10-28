@@ -854,7 +854,7 @@ impl Session {
     /// Rescans every configured local folder without changing the list, e.g. after files
     /// changed on disk or a tag was edited. A `thorough` rescan is the one the user asked for:
     /// it forgets what the last scan recorded, so every folder is listed and every file stat'd
-    /// again, which is the only way an edit made behind Sonora's back is noticed.
+    /// again, which is the only way an edit made behind Cavifax's back is noticed.
     pub fn rescan_local(&mut self, thorough: bool, cx: &mut Context<Self>) {
         if thorough {
             self.local_provider.forget_scan();

@@ -3,7 +3,7 @@
 //! Nothing here is about one service. A provider that streams CENC audio needs the same five
 //! things, and they are all this crate does:
 //!
-//! - [`find`] settles which CDM this process uses: one the user named, one in Sonora's own
+//! - [`find`] settles which CDM this process uses: one the user named, one in Cavifax's own
 //!   store, or one a browser on the machine has. [`offer`] and [`Offer::install`] put one into
 //!   that store from Google's component update service, the way Chrome and Kodi get theirs,
 //!   with Google's terms shown in between. Google publishes nothing anyone may redistribute,
@@ -17,7 +17,7 @@
 //!   and where each fragment starts on the media timeline.
 //! - [`cenc::unlock`] relabels the sample entry so an ordinary decoder will open the cleartext.
 //!
-//! `SONORA_WIDEVINE_CDM` overrides the search with a path of the user's choosing, which is what
+//! `CAVIFAX_WIDEVINE_CDM` overrides the search with a path of the user's choosing, which is what
 //! a package with a CDM of its own should set. With no module anywhere there is no Widevine
 //! playback and nothing else changes.
 //!
@@ -45,13 +45,13 @@ pub use fetch::{Offer, Release, fetch, latest, offer};
 pub use source::{Found, LIBRARY, Origin, configured, find, installed, store, stored, uninstall};
 
 /// The environment variable naming the CDM to load.
-pub const CDM_PATH: &str = "SONORA_WIDEVINE_CDM";
+pub const CDM_PATH: &str = "CAVIFAX_WIDEVINE_CDM";
 
 /// The environment variable that, when set to anything, skips the browser search. For trying
 /// the download on a machine that has a browser's copy.
-pub const SKIP_BROWSERS: &str = "SONORA_WIDEVINE_SKIP_BROWSERS";
+pub const SKIP_BROWSERS: &str = "CAVIFAX_WIDEVINE_SKIP_BROWSERS";
 
-/// The argument that starts the Sonora executable as the CDM host rather than the app. The
+/// The argument that starts the Cavifax executable as the CDM host rather than the app. The
 /// module path follows it.
 pub const HOST_ARG: &str = "--widevine-host";
 

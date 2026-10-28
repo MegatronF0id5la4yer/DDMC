@@ -1013,7 +1013,7 @@ impl Library {
     /// Changes the provider's own pin for `uri` and calls `done` with whether it stuck. A second
     /// change replaces the one in flight, so the last one wins and only its `done` runs. A pin
     /// the provider turns away for being past its limit or outside the library counts as stuck
-    /// too, since Sonora keeps the pin itself and the sidebar has no limit of its own.
+    /// too, since Cavifax keeps the pin itself and the sidebar has no limit of its own.
     pub fn set_pinned(
         &mut self,
         uri: String,

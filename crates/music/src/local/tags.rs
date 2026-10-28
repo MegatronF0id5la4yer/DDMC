@@ -456,7 +456,7 @@ pub(super) mod tests {
         info.extend_from_slice(&packed.to_be_bytes());
         info.extend_from_slice(&[0; 16]);
 
-        let vendor = b"sonora";
+        let vendor = b"cavifax";
         let mut block = Vec::new();
         block.extend_from_slice(&(vendor.len() as u32).to_le_bytes());
         block.extend_from_slice(vendor);
@@ -495,7 +495,7 @@ pub(super) mod tests {
 
     #[test]
     fn saving_a_new_title_keeps_every_genre() {
-        let dir = scratch("sonora-tags-test-genres");
+        let dir = scratch("cavifax-tags-test-genres");
         let path = dir.join("song.flac");
         flac(&path, &["TITLE=Song", "GENRE=Rock", "GENRE=Pop"]);
 
@@ -514,7 +514,7 @@ pub(super) mod tests {
 
     #[test]
     fn saving_a_new_title_keeps_the_full_date() {
-        let dir = scratch("sonora-tags-test-date");
+        let dir = scratch("cavifax-tags-test-date");
         let path = dir.join("song.flac");
         flac(&path, &["TITLE=Song", "DATE=2004-05-12"]);
 
@@ -531,7 +531,7 @@ pub(super) mod tests {
 
     #[test]
     fn saving_a_new_year_replaces_the_date() {
-        let dir = scratch("sonora-tags-test-year");
+        let dir = scratch("cavifax-tags-test-year");
         let path = dir.join("song.flac");
         flac(&path, &["TITLE=Song", "DATE=2004-05-12"]);
 

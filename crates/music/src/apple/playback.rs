@@ -3,7 +3,7 @@
 //! The engine, the threads, the queue and the gapless join are shared with every other
 //! provider. What is here is where the bytes come from and what a decoder over them looks like.
 //! A [`Media`] decrypts each sample through the system Widevine CDM just before it is read, so
-//! from `rodio`'s side this is an ordinary clear fMP4, and every sample then travels Sonora's
+//! from `rodio`'s side this is an ordinary clear fMP4, and every sample then travels Cavifax's
 //! own path: the equalizer, the volume ramp and the spectrum tap in `crate::audio`, out through
 //! cpal.
 //!

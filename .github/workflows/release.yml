@@ -35,11 +35,11 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             arch: x64compatible
-            setup: Sonora-Setup
+            setup: Cavifax-Setup
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
             arch: arm64
-            setup: Sonora-Setup-arm64
+            setup: Cavifax-Setup-arm64
     steps:
       - uses: actions/checkout@v5
 
@@ -75,7 +75,7 @@ jobs:
           cache-targets: false
           cache-on-failure: true
       - name: build
-        run: cargo build --release --locked --package sonora --target ${{ matrix.target }}
+        run: cargo build --release --locked --package cavifax --target ${{ matrix.target }}
 
       - name: sccache stats
         if: always()
@@ -91,20 +91,20 @@ jobs:
           case "$RUNNER_OS" in
             macOS)
               cp \
-                "target/$TARGET/release/sonora" \
-                "dist/sonora-$TARGET"
+                "target/$TARGET/release/cavifax" \
+                "dist/cavifax-$TARGET"
               ;;
 
             Windows)
               cp \
-                "target/$TARGET/release/sonora.exe" \
-                "dist/sonora-$VERSION-$TARGET.exe"
+                "target/$TARGET/release/cavifax.exe" \
+                "dist/cavifax-$VERSION-$TARGET.exe"
               ;;
 
             *)
               cp \
-                "target/$TARGET/release/sonora" \
-                "dist/sonora-$VERSION-$TARGET"
+                "target/$TARGET/release/cavifax" \
+                "dist/cavifax-$VERSION-$TARGET"
               ;;
           esac
 
@@ -119,17 +119,17 @@ jobs:
         env:
           VERSION: ${{ steps.meta.outputs.version }}
           TARGET: ${{ matrix.target }}
-          SONORA_ARCH: ${{ matrix.arch }}
-          SONORA_SETUP: ${{ matrix.setup }}
+          CAVIFAX_ARCH: ${{ matrix.arch }}
+          CAVIFAX_SETUP: ${{ matrix.setup }}
         run: |
           $number = $env:VERSION.TrimStart("v")
           if ($number -notmatch '^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$') {
             $number = "0.0.0"
           }
-          $env:SONORA_VERSION = $number
-          $env:SONORA_EXE = (Resolve-Path "target/$env:TARGET/release/sonora.exe").Path
-          $env:SONORA_DIST = (Resolve-Path "dist").Path
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "scripts/windows/sonora.iss"
+          $env:CAVIFAX_VERSION = $number
+          $env:CAVIFAX_EXE = (Resolve-Path "target/$env:TARGET/release/cavifax.exe").Path
+          $env:CAVIFAX_DIST = (Resolve-Path "dist").Path
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "scripts/windows/cavifax.iss"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -176,45 +176,45 @@ jobs:
           set -euo pipefail
 
           mkdir -p \
-            Sonora.app/Contents/MacOS \
-            Sonora.app/Contents/Resources
+            Cavifax.app/Contents/MacOS \
+            Cavifax.app/Contents/Resources
 
           lipo -create \
-            -output Sonora.app/Contents/MacOS/sonora \
-            darwin/sonora-aarch64-apple-darwin \
-            darwin/sonora-x86_64-apple-darwin
-          chmod +x Sonora.app/Contents/MacOS/sonora
-          lipo -info Sonora.app/Contents/MacOS/sonora
+            -output Cavifax.app/Contents/MacOS/cavifax \
+            darwin/cavifax-aarch64-apple-darwin \
+            darwin/cavifax-x86_64-apple-darwin
+          chmod +x Cavifax.app/Contents/MacOS/cavifax
+          lipo -info Cavifax.app/Contents/MacOS/cavifax
 
           cp \
-            assets/macos/sonora.icns \
-            Sonora.app/Contents/Resources/
+            assets/macos/cavifax.icns \
+            Cavifax.app/Contents/Resources/
 
           cp \
             COPYING \
-            Sonora.app/Contents/Resources/LICENSE
+            Cavifax.app/Contents/Resources/LICENSE
 
           cp \
             THIRD-PARTY.md \
-            Sonora.app/Contents/Resources/
+            Cavifax.app/Contents/Resources/
 
           cp \
             assets/fonts/LICENSE.txt \
-            Sonora.app/Contents/Resources/LICENSE.Inter
+            Cavifax.app/Contents/Resources/LICENSE.Inter
 
-          mkdir -p Sonora.app/Contents/Resources/icons
-          cp assets/icons/LICENSE Sonora.app/Contents/Resources/icons/LICENSE
+          mkdir -p Cavifax.app/Contents/Resources/icons
+          cp assets/icons/LICENSE Cavifax.app/Contents/Resources/icons/LICENSE
           for licence in assets/icons/*/LICENSE; do
             pack="$(basename "$(dirname "$licence")")"
-            cp "$licence" "Sonora.app/Contents/Resources/icons/LICENSE.$pack"
+            cp "$licence" "Cavifax.app/Contents/Resources/icons/LICENSE.$pack"
           done
 
           sed \
             "s/@VERSION@/$NUMBER/g" \
             assets/macos/Info.plist \
-            > Sonora.app/Contents/Info.plist
+            > Cavifax.app/Contents/Info.plist
 
-          plutil -lint Sonora.app/Contents/Info.plist
+          plutil -lint Cavifax.app/Contents/Info.plist
 
       - name: sign the bundle
         shell: bash
@@ -224,13 +224,13 @@ jobs:
           codesign \
             --force \
             --sign - \
-            Sonora.app
+            Cavifax.app
 
           codesign \
             --verify \
             --strict \
             --verbose=2 \
-            Sonora.app
+            Cavifax.app
 
       - name: create the disk image
         shell: bash
@@ -239,16 +239,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist staging
-          cp -R Sonora.app staging/
+          cp -R Cavifax.app staging/
           ln -s /Applications staging/Applications
           megabytes=$(du -ms staging | cut -f1)
           hdiutil create \
-            -volname Sonora \
+            -volname Cavifax \
             -srcfolder staging \
             -size "$((megabytes + 128))m" \
             -ov \
             -format UDZO \
-            "dist/sonora-$VERSION-macos.dmg"
+            "dist/cavifax-$VERSION-macos.dmg"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -302,7 +302,7 @@ jobs:
           update=""
           case "$number" in
             "" | *-*) ;;
-            *) update="gh-releases-zsync|${GITHUB_REPOSITORY%/*}|${GITHUB_REPOSITORY#*/}|latest|sonora-*-$ARCH.AppImage.zsync" ;;
+            *) update="gh-releases-zsync|${GITHUB_REPOSITORY%/*}|${GITHUB_REPOSITORY#*/}|latest|cavifax-*-$ARCH.AppImage.zsync" ;;
           esac
 
           {
@@ -347,8 +347,8 @@ jobs:
           set -euo pipefail
 
           mkdir -p AppDir/usr/bin
-          cp "staged/sonora-$VERSION-$TARGET" AppDir/usr/bin/sonora
-          chmod +x AppDir/usr/bin/sonora
+          cp "staged/cavifax-$VERSION-$TARGET" AppDir/usr/bin/cavifax
+          chmod +x AppDir/usr/bin/cavifax
 
           # Every asset is compiled into the executable, so the AppDir carries the desktop entry
           # and the icons for the host's launcher and nothing else.
@@ -359,34 +359,34 @@ jobs:
           # entry the Flatpak and the distribution packages install stays as it is.
           homepage="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
           mkdir -p desktop
-          cp assets/linux/sonora.desktop desktop/sonora.desktop
+          cp assets/linux/cavifax.desktop desktop/cavifax.desktop
           {
-            echo "X-AppImage-Name=Sonora"
+            echo "X-AppImage-Name=Cavifax"
             echo "X-AppImage-Arch=$ARCH"
             echo "X-AppImage-Homepage=$homepage"
             if [ -n "$NUMBER" ]; then echo "X-AppImage-Version=$NUMBER"; fi
             if [ -n "$UPDATE" ]; then echo "X-AppImage-UpdateURL=$homepage"; fi
-          } >> desktop/sonora.desktop
-          desktop-file-validate desktop/sonora.desktop
+          } >> desktop/cavifax.desktop
+          desktop-file-validate desktop/cavifax.desktop
 
           ./linuxdeploy \
             --appdir AppDir \
-            --executable AppDir/usr/bin/sonora \
-            --desktop-file desktop/sonora.desktop \
-            --icon-file assets/linux/sonora.svg
+            --executable AppDir/usr/bin/cavifax \
+            --desktop-file desktop/cavifax.desktop \
+            --icon-file assets/linux/cavifax.svg
 
           # The Vulkan loader has to be the host's: it is what finds the host's ICD, and a loader
           # this old paired with a current driver is how an AppImage stops starting.
           rm -f AppDir/usr/lib/libvulkan.so.1*
 
-          mkdir -p AppDir/usr/share/doc/sonora/icons
-          cp COPYING AppDir/usr/share/doc/sonora/LICENSE
-          cp THIRD-PARTY.md AppDir/usr/share/doc/sonora/
-          cp assets/fonts/LICENSE.txt AppDir/usr/share/doc/sonora/LICENSE.Inter
-          cp assets/icons/LICENSE AppDir/usr/share/doc/sonora/icons/LICENSE
+          mkdir -p AppDir/usr/share/doc/cavifax/icons
+          cp COPYING AppDir/usr/share/doc/cavifax/LICENSE
+          cp THIRD-PARTY.md AppDir/usr/share/doc/cavifax/
+          cp assets/fonts/LICENSE.txt AppDir/usr/share/doc/cavifax/LICENSE.Inter
+          cp assets/icons/LICENSE AppDir/usr/share/doc/cavifax/icons/LICENSE
           for licence in assets/icons/*/LICENSE; do
             pack="$(basename "$(dirname "$licence")")"
-            cp "$licence" "AppDir/usr/share/doc/sonora/icons/LICENSE.$pack"
+            cp "$licence" "AppDir/usr/share/doc/cavifax/icons/LICENSE.$pack"
           done
 
       - name: build the AppImage
@@ -396,7 +396,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          image="sonora-$VERSION-$ARCH.AppImage"
+          image="cavifax-$VERSION-$ARCH.AppImage"
 
           # Given update information, appimagetool embeds it and writes the .zsync that
           # AppImageUpdate diffs against beside the image, with a zsyncmake of its own.
@@ -415,13 +415,13 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
-          image="sonora-$VERSION-$ARCH.AppImage"
+          image="cavifax-$VERSION-$ARCH.AppImage"
           "./$image" --appimage-extract > /dev/null
-          test -x squashfs-root/usr/bin/sonora
-          test -f squashfs-root/sonora.desktop
-          grep -qx "X-AppImage-Arch=$ARCH" squashfs-root/sonora.desktop
+          test -x squashfs-root/usr/bin/cavifax
+          test -f squashfs-root/cavifax.desktop
+          grep -qx "X-AppImage-Arch=$ARCH" squashfs-root/cavifax.desktop
           if [ -n "$NUMBER" ]; then
-            grep -qx "X-AppImage-Version=$NUMBER" squashfs-root/sonora.desktop
+            grep -qx "X-AppImage-Version=$NUMBER" squashfs-root/cavifax.desktop
           fi
           if [ -n "$UPDATE" ]; then
             test -f "$image.zsync"
@@ -430,9 +430,9 @@ jobs:
           else
             test ! -e "$image.zsync"
           fi
-          test -f squashfs-root/usr/share/doc/sonora/THIRD-PARTY.md
+          test -f squashfs-root/usr/share/doc/cavifax/THIRD-PARTY.md
           test ! -e squashfs-root/usr/lib/libvulkan.so.1
-          ldd squashfs-root/usr/bin/sonora
+          ldd squashfs-root/usr/bin/cavifax
           rm -rf squashfs-root
 
       - uses: actions/upload-artifact@v4
@@ -488,7 +488,7 @@ jobs:
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           manifest-path: flatpak/flatpak-builder.yaml
-          bundle: sonora-${{ steps.meta.outputs.version }}-${{ matrix.variant.arch }}.flatpak
+          bundle: cavifax-${{ steps.meta.outputs.version }}-${{ matrix.variant.arch }}.flatpak
           arch: ${{ matrix.variant.arch }}
           upload-artifact: true
           artifact-name: flatpak-${{ matrix.variant.arch }}
@@ -549,7 +549,7 @@ jobs:
               site/repo "$bundle"
           done
           flatpak build-update-repo \
-            --title=Sonora \
+            --title=Cavifax \
             --generate-static-deltas \
             --prune \
             --prune-depth=3 \
@@ -615,7 +615,7 @@ jobs:
             pack="$(basename "$(dirname "$licence")")"
             cp "$licence" "licenses/icons/LICENSE.$pack"
           done
-          tar -czf "dist/sonora-$VERSION-licenses.tar.gz" -C licenses .
+          tar -czf "dist/cavifax-$VERSION-licenses.tar.gz" -C licenses .
 
       - name: checksums
         run: cd dist && shasum -a 256 * > SHA256SUMS
