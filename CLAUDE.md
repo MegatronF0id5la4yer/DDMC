@@ -1,3 +1,9 @@
+# REGLAS CRITICAS PERMANENTES (DDMC / CAVIFAX)
+- **Carpeta de APKs local (apks/)**: Toda APK compilada debe guardarse archivada en apks/DDMC_vX.X.X.apk. La carpeta apks/ NUNCA se sube a Git. Ver RULES_APKS.txt.
+- **Version Troll Prohibida**: DDMC_Version_Troll.apk fue una broma y es INEXISTENTE. Solo compilar y mantener releases/DDMC.apk (assembleStandardDebug, package com.cavifax.bagresuko).
+- **GitHub Releases & README**: Cada nueva version debe publicarse en GitHub Releases (MegatronF0id5la4yer/DDMC) con releases/DDMC.apk, actualizando README.md y releases/README.md.
+- **Rebranding Total**: Cero menciones a nombres antiguos (Sonora/MusicOlet/Namida/Spotiflac). Usar siempre Cavifax / Chris Chan / Aimep3 / Bagresuko.
+
 # cavifax
 
 A native music streaming client, built with Rust and [GPUI](https://github.com/zed-industries/zed)

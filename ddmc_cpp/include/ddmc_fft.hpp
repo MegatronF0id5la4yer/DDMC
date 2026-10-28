@@ -14,6 +14,11 @@ public:
     void setPerfMode(PerfMode mode);
     PerfMode getPerfMode() const { return m_perfMode; }
 
+    void setVisualizerSensitivity(float sensitivity) {
+        m_sensitivity = std::max(0.15f, std::min(sensitivity, 4.0f));
+    }
+    float getVisualizerSensitivity() const { return m_sensitivity; }
+
     // Feeds PCM samples (mono or stereo interleaved float buffer, [-1.0f, 1.0f])
     void feedAudioSamples(const float* samples, size_t sampleCount, uint32_t channels);
 
@@ -41,6 +46,7 @@ private:
     float m_rawMagnitudes[HALF_FFT] = {0.0f};
 
     float m_agcPeak = 0.08f;
+    float m_sensitivity = 1.0f;
     float m_beatHistory[16] = {0.0f};
     int m_beatHistIdx = 0;
 };

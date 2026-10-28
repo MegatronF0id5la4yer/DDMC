@@ -45,6 +45,13 @@ Java_com_cavifax_bagresuko_DdmcNative_nativeSetPerfMode(JNIEnv* env, jclass claz
 }
 
 JNIEXPORT void JNICALL
+Java_com_cavifax_bagresuko_DdmcNative_nativeSetVisualizerSensitivity(JNIEnv* env, jclass clazz, jfloat sensitivity) {
+    if (s_analyzer) {
+        s_analyzer->setVisualizerSensitivity(static_cast<float>(sensitivity));
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_com_cavifax_bagresuko_DdmcNative_nativeFeedAudioSamples(
     JNIEnv* env, jclass clazz, jfloatArray samples, jint count, jint channels) {
     if (!s_analyzer || !samples || count <= 0 || channels <= 0) return;

@@ -21,6 +21,7 @@ object DdmcNative {
 
     external fun nativeInit(perfMode: Int): Boolean
     external fun nativeSetPerfMode(perfMode: Int)
+    external fun nativeSetVisualizerSensitivity(sensitivity: Float)
     external fun nativeFeedAudioSamples(samples: FloatArray, count: Int, channels: Int)
     external fun nativeFeedFftBytes(rawFft: ByteArray, count: Int)
     external fun nativeProcessFft(
@@ -70,6 +71,13 @@ object DdmcNative {
         if (!isAvailable || bytes == null) return
         try {
             nativeFeedFftBytes(bytes, bytes.size)
+        } catch (_: Throwable) {}
+    }
+
+    fun setVisualizerSensitivity(sensitivity: Float) {
+        if (!isAvailable) return
+        try {
+            nativeSetVisualizerSensitivity(sensitivity)
         } catch (_: Throwable) {}
     }
 

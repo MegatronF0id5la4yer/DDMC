@@ -1,0 +1,38 @@
+================================================================================
+REGLAS OBLIGATORIAS PERMANENTES PARA ASISTENTES Y MODELOS DE IA
+DDMC / CAVIFAX - CRIS CHAN - AIMEP3 - BAGRESUKO
+================================================================================
+ESTAS REGLAS DEBEN SEGUIRSE SIEMPRE, SIN EXCEPCIÓN, POR CUALQUIER MODELO DE IA
+(Antigravity, Claude, ChatGPT, Gemini, etc.) EN CADA SESIÓN Y CADA TURNO.
+
+1. CARPETA DE RESPALDO DE APKS LOCAL ('apks/'):
+   - Cada vez que se compile una versión de la APK (assembleStandardDebug), DEBE
+     guardarse una copia archivada en la carpeta 'apks/' en la raíz del proyecto.
+   - Formato de nombre: 'apks/DDMC_vX.X.X.apk'
+     (Ejemplo: 'apks/DDMC_v2.0.7.apk', 'apks/DDMC_v2.0.8.apk').
+   - La carpeta 'apks/' NUNCA se sube a Git. Permanece siempre excluida en .gitignore.
+
+2. VERSIÓN TROLL TOTALMENTE PROHIBIDA E INEXISTENTE:
+   - La versión troll ('DDMC_Version_Troll.apk' / flavor 'trollDebug') fue una broma
+     y se considera COMPLETAMENTE INEXISTENTE.
+   - NUNCA compilarla, NUNCA actualizarla, NUNCA subirla a GitHub Releases ni
+     mencionarla como opción en el README ni en las respuestas al usuario.
+   - ÚNICAMENTE compilar, instalar y distribuir la versión estándar limpia:
+     'releases/DDMC.apk' (flavor 'standardDebug', package 'com.cavifax.bagresuko').
+
+3. DISTRIBUCIÓN PÚBLICA EN GITHUB RELEASES:
+   - Cada vez que se implementen mejoras o nuevas versiones:
+     a) Compilar la APK estándar:
+        cd android_app && .\gradlew.bat assembleStandardDebug --console=plain
+     b) Copiar la APK a:
+        - 'releases/DDMC.apk' (para el enlace canónico de releases)
+        - 'apks/DDMC_vX.X.X.apk' (para el respaldo local versionado)
+     c) Subir 'releases/DDMC.apk' a la Release correspondiente de GitHub
+        (MegatronF0id5la4yer/DDMC) bajo el tag 'vX.X.X'.
+     d) Actualizar 'README.md' y 'releases/README.md' con las notas y enlace de la versión.
+     e) Hacer commit y push a la rama 'main'.
+
+4. REBRANDING ESTRICTO:
+   - NUNCA usar ni mencionar los nombres antiguos: Sonora, MusicOlet, Namida o Spotiflac.
+   - Usar siempre: Cavifax / Chris Chan / Aimep3 / Bagresuko.
+================================================================================

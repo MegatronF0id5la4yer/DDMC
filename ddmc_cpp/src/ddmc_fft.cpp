@@ -166,12 +166,13 @@ void FftAnalyzer::process(float dtSec) {
     }
     float refPeak = std::max(0.022f, std::min(m_agcPeak * 1.08f, 0.48f));
 
-    // 3. Perceptual dB curve + contrast shaping
+    // 3. Perceptual dB curve + contrast shaping with user-controlled sensitivity
     float shapedBands[64] = {0.0f};
     for (int i = 0; i < bands; ++i) {
-        float norm = (rawBandTilt[i] / refPeak);
-        // Clean noise gate
-        norm = std::max(0.0f, norm - 0.025f);
+        float norm = (rawBandTilt[i] / refPeak) * m_sensitivity;
+        // Clean noise gate (dynamically scaled with sensitivity)
+        float gate = 0.024f / std::max(0.4f, std::sqrt(m_sensitivity));
+        norm = std::max(0.0f, norm - gate);
         float logNorm = std::log10(1.0f + norm * 12.0f) / std::log10(13.0f);
         logNorm = std::max(0.0f, std::min(1.0f, logNorm));
         // Power contrast so beats punch sharply while quiet parts stay low

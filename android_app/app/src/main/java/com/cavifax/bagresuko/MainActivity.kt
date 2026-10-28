@@ -1,5 +1,8 @@
 package com.cavifax.bagresuko
 
+import java.util.Locale
+import kotlin.math.roundToInt
+
 import android.Manifest
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
@@ -258,6 +261,16 @@ class VisualizerView(context: Context) : View(context) {
             field = value
             postInvalidateOnAnimation()
         }
+    var sensitivity: Float = CavifaxStore.getFloat(context, "viz_sensitivity", 1.0f)
+        set(value) {
+            val clamped = value.coerceIn(0.2f, 3.5f)
+            field = clamped
+            CavifaxStore.putFloat(context, "viz_sensitivity", clamped)
+            if (DdmcNative.isAvailable) {
+                DdmcNative.setVisualizerSensitivity(clamped)
+            }
+            postInvalidateOnAnimation()
+        }
     var visualMode = 0
 
     companion object {
@@ -281,6 +294,9 @@ class VisualizerView(context: Context) : View(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        if (DdmcNative.isAvailable) {
+            DdmcNative.setVisualizerSensitivity(sensitivity)
+        }
         postInvalidateOnAnimation()
     }
 
@@ -347,7 +363,7 @@ class VisualizerView(context: Context) : View(context) {
                 }
                 val avg = if (count > 0) sum / count else 0f
                 // Logarithmic dB boost so quiet and loud passages look vivid
-                val boost = 1f + ratio * 1.35f
+                val boost = (1f + ratio * 1.35f) * sensitivity
                 val dbNorm = ((log10(1f + avg * boost) / 2.05f)).coerceIn(0.05f, 1.0f)
                 val prev = magnitudes[i]
                 magnitudes[i] = if (dbNorm > prev) (prev * 0.35f + dbNorm * 0.65f) else (prev * 0.78f + dbNorm * 0.22f)
@@ -388,7 +404,7 @@ class VisualizerView(context: Context) : View(context) {
             val wave1 = (sin(phase * 1.6f + i * 0.32f) + 1f) * 0.16f
             val wave2 = (cos(phase * 2.4f - i * 0.48f) + 1f) * 0.11f
             val target = if (isPlaying) {
-                (0.10f + bassEnv + midEnv + hiEnv + wave1 + wave2).coerceIn(0.08f, 0.96f)
+                (0.08f + (bassEnv + midEnv + hiEnv + wave1 + wave2) * sensitivity).coerceIn(0.06f, 0.98f)
             } else {
                 0.05f
             }
@@ -2490,7 +2506,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                     showVizHudBadge(if (fullscreenWindowId != null) "Pantalla Completa: Visualizador (Desliza para cambiar)" else "Cuadrícula Restaurada")
                     reorderStageContainers()
                 },
-                onMoreClick = { cycleVisualizerMode() }
+                onMoreClick = { showVisualizerQuickOptionsDialog() }
             ).apply {
                 onScaleUpdate = { _, label ->
                     reorderStageContainers(instant = true)
@@ -3765,6 +3781,90 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
             root.addView(vizHBtn)
 
+            // ---- Sensibilidad del Visualizador ----
+            val vizSensTitle = TextView(this).apply {
+                text = "Sensibilidad del Visualizador"
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                setPadding(0, dp(8), 0, dp(4))
+            }
+            root.addView(vizSensTitle)
+
+            var layoutSens = CavifaxStore.getFloat(this, "viz_sensitivity", 1.0f)
+            var layoutSensPct = (layoutSens * 100f).roundToInt()
+
+            val vizSensLabel = TextView(this).apply {
+                text = "Sensibilidad: $layoutSensPct% (${String.format(Locale.US, "%.1fx", layoutSens)})"
+                setTextColor(Color.parseColor(Pal.ACCENT))
+                textSize = 13f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                setPadding(0, 0, 0, dp(4))
+            }
+            root.addView(vizSensLabel)
+
+            val vizSensSb = SeekBar(this).apply {
+                max = 275
+                progress = (layoutSensPct - 25).coerceIn(0, 275)
+                progressTintList = ColorStateList.valueOf(Color.parseColor(Pal.ACCENT))
+                thumbTintList = ColorStateList.valueOf(Color.WHITE)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                        val pct = p + 25
+                        val fVal = pct / 100f
+                        vizSensLabel.text = "Sensibilidad: $pct% (${String.format(Locale.US, "%.1fx", fVal)})"
+                        if (fromUser) {
+                            CavifaxStore.putFloat(this@MainActivity, "viz_sensitivity", fVal)
+                            visualizerView.sensitivity = fVal
+                            visualizerStripView.sensitivity = fVal
+                            showVizHudBadge("Sensibilidad: $pct%")
+                        }
+                    }
+                    override fun onStartTrackingTouch(sb: SeekBar?) {}
+                    override fun onStopTrackingTouch(sb: SeekBar?) {
+                        val fVal = (progress + 25) / 100f
+                        CavifaxStore.putFloat(this@MainActivity, "viz_sensitivity", fVal)
+                        visualizerView.sensitivity = fVal
+                        visualizerStripView.sensitivity = fVal
+                    }
+                })
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(8)
+                }
+            }
+            root.addView(vizSensSb)
+
+            val layoutPresetsRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(14)
+                }
+            }
+            val lPresets = listOf(
+                Pair("50% (Baja)", 0.5f),
+                Pair("100% (Normal)", 1.0f),
+                Pair("175% (Alta)", 1.75f),
+                Pair("250% (Extrema)", 2.5f)
+            )
+            for ((name, fVal) in lPresets) {
+                val pBtn = Pill(this, name, R.drawable.ic_waveform, 30).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        marginEnd = dp(4)
+                    }
+                    setOnClickListener {
+                        val pct = (fVal * 100f).roundToInt()
+                        vizSensSb.progress = (pct - 25).coerceIn(0, 275)
+                        vizSensLabel.text = "Sensibilidad: $pct% (${String.format(Locale.US, "%.1fx", fVal)})"
+                        CavifaxStore.putFloat(this@MainActivity, "viz_sensitivity", fVal)
+                        visualizerView.sensitivity = fVal
+                        visualizerStripView.sensitivity = fVal
+                        showVizHudBadge("Sensibilidad: $pct%")
+                    }
+                }
+                layoutPresetsRow.addView(pBtn)
+            }
+            root.addView(layoutPresetsRow)
+
             val videoModeRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -4526,6 +4626,126 @@ class MainActivity : AppCompatActivity(), RowHost {
         visualizerView.visualMode = (next + 2) % VisualizerView.MODE_NAMES.size
         val modeName = VisualizerView.MODE_NAMES[next].uppercase()
         visualizerModeBadge.text = "$modeName \u2022 TOCA PARA CAMBIAR"
+        }
+    }
+
+    fun showVisualizerQuickOptionsDialog() {
+        showSheet { root, dialog ->
+            root.addView(sheetTitle("Ajustes del Visualizador", "Sensibilidad del espectro, modos y posición"))
+
+            val sensTitle = TextView(this).apply {
+                text = "Sensibilidad de Respuesta"
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                setPadding(0, dp(6), 0, dp(4))
+            }
+            root.addView(sensTitle)
+
+            var curSens = CavifaxStore.getFloat(this, "viz_sensitivity", 1.0f)
+            var curSensPct = (curSens * 100f).roundToInt()
+
+            val sensLabel = TextView(this).apply {
+                text = "Sensibilidad: $curSensPct% (${String.format(Locale.US, "%.1fx", curSens)})"
+                setTextColor(Color.parseColor(Pal.ACCENT))
+                textSize = 13f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                setPadding(0, 0, 0, dp(4))
+            }
+            root.addView(sensLabel)
+
+            val sensSb = SeekBar(this).apply {
+                max = 275
+                progress = (curSensPct - 25).coerceIn(0, 275)
+                progressTintList = ColorStateList.valueOf(Color.parseColor(Pal.ACCENT))
+                thumbTintList = ColorStateList.valueOf(Color.WHITE)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                        val pct = p + 25
+                        val fVal = pct / 100f
+                        sensLabel.text = "Sensibilidad: $pct% (${String.format(Locale.US, "%.1fx", fVal)})"
+                        if (fromUser) {
+                            CavifaxStore.putFloat(this@MainActivity, "viz_sensitivity", fVal)
+                            visualizerView.sensitivity = fVal
+                            visualizerStripView.sensitivity = fVal
+                            showVizHudBadge("Sensibilidad: $pct%")
+                        }
+                    }
+                    override fun onStartTrackingTouch(sb: SeekBar?) {}
+                    override fun onStopTrackingTouch(sb: SeekBar?) {
+                        val fVal = (progress + 25) / 100f
+                        CavifaxStore.putFloat(this@MainActivity, "viz_sensitivity", fVal)
+                        visualizerView.sensitivity = fVal
+                        visualizerStripView.sensitivity = fVal
+                    }
+                })
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(8)
+                }
+            }
+            root.addView(sensSb)
+
+            val presetsRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(14)
+                }
+            }
+            val presets = listOf(
+                Pair("50% (Baja)", 0.5f),
+                Pair("100% (Normal)", 1.0f),
+                Pair("175% (Alta)", 1.75f),
+                Pair("250% (Extrema)", 2.5f)
+            )
+            for ((name, fVal) in presets) {
+                val pBtn = Pill(this, name, R.drawable.ic_waveform, 30).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        marginEnd = dp(4)
+                    }
+                    setOnClickListener {
+                        val pct = (fVal * 100f).roundToInt()
+                        sensSb.progress = (pct - 25).coerceIn(0, 275)
+                        sensLabel.text = "Sensibilidad: $pct% (${String.format(Locale.US, "%.1fx", fVal)})"
+                        CavifaxStore.putFloat(this@MainActivity, "viz_sensitivity", fVal)
+                        visualizerView.sensitivity = fVal
+                        visualizerStripView.sensitivity = fVal
+                        showVizHudBadge("Sensibilidad: $pct%")
+                    }
+                }
+                presetsRow.addView(pBtn)
+            }
+            root.addView(presetsRow)
+
+            val modesTitle = TextView(this).apply {
+                text = "Modo Visual (10 Estilos)"
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+                setPadding(0, dp(4), 0, dp(8))
+            }
+            root.addView(modesTitle)
+
+            val modesBox = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(14)
+                }
+            }
+            for (idx in VisualizerView.MODE_NAMES.indices) {
+                val modeBtn = Pill(this, VisualizerView.MODE_NAMES[idx], R.drawable.ic_sparkles, 32).apply {
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        bottomMargin = dp(6)
+                    }
+                    setOnClickListener {
+                        visualizerView.visualMode = idx
+                        visualizerStripView.visualMode = idx
+                        showVizHudBadge(VisualizerView.MODE_NAMES[idx])
+                        dialog.dismiss()
+                    }
+                }
+                modesBox.addView(modeBtn)
+            }
+            root.addView(modesBox)
         }
     }
 

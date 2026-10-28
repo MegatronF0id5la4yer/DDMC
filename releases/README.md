@@ -1,36 +1,32 @@
-# DDMC Releases Folder
+# DDMC Official Releases
 
-This directory stores the official distribution APKs for DDMC.
+This directory stores the official distribution APK for DDMC.
 
 ---
 
-## Available Packages
+## Official Package
 
-### 1. `DDMC.apk`
+### `DDMC.apk`
 - **Flavor**: `standard`
-- **Application ID**: `com.sonora.music`
+- **Application ID**: `com.cavifax.bagresuko`
 - **App Name**: `DDMC`
+- **Version**: `v2.0.8`
 - **Target OS**: Android 8.0+ (API 26+)
-- **Description**: The official clean release of DDMC. Contains all 10 audio visualizers, Doki companion engine, hardware performance engine (Potato/Balanced/Ultra), video cover engine, and complete offline DSP suite. Zero interruptions or paywalls.
-- **Download**: [Direct Download](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.6/DDMC.apk)
+- **Description**: The official clean release of DDMC powered by the Cavifax, Chris Chan, Aimep3, and Bagresuko engine suite. Features 10 real-time audio visualizers with user-adjustable sensitivity (25% to 300%), 3D Blender 5.2 Satchely anime Doki companions with idol dance choreography, per-track video covers, multi-mode window snap grid, and complete offline DSP audio processing. Zero interruptions or telemetry.
+- **Download**: [Download DDMC.apk (v2.0.8)](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.8/DDMC.apk)
 
-### 2. `DDMC_Version_Troll.apk`
-- **Flavor**: `troll`
-- **Application ID**: `com.sonora.music.troll`
-- **App Name**: `DDMC Version Troll`
-- **Target OS**: Android 8.0+ (API 26+)
-- **Description**: Satirical edition featuring comic micro-paywall dialogs (Plan Ario Honorario, NostraCoins, Oveja Plus, Jerry Engine Pro) between player actions (play/pause, skip, shuffle, favorite, equalizer) with a 4-second mock ad and public poverty bypass.
-- **Download**: [Direct Download](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.6/DDMC_Version_Troll.apk)
+---
+
+## Local Versioned Archive (`apks/`)
+
+Every compiled version is preserved locally in the `apks/` directory (e.g. `apks/DDMC_v2.0.7.apk`, `apks/DDMC_v2.0.8.apk`). The `apks/` directory is kept offline and excluded from Git.
 
 ---
 
 ## Installation via ADB
 
-To install both editions simultaneously on a connected Android device:
+To install DDMC on a connected Android device:
 
 ```bash
 adb install -r DDMC.apk
-adb install -r DDMC_Version_Troll.apk
 ```
-
-Both apps will appear as separate launcher icons on your home screen.
