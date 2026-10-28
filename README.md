@@ -63,6 +63,19 @@ DDMC includes built-in interactive companions that celebrate and dance to real a
 | **Bocchi (Hitori Gotoh)** | ![Bocchi Stand](./docs/characters/bocchi_stand.png) | ![Bocchi Guitar](./docs/characters/bocchi_guitar.png) | Bocchi the Rock! |
 | **Konata Izumi** | ![Konata Stand](./docs/characters/konata_stand.png) | ![Konata Guitar](./docs/characters/konata_guitar.png) | Lucky Star |
 
+### 3D Characters (Blender 5.2 + `uv` Skeletal Rig & Animations)
+
+All 6 companions include 3D rigged meshes generated from their cleaned sprites via `uv` and headless **Blender 5.2** (`scripts/build_3d_characters.py` + `scripts/blender_rig_and_render.py`), complete with skeletal armature animations (`idle`, `walk`, `dance`, `jump`, `action`) and exported glTF 2.0 (`.glb`) 3D models:
+
+| Character | 3D Render (Blender 5.2) | 3D Dance Animation | 3D glTF Model (`.glb`) |
+|---|:---:|:---:|:---:|
+| **Monika** | ![Monika 3D](./docs/characters/3d/monika_3d.png) | ![Monika 3D Dance](./docs/characters/3d/monika_3d_dance.gif) | [`monika_3d.glb`](./docs/models3d/monika_3d.glb) |
+| **Sayori** | ![Sayori 3D](./docs/characters/3d/sayori_3d.png) | ![Sayori 3D Dance](./docs/characters/3d/sayori_3d_dance.gif) | [`sayori_3d.glb`](./docs/models3d/sayori_3d.glb) |
+| **Natsuki** | ![Natsuki 3D](./docs/characters/3d/natsuki_3d.png) | ![Natsuki 3D Dance](./docs/characters/3d/natsuki_3d_dance.gif) | [`natsuki_3d.glb`](./docs/models3d/natsuki_3d.glb) |
+| **Yuri** | ![Yuri 3D](./docs/characters/3d/yuri_3d.png) | ![Yuri 3D Dance](./docs/characters/3d/yuri_3d_dance.gif) | [`yuri_3d.glb`](./docs/models3d/yuri_3d.glb) |
+| **Bocchi** | ![Bocchi 3D](./docs/characters/3d/bocchi_3d.png) | ![Bocchi 3D Dance](./docs/characters/3d/bocchi_3d_dance.gif) | [`bocchi_3d.glb`](./docs/models3d/bocchi_3d.glb) |
+| **Konata** | ![Konata 3D](./docs/characters/3d/konata_3d.png) | ![Konata 3D Dance](./docs/characters/3d/konata_3d_dance.gif) | [`konata_3d.glb`](./docs/models3d/konata_3d.glb) |
+
 
 ---
 

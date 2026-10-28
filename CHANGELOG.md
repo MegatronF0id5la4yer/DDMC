@@ -7,6 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.6] - 2026-10-27
+
+### Added
+- **3D Blender 5.2 + `uv` Character Pipeline (`scripts/build_3d_characters.py`, `scripts/blender_rig_and_render.py`)**: Generated 3D skeletal-rigged volumetric meshes for all 6 companions (Monika, Sayori, Natsuki, Yuri, Bocchi, Konata) with 5 basic 3D movements (`idle`, `walk`, `dance`, `jump`, `action`), exported as glTF 2.0 (`.glb`) models in `docs/models3d/` and real-time multi-frame 3D animation sequences in `assets/doki3d/`.
+- **Interactive 3D Blender Mode in Android Companion Engine (`DdscEngine.kt`, `MainActivity.kt`)**: Added `Modo 3D (Blender)` expression mode and interactive 3D movement controls (`Idle 3D`, `Caminar 3D`, `Bailar 3D`, `Saltar 3D`, `Acción 3D`).
+- **Complete Guest Companion Drawables**: Added dedicated `doki_bocchi.png`, `doki_bocchi_snug.png`, `doki_konata.png`, and `doki_konata_snug.png` drawables and ensured all Shimeji animation frames exist across all 6 character skin folders.
+
+### Fixed
+- **Doki Cutout & Sticker Border Cleanup (`scripts/clean_all_doki_cutouts.py`)**: Removed baked-in white paper sticker borders and grey outer shadow rings from all Chibi sprites, replaced solid-background classic drawables with clean transparent cutouts, rebuilt `Konata/guitar1..3.png` without face-obscuring artifacts, and re-extracted all HD `school`/`casual` cutouts with zero hair clipping and smooth cosine bottom feathering.
+- **Stage Companion Layering & Avatar Centering (`MainActivity.kt`, `DdscEngine.kt`)**: Anchored `dokiSpriteView` to the bottom of the stage in front of the cover card (preventing mid-air thigh cuts behind the cover), centered circular face avatars on the upper head centroid (fixing off-center Monika ponytail crops), and unified `"sonora_prefs"` persistence.
+
 ## [2.0.5] - 2026-10-23
 
 ### Added

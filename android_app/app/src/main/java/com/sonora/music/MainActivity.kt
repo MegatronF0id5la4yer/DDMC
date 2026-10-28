@@ -158,16 +158,16 @@ val DOKI_AVATARS = listOf(
         name = "Bocchi",
         subtitle = "Hitori Gotoh \u2022 Guitar Hero & Caja de Mango",
         colorHex = "#EC4899",
-        normalResId = R.drawable.doki_natsuki_casual,
-        snugResId = R.drawable.doki_natsuki_snug
+        normalResId = R.drawable.doki_bocchi,
+        snugResId = R.drawable.doki_bocchi_snug
     ),
     DokiAvatar(
         id = "konata",
         name = "Konata",
         subtitle = "Lucky Star \u2022 Otaku & Gamer Nivel 99",
         colorHex = "#38BDF8",
-        normalResId = R.drawable.doki_monika,
-        snugResId = R.drawable.doki_monika_snug
+        normalResId = R.drawable.doki_konata,
+        snugResId = R.drawable.doki_konata_snug
     )
 )
 
@@ -2820,18 +2820,19 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         unifiedStageBlock.addView(stage)
 
-        // Doki stands on the wave as part of the visualizer deck
-        if (::vizDeckCard.isInitialized && ::dokiSpriteView.isInitialized) {
-            vizDeckCard.clipChildren = false
-            vizDeckCard.clipToPadding = false
-            if (dokiSpriteView.parent != vizDeckCard) {
+        // Doki stands anchored at the bottom of the stage in front of the cover & wave
+        if (::dokiSpriteView.isInitialized) {
+            stage.clipChildren = false
+            stage.clipToPadding = false
+            if (dokiSpriteView.parent != stage) {
                 (dokiSpriteView.parent as? ViewGroup)?.removeView(dokiSpriteView)
-                vizDeckCard.addView(dokiSpriteView)
+                stage.addView(dokiSpriteView)
             }
+            dokiSpriteView.elevation = dpf(14f)
             dokiSpriteView.layoutParams = FrameLayout.LayoutParams(
-                dp(160), dp(180),
+                dp(172), dp(204),
                 Gravity.BOTTOM or (if (swapped) Gravity.START else Gravity.END)
-            ).apply { if (swapped) marginStart = dp(24) else marginEnd = dp(24) }
+            ).apply { if (swapped) marginStart = dp(16) else marginEnd = dp(16) }
             dokiSpriteView.setFullScreenMode(false)
             dokiSpriteView.dokiScale = SonoraStore.getInt(this, "player_doki_scale_pct", 100) / 100f
             dokiSpriteView.visibility = if (showStageDoki) View.VISIBLE else View.GONE
@@ -3145,7 +3146,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             val curIdx = dokiList.indexOf(selectedDokiId).takeIf { it >= 0 } ?: 0
             val nextDoki = dokiList[(curIdx + 1) % dokiList.size]
             selectedDokiId = nextDoki
-            val prefs = getSharedPreferences("doki_prefs", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("sonora_prefs", Context.MODE_PRIVATE)
             prefs.edit().putString("doki_id", selectedDokiId).apply()
             updateDokiViews()
             showVizHudBadge(selectedDokiId.replaceFirstChar { it.uppercase() })
@@ -4157,7 +4158,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                         selectedDokiId = d.first
                         selectedDokiPose = "casual"
                         selectedDokiExpr = d.third
-                        val dokiPrefs = getSharedPreferences("doki_prefs", Context.MODE_PRIVATE)
+                        val dokiPrefs = getSharedPreferences("sonora_prefs", Context.MODE_PRIVATE)
                         dokiPrefs.edit()
                             .putString("doki_id", selectedDokiId)
                             .putString("doki_pose", selectedDokiPose)
@@ -10106,6 +10107,62 @@ class MainActivity : AppCompatActivity(), RowHost {
             }
             exprScroll.addView(exprRow)
             root.addView(exprScroll)
+
+            // 3b. Interactive 3D Blender Movement Controls
+            root.addView(TextView(this).apply {
+                text = "MOVIMIENTOS 3D (BLENDER 5.2)"
+                textSize = 10.5f
+                letterSpacing = 0.05f
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(Color.parseColor("#94A3B8"))
+                setPadding(0, dp(2), 0, dp(6))
+            })
+            val anim3dScroll = HorizontalScrollView(this).apply {
+                isHorizontalScrollBarEnabled = false
+                setPadding(0, 0, 0, dp(10))
+            }
+            val anim3dRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            val movements3d = listOf(
+                "idle" to "Idle 3D",
+                "walk" to "Caminar 3D",
+                "dance" to "Bailar 3D",
+                "jump" to "Saltar 3D",
+                "action" to "Acción 3D"
+            )
+            for ((animKey, animLabel) in movements3d) {
+                anim3dRow.addView(TextView(this).apply {
+                    text = animLabel
+                    textSize = 11f
+                    setTypeface(null, Typeface.BOLD)
+                    setTextColor(Color.WHITE)
+                    background = GradientDrawable().apply {
+                        cornerRadius = dpf(10f)
+                        setColor(Color.parseColor("#1E2436"))
+                        setStroke(dp(1), acc)
+                    }
+                    setPadding(dp(11), dp(6), dp(11), dp(6))
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply { marginEnd = dp(6) }
+                    isClickable = true
+                    setOnClickListener {
+                        selectedDokiExpr = "3d"
+                        getSharedPreferences("sonora_prefs", Context.MODE_PRIVATE).edit()
+                            .putString("doki_expr", "3d")
+                            .putString("doki_custom_asset", "")
+                            .apply()
+                        updateDokiViews()
+                        if (::dokiSpriteView.isInitialized) {
+                            dokiSpriteView.trigger3dMovement(animKey, 4500L)
+                        }
+                        Toast.makeText(this@MainActivity, "Blender 3D: $animLabel", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                    }
+                })
+            }
+            anim3dScroll.addView(anim3dRow)
+            root.addView(anim3dScroll)
 
             // 4. Full Gallery of DDSC + PinkChan Chibi Sprites for the active Doki
             val allSprites = DdscEngine.spritesForCharacter(this, selectedDokiId)

@@ -375,7 +375,7 @@ object DanteEngine {
             outfitLabel = "Uniforme Escolar",
             colorHex = "#FB7185",
             folder = "sayori escuela",
-            idle = "sayori escuela/Ori1.webp",
+            idle = "sayori escuela/Say4.webp",
             speak = "sayori escuela/Ori2.webp",
             blink = "sayori escuela/Ori5.webp",
             feliz = listOf("sayori escuela/Say4.webp", "sayori escuela/Ori10.webp"),
@@ -390,7 +390,7 @@ object DanteEngine {
             outfitLabel = "Uniforme Escolar",
             colorHex = "#A855F7",
             folder = "yuri escuela",
-            idle = "yuri escuela/YBashful_Smile.webp",
+            idle = "yuri escuela/Yuri_school_1.webp",
             speak = "yuri escuela/YHappy2.webp",
             blink = "yuri escuela/Yuri_Exhale.webp",
             feliz = listOf("yuri escuela/YSHappy.webp", "yuri escuela/YBashful_Smile_2.webp"),
@@ -423,6 +423,7 @@ object DanteEngine {
     private var soundPlayer: MediaPlayer? = null
 
     val EXPRESSIONS = listOf(
+        "3d" to "Modo 3D (Blender)",
         "shimeji" to "Chibi PinkChan (Interactivo)",
         "idle" to "Doki HD (Lip-Sync)",
         "feliz" to "Doki HD • Feliz",
@@ -527,6 +528,27 @@ object DanteEngine {
     /**
      * Loads a close-up face/head avatar bitmap for the top bar and character selector chips.
      */
+    fun load3dFrame(context: Context, dokiId: String, animName: String, frameIdx: Int): Bitmap? {
+        val id = dokiId.lowercase()
+        val idxStr = String.format(java.util.Locale.US, "%02d", frameIdx.coerceIn(0, 11))
+        val assetPath = "doki3d/$id/${animName}_$idxStr.webp"
+        val cacheKey = "3d:$assetPath"
+        bitmapCache.get(cacheKey)?.let { if (!it.isRecycled) return it }
+        return try {
+            context.assets.open(assetPath).use { stream ->
+                val raw = BitmapFactory.decodeStream(stream)
+                if (raw != null) {
+                    val bounds = computeOpaqueBounds(raw, keepBottomAnchored = false)
+                    val cropped = cropToBounds(raw, bounds)
+                    bitmapCache.put(cacheKey, cropped)
+                    cropped
+                } else null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun loadFaceAvatarBitmap(context: Context, dokiId: String, pose: String = "casual"): Bitmap? {
         val key = "face:$dokiId:$pose"
         avatarCache.get(key)?.let { if (!it.isRecycled) return it }
@@ -548,7 +570,22 @@ object DanteEngine {
         val h = full.height
         // The cropped DDSC sprite has the head in the top ~36% of the height
         val cropSize = min(w, (h * 0.42f).toInt()).coerceAtLeast(32)
-        val left = ((w - cropSize) / 2).coerceAtLeast(0)
+        var sumX = 0L
+        var countX = 0L
+        val yStart = (h * 0.08f).toInt().coerceIn(0, h - 1)
+        val yEnd = (h * 0.30f).toInt().coerceIn(yStart + 1, h)
+        val rowPixels = IntArray(w)
+        for (ry in yStart until yEnd step 2) {
+            full.getPixels(rowPixels, 0, w, 0, ry, w, 1)
+            for (rx in 0 until w step 2) {
+                if (((rowPixels[rx] ushr 24) and 0xFF) > 40) {
+                    sumX += rx
+                    countX++
+                }
+            }
+        }
+        val headCenterX = if (countX > 10L) (sumX / countX).toInt() else (w / 2)
+        val left = (headCenterX - cropSize / 2).coerceIn(0, (w - cropSize).coerceAtLeast(0))
         val top = 0
         val headBmp = try {
             Bitmap.createBitmap(full, left, top, cropSize.coerceAtMost(w - left), cropSize.coerceAtMost(h))
@@ -611,7 +648,29 @@ object DanteEngine {
                         )
                     } ?: b
                     if (folder.isNotEmpty()) folderBoundsCache[folder] = union
-                    cropToBounds(raw, union)
+                    val sub = cropToBounds(raw, union)
+                    val fadeH = (sub.height * 0.065f).toInt().coerceAtLeast(12)
+                    if (sub.height > fadeH * 2) {
+                        val mutable = sub.copy(Bitmap.Config.ARGB_8888, true)
+                        val mw = mutable.width
+                        val mh = mutable.height
+                        val row = IntArray(mw)
+                        for (fy in (mh - fadeH) until mh) {
+                            val t = (mh - 1 - fy).toFloat() / fadeH.toFloat()
+                            val factor = (0.5f - 0.5f * kotlin.math.cos(Math.PI * t).toFloat()).coerceIn(0f, 1f)
+                            mutable.getPixels(row, 0, mw, 0, fy, mw, 1)
+                            for (fx in 0 until mw) {
+                                val px = row[fx]
+                                val a = ((px ushr 24) and 0xFF)
+                                if (a > 0) {
+                                    val na = (a * factor).toInt().coerceIn(0, 255)
+                                    row[fx] = (px and 0x00FFFFFF) or (na shl 24)
+                                }
+                            }
+                            mutable.setPixels(row, 0, mw, 0, fy, mw, 1)
+                        }
+                        mutable
+                    } else sub
                 }
                 bitmapCache.put(clean, cropped)
                 cropped
@@ -851,7 +910,43 @@ class DokiStageSpriteView(context: Context) : View(context) {
     fun setFullScreenMode(enabled: Boolean = true) { invalidate() }
 
     val isChibiMode: Boolean
-        get() = activeEmotion == "shimeji" || activeDokiId == "bocchi" || activeDokiId == "konata"
+        get() = activeEmotion == "shimeji" || activeEmotion == "3d" || activeDokiId == "bocchi" || activeDokiId == "konata"
+
+    val is3dMode: Boolean
+        get() = activeEmotion == "3d"
+
+    private var forced3dAnim: String? = null
+    private var forced3dUntilMs: Long = 0L
+
+    fun trigger3dMovement(animName: String, durationMs: Long = 3800L) {
+        activeEmotion = "3d"
+        forced3dAnim = animName.lowercase()
+        forced3dUntilMs = System.currentTimeMillis() + durationMs
+        when (forced3dAnim) {
+            "jump" -> {
+                shimejiState = ShimejiState.HAPPY_JUMP
+                stateTicks = 85
+            }
+            "walk" -> {
+                shimejiState = ShimejiState.WALK
+                stateTicks = 120
+            }
+            "dance" -> {
+                shimejiState = ShimejiState.STAND
+                stateTicks = 140
+            }
+            "action" -> {
+                shimejiState = ShimejiState.CUSTOM_ACTION
+                stateTicks = 120
+            }
+            else -> {
+                shimejiState = ShimejiState.STAND
+                stateTicks = 100
+            }
+        }
+        spawnParticles("*", 4)
+        postInvalidateOnAnimation()
+    }
 
     fun say(text: String, durationMs: Long = 3000L) {
         // Silenced per user request: no speech bubbles / quotes
@@ -1113,7 +1208,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
             if (reactionSprites.isNotEmpty()) {
                 val chosen = reactionSprites.random()
                 val folder = outfit.folder.ifEmpty { "$activeDokiId $activePose" }
-                customLockedPath = "$folder/$chosen"
+                customLockedPath = if (chosen.contains('/')) chosen else "$folder/$chosen"
                 postDelayed({
                     customLockedPath = null
                     postInvalidateOnAnimation()
@@ -1359,10 +1454,30 @@ class DokiStageSpriteView(context: Context) : View(context) {
 
         // Select the exact PinkChan frame for the current state
         val frameName = selectChibiFrameName(skin)
-        val bmp = DanteEngine.loadChibiFrame(context, skin.skinFolder, frameName) ?: return
+        val bmp = if (is3dMode) {
+            val anim3d = when {
+                forced3dAnim != null && now < forced3dUntilMs -> forced3dAnim!!
+                shimejiState in listOf(ShimejiState.HAPPY_JUMP, ShimejiState.FLUNG, ShimejiState.FALL, ShimejiState.DRAGGED) -> "jump"
+                shimejiState == ShimejiState.CUSTOM_ACTION || shimejiState == ShimejiState.ANGRY -> "action"
+                isMusicPlaying && shimejiState in listOf(ShimejiState.STAND, ShimejiState.SIT) -> "dance"
+                shimejiState in listOf(ShimejiState.WALK, ShimejiState.RUN, ShimejiState.CLIMB_LEFT, ShimejiState.CLIMB_RIGHT, ShimejiState.CEILING) -> "walk"
+                else -> "idle"
+            }
+            val speedMul = accumulatedSpeed.coerceIn(1.0f, 3.2f)
+            val stepMs = (if (isMusicPlaying) (75f / speedMul) else (90f / speedMul)).toLong().coerceAtLeast(28L)
+            val fIdx = ((now / stepMs) % 12L).toInt()
+            DanteEngine.load3dFrame(context, activeDokiId, anim3d, fIdx)
+                ?: DanteEngine.loadChibiFrame(context, skin.skinFolder, frameName)
+        } else {
+            DanteEngine.loadChibiFrame(context, skin.skinFolder, frameName)
+        } ?: return
 
         // Target height: generous, crisp Chibi size with user-customizable dokiScale
-        val baseH = if (isFullScreen) context.dpf(125f) else (h * 0.44f).coerceIn(context.dpf(96f), context.dpf(152f))
+        val baseH = if (is3dMode) {
+            if (isFullScreen) context.dpf(156f) else (h * 0.56f).coerceIn(context.dpf(120f), context.dpf(184f))
+        } else {
+            if (isFullScreen) context.dpf(125f) else (h * 0.44f).coerceIn(context.dpf(96f), context.dpf(152f))
+        }
         val targetH = baseH * dokiScale
         val aspect = bmp.width.toFloat() / bmp.height.toFloat().coerceAtLeast(1f)
         val drawH = targetH
@@ -1403,7 +1518,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
             destRect.set(cloneX - drawW / 2f, drawBottomY - drawH, cloneX + drawW / 2f, drawBottomY)
             canvas.save()
             chibiPaint.alpha = 215
-            canvas.drawBitmap(bmp, null, destRect, chibiPaint)
+            canvas.drawBitmap(bmp, null, destRect, if (is3dMode) bitmapPaint else chibiPaint)
             chibiPaint.alpha = 255
             canvas.restore()
         }
@@ -1416,12 +1531,16 @@ class DokiStageSpriteView(context: Context) : View(context) {
         )
 
         // Flip horizontally according to native facing direction in PinkChan's actions.xml
-        val needFlip = if (skin.nativeFacesLeft) facingRight else !facingRight
+        val needFlip = if (is3dMode) {
+            (shimejiState == ShimejiState.WALK || shimejiState == ShimejiState.RUN) && (if (skin.nativeFacesLeft) facingRight else !facingRight)
+        } else {
+            if (skin.nativeFacesLeft) facingRight else !facingRight
+        }
         canvas.save()
         if (needFlip && shimejiState != ShimejiState.DRAGGED && shimejiState != ShimejiState.CEILING) {
             canvas.scale(-1f, 1f, drawCenterX, drawBottomY - drawH / 2f)
         }
-        canvas.drawBitmap(bmp, null, destRect, chibiPaint)
+        canvas.drawBitmap(bmp, null, destRect, if (is3dMode) bitmapPaint else chibiPaint)
         canvas.restore()
 
         // Draw custom action prop badge next to the Chibi if active
@@ -1609,7 +1728,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
             (w - drawW) / 2f
         }
         val top = if (isFullScreen) {
-            (h - drawH - context.dpf(68f)).coerceAtLeast(0f)
+            (h - drawH).coerceAtLeast(0f)
         } else {
             h - drawH
         }
@@ -1641,7 +1760,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
                 destRect.left - padRatioX + offsetX,
                 destRect.top - padRatioY + offsetY,
                 destRect.right + padRatioX + offsetX,
-                destRect.bottom + padRatioY + offsetY
+                destRect.bottom
             )
             canvas.drawBitmap(shadowBmp, null, shadowRect, shadowPaint)
         }
