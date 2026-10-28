@@ -8,8 +8,8 @@ A high-fidelity, zero-telemetry Android music player and desktop audio suite fea
 
 | Edition | Application ID | Target | Description | Download Link |
 |---|---|---|---|---|
-| **DDMC Standard Edition (v2.0.5)** | `com.sonora.music` | Android 8.0+ | Official clean release with zero interruptions, full DSP suite, 10 visualizers, and Doki companion. | [Download DDMC.apk](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.5/DDMC.apk) |
-| **DDMC Version Troll (v2.0.5)** | `com.sonora.music.troll` | Android 8.0+ | Satirical edition with comic micro-paywalls (Plan Ario Honorario, NostraCoins, Oveja Plus) between actions and poverty bypass. | [Download DDMC_Version_Troll.apk](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.5/DDMC_Version_Troll.apk) |
+| **DDMC Standard Edition (v2.0.6)** | `com.sonora.music` | Android 8.0+ | Official clean release with zero interruptions, full DSP suite, 10 visualizers, and 2D/3D Blender Doki companions. | [Download DDMC.apk](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.6/DDMC.apk) |
+| **DDMC Version Troll (v2.0.6)** | `com.sonora.music.troll` | Android 8.0+ | Satirical edition with comic micro-paywalls (Plan Ario Honorario, NostraCoins, Oveja Plus) between actions and poverty bypass. | [Download DDMC_Version_Troll.apk](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.6/DDMC_Version_Troll.apk) |
 | **DDMC C/C++ Desktop Engine** | CLI Executable | Windows / Linux / macOS | Standalone zero-GC command-line player with miniaudio, Cooley-Tukey Radix-2 FFT, and ANSI TrueColor visualizer. | [Source in `ddmc_cpp/`](./ddmc_cpp) |
 
 Both Android editions can be installed simultaneously on the same device without package or provider collisions.
@@ -108,10 +108,12 @@ All 6 companions include 3D rigged meshes generated from their cleaned sprites v
   - Visualizer can be positioned as a dedicated side column (Left or Right) or docked (Bottom, Center, Top).
   - Eliminates overlap between radial/circular visualizers and the album art card in horizontal tablet and landscape phone orientations.
 
-### 4. Doki Doki Companion Engine
+### 4. Doki Doki Companion Engine (2D & 3D Blender 5.2)
 - **Characters**: Natsuki, Sayori, Yuri, Monika, Bocchi, and Konata.
+- **3D Blender 5.2 Mode (`Modo 3D (Blender)`)**: Volumetric 3D rigged meshes generated via `uv` and headless Blender 5.2 (`scripts/build_3d_characters.py` and `scripts/blender_rig_and_render.py`) with 5 interactive 3D skeletal movements (`Idle 3D`, `Caminar 3D`, `Bailar 3D`, `Saltar 3D`, `Acción 3D`) and exported `.glb` models in `docs/models3d/`.
+- **Clean Cutouts & Feathering**: Zero sticker borders on Chibi sprites and smooth cosine bottom feathering on HD `.webp` sprites.
 - **Beat and Kinetic Physics**: Companions jump, dance, and celebrate in sync with real bass beat drops detected in C++.
-- **Mounting Options**: Companions can sit or dance directly on the spectrum visualizer or wander along the stage dock.
+- **Stage Layering**: Companions anchor cleanly at the bottom of the stage in front of the cover card and waveform.
 
 ### 5. Sound DSP Engines (Offline, Zero Cloud)
 - **Doomentio Audio Engine**: Software mono downmix, stereo balance pan, and independent digital gain per track.

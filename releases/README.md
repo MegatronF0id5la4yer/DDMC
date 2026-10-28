@@ -12,7 +12,7 @@ This directory stores the official distribution APKs for DDMC.
 - **App Name**: `DDMC`
 - **Target OS**: Android 8.0+ (API 26+)
 - **Description**: The official clean release of DDMC. Contains all 10 audio visualizers, Doki companion engine, hardware performance engine (Potato/Balanced/Ultra), video cover engine, and complete offline DSP suite. Zero interruptions or paywalls.
-- **Download**: [Direct Download](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.5/DDMC.apk)
+- **Download**: [Direct Download](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.6/DDMC.apk)
 
 ### 2. `DDMC_Version_Troll.apk`
 - **Flavor**: `troll`
@@ -20,7 +20,7 @@ This directory stores the official distribution APKs for DDMC.
 - **App Name**: `DDMC Version Troll`
 - **Target OS**: Android 8.0+ (API 26+)
 - **Description**: Satirical edition featuring comic micro-paywall dialogs (Plan Ario Honorario, NostraCoins, Oveja Plus, Jerry Engine Pro) between player actions (play/pause, skip, shuffle, favorite, equalizer) with a 4-second mock ad and public poverty bypass.
-- **Download**: [Direct Download](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.5/DDMC_Version_Troll.apk)
+- **Download**: [Direct Download](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.6/DDMC_Version_Troll.apk)
 
 ---
 
