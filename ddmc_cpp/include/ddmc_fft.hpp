@@ -40,6 +40,7 @@ private:
     std::vector<std::complex<float>> m_fftComplex;
     float m_rawMagnitudes[HALF_FFT] = {0.0f};
 
+    float m_agcPeak = 0.08f;
     float m_beatHistory[16] = {0.0f};
     int m_beatHistIdx = 0;
 };

@@ -25,6 +25,7 @@ object DoomentioEngine {
     @Volatile var currentTrackBassBoostLevel: Int = 0 // -1000 to +1000 mB
     @Volatile var currentTrackGainMultiplier: Float = 1.0f // 0.5f to 2.0f
     @Volatile var currentTrackKey: String = ""
+    @Volatile var lastPcmFeedMs: Long = 0L
 
     // Low-shelf IIR filter state for digital bass enhancement on 16-bit PCM
     @Volatile var bassGainLinear: Float = 1.0f // computed from currentTrackBassBoostLevel
@@ -82,7 +83,7 @@ class CavifaxAudioProcessor : BaseAudioProcessor() {
     // Simple 1st-order IIR low-pass filter states for bass boost
     private var lLow: Float = 0f
     private var rLow: Float = 0f
-    private val nativePcmFeed = FloatArray(512)
+    private val nativePcmFeed = FloatArray(1024)
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         // We handle 16-bit PCM. If input is 16-bit PCM, enforce 2 channels stereo output.
@@ -177,7 +178,7 @@ class CavifaxAudioProcessor : BaseAudioProcessor() {
             val finalL = left.coerceIn(-32768, 32767).toShort()
             val finalR = right.coerceIn(-32768, 32767).toShort()
 
-            if (i < 512) {
+            if (i < 1024) {
                 nativePcmFeed[i] = ((finalL.toInt() + finalR.toInt()) * 0.5f) / 32768.0f
             }
 
@@ -186,7 +187,8 @@ class CavifaxAudioProcessor : BaseAudioProcessor() {
         }
 
         if (frameCount > 0 && DdmcNative.isAvailable) {
-            val feedCount = minOf(frameCount, 512)
+            val feedCount = minOf(frameCount, 1024)
+            DoomentioEngine.lastPcmFeedMs = System.currentTimeMillis()
             DdmcNative.feedAudioSamples(nativePcmFeed, feedCount, 1)
         }
 

@@ -1817,21 +1817,33 @@ class MainActivity : AppCompatActivity(), RowHost {
                     setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
                         override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, samplingRate: Int) {
                             if (waveform != null && waveform.isNotEmpty()) {
-                                if (::visualizerView.isInitialized) visualizerView.updateWaveform(waveform)
-                                if (FloatingPlayerService.isRunning) FloatingPlayerService.updateWaveform(waveform)
-                                if (DdmcNative.isAvailable) {
-                                    val count = minOf(waveform.size, 512)
-                                    val floats = FloatArray(count) { idx ->
-                                        ((waveform[idx].toInt() and 0xFF) - 128) / 128.0f
+                                val pcmActive = (System.currentTimeMillis() - DoomentioEngine.lastPcmFeedMs) < 650L
+                                if (!pcmActive) {
+                                    if (::visualizerView.isInitialized) visualizerView.updateWaveform(waveform)
+                                    if (FloatingPlayerService.isRunning) FloatingPlayerService.updateWaveform(waveform)
+                                    if (DdmcNative.isAvailable) {
+                                        var maxDev = 0
+                                        val count = minOf(waveform.size, 512)
+                                        for (i in 0 until count) {
+                                            val dev = kotlin.math.abs((waveform[i].toInt() and 0xFF) - 128)
+                                            if (dev > maxDev) maxDev = dev
+                                        }
+                                        if (maxDev > 3) {
+                                            val floats = FloatArray(count) { idx ->
+                                                ((waveform[idx].toInt() and 0xFF) - 128) / 128.0f
+                                            }
+                                            DdmcNative.feedAudioSamples(floats, count, 1)
+                                        }
                                     }
-                                    DdmcNative.feedAudioSamples(floats, count, 1)
-                                    DdmcNative.processSpectrum(0.016f, FloatArray(44), FloatArray(44), FloatArray(128))
                                 }
                             }
                         }
                         override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, samplingRate: Int) {
                             if (::visualizerView.isInitialized) {
-                                visualizerView.updateFft(fft)
+                                val pcmActive = (System.currentTimeMillis() - DoomentioEngine.lastPcmFeedMs) < 650L
+                                if (!pcmActive) {
+                                    visualizerView.updateFft(fft)
+                                }
                                 if (FloatingPlayerService.isRunning) FloatingPlayerService.updateFft(fft)
                                 if (::dokiSpriteView.isInitialized) {
                                     val energy = visualizerView.currentVocalEnergy()
