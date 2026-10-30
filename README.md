@@ -8,7 +8,7 @@ A high-fidelity, zero-telemetry Android music player and desktop audio suite pow
 
 | Edition | Application ID | Target | Description | Download Link |
 |---|---|---|---|---|
-| **DDMC (v2.0.8)** | `com.cavifax.bagresuko` | Android 8.0+ | Official release with Cavifax/Chris Chan/Aimep3/Bagresuko suite, 10 visualizers with real-time sensitivity slider (25% to 300%), and Non-Chibi + Chibi 3D Blender Doki companions. | [Download DDMC.apk](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.8/DDMC.apk) |
+| **DDMC (v2.0.9)** | `com.cavifax.bagresuko` | Android 8.0+ | Official release with Cavifax/Chris Chan/Aimep3/Bagresuko suite, 10 visualizers with real-time sensitivity slider (25% to 300%), and 3D Blender 5.2 Satchely Doki companions with full 48-frame idol dance choreography. | [Download DDMC.apk](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.0.9/DDMC.apk) |
 | **DDMC C/C++ Desktop Engine** | CLI Executable | Windows / Linux / macOS | Standalone zero-GC command-line player with miniaudio, Cooley-Tukey Radix-2 FFT, and ANSI TrueColor visualizer. | [Source in `ddmc_cpp/`](./ddmc_cpp) |
 
 All official releases, changelogs, and binary assets are published on [GitHub Releases](https://github.com/MegatronF0id5la4yer/DDMC/releases).

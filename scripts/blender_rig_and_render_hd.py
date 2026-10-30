@@ -4,6 +4,7 @@ import json
 import math
 import time
 import bpy
+from mathutils import Matrix, Vector
 
 # Executed inside Blender 5.2:
 # blender.exe --background --python scripts/blender_rig_and_render_hd.py -- <manifest_json_path>
@@ -113,9 +114,29 @@ def build_rigged_hd_character(mesh_data):
     b_shin_r.parent = b_thigh_r
     b_shin_r.use_connect = True
 
+    # Optional articulated arms (Yuri has both hands behind her back: no arm rig).
+    arm_joints = mesh_data.get("arm_joints")
+    if arm_joints:
+        for side_key, suffix in (("left", "l"), ("right", "r")):
+            j = arm_joints[side_key]
+            piv = Vector((j["pivot"][0], 0.0, j["pivot"][1]))
+            elb = Vector((j["elbow"][0], 0.0, j["elbow"][1]))
+            wri = Vector((j["wrist"][0], 0.0, j["wrist"][1]))
+            b_u = eb.new(f"uarm_{suffix}")
+            b_u.head = piv
+            b_u.tail = elb
+            b_u.parent = b_spine
+            b_f = eb.new(f"farm_{suffix}")
+            b_f.head = elb
+            b_f.tail = wri
+            b_f.parent = b_u
+            b_f.use_connect = True
+
     bpy.ops.object.mode_set(mode="OBJECT")
 
     bone_names = ["root", "hips", "spine", "head", "thigh_l", "shin_l", "thigh_r", "shin_r"]
+    if arm_joints:
+        bone_names += ["uarm_l", "farm_l", "uarm_r", "farm_r"]
 
     # 2. Build the 3 Layered Meshes ('leg_l', 'leg_r', 'upper')
     part_objs = []
@@ -202,12 +223,128 @@ def setup_camera_and_workbench():
     scene.camera = cam_obj
 
 
+ARM_BONES = ("uarm_l", "farm_l", "uarm_r", "farm_r")
+
+
 def reset_pose(arm_obj):
     for pb in arm_obj.pose.bones:
-        pb.rotation_mode = "XYZ"
+        if pb.name in ARM_BONES:
+            pb.rotation_mode = "QUATERNION"
+            pb.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
+        else:
+            pb.rotation_mode = "XYZ"
+            pb.rotation_euler = (0.0, 0.0, 0.0)
         pb.location = (0.0, 0.0, 0.0)
-        pb.rotation_euler = (0.0, 0.0, 0.0)
         pb.scale = (1.0, 1.0, 1.0)
+
+
+def _world_y_quat(pbone, deg_ccw):
+    """
+    Local-space quaternion that rotates `pbone` about the WORLD Y axis (the camera
+    view axis) by `deg_ccw` degrees, counter-clockwise as seen on screen.
+    Valid while the parent chain is at rest; extra parent motion is inherited.
+    """
+    rest = pbone.bone.matrix_local.to_3x3()
+    rot = Matrix.Rotation(-math.radians(deg_ccw), 3, "Y")
+    return (rest.inverted() @ rot @ rest).to_quaternion()
+
+
+def set_arm(pb, side, abd, flex, front=0.04):
+    """
+    side: 'l' (screen-left) or 'r' (screen-right).
+    abd : shoulder swing in degrees. 0 = hanging down, +90 = straight out sideways,
+          +180 = straight up. Negative swings the arm across the body.
+    flex: extra elbow bend in degrees. Positive keeps curling outward/up,
+          negative folds the forearm toward the body.
+    """
+    u = pb.get(f"uarm_{side}")
+    if u is None:
+        return
+    s = 1.0 if side == "r" else -1.0
+    u.rotation_quaternion = _world_y_quat(u, s * abd)
+    f = pb[f"farm_{side}"]
+    f.rotation_quaternion = _world_y_quat(f, s * flex)
+    rest = u.bone.matrix_local.to_3x3()
+    u.location = rest.inverted() @ Vector((0.0, -front, 0.0))
+
+
+def _K(**kw):
+    base = dict(hx=0.0, hz=0.0, yh=0.0, th=0.0, ys=0.0, ts=0.0, hy=0.0, ht=0.0,
+                aL=6.0, fL=4.0, aR=6.0, fR=4.0, sl=0.0, sr=0.0)
+    base.update(kw)
+    return base
+
+
+# 12 key poses, one every 4 frames (48-frame loop). Modelled on the reference
+# TikTok-style idol dance: twisting side-to-side, crossed-arm pointing, both arms
+# overhead, hip sway with hands near the face.
+DANCE_KEYS = [
+    # --- A: twist + cute rhythmic gesture ---------------------------------
+    _K(hx=-0.012, yh=-8, ys=-14, ts=3, hy=10, ht=-5, aL=14, fL=12, aR=2, fR=6, sl=0.7),
+    _K(hx=0.012, yh=8, ys=14, ts=-3, hy=-10, ht=5, aL=2, fL=6, aR=14, fR=12, sr=0.7),
+    _K(hx=-0.012, hz=-0.012, yh=-8, ys=-14, ts=3, hy=10, ht=-5, aL=16, fL=15, aR=4, fR=8, sl=0.6),
+    _K(hx=0.012, hz=-0.012, yh=8, ys=14, ts=-3, hy=-10, ht=5, aL=4, fL=8, aR=16, fR=15, sr=0.6),
+    # --- B: rhythmic hip bounce & arm sway -------------------------------
+    _K(hz=-0.022, aL=14, fL=16, aR=14, fR=16, sl=0.3, sr=0.3, ht=-4),
+    _K(hz=0.012, yh=6, ys=8, aL=8, fL=10, aR=16, fR=18, sl=0.0, sr=0.0, ht=4, hy=-6),
+    _K(hz=-0.022, yh=-6, ys=-8, aL=16, fL=18, aR=8, fR=10, sl=0.3, sr=0.3, ht=-4, hy=6),
+    _K(hz=0.008, aL=10, fL=8, aR=10, fR=8, ht=0),
+    # --- C: cute hip sway & head tilt ------------------------------------
+    _K(hx=0.014, yh=10, ys=16, ts=-5, th=3, hy=-8, aL=6, fL=8, aR=15, fR=14, sr=0.8),
+    _K(hx=-0.014, yh=-10, ys=-16, ts=5, th=-3, hy=8, aL=15, fL=14, aR=6, fR=8, sl=0.8),
+    _K(hx=0.010, hz=-0.010, yh=8, ys=12, ts=-4, hy=-6, aL=4, fL=6, aR=16, fR=16, sr=0.5),
+    _K(hx=-0.010, hz=-0.010, yh=-8, ys=-12, ts=4, hy=6, aL=16, fL=16, aR=4, fR=6, sl=0.5),
+]
+
+
+def _smooth(t):
+    return t * t * (3.0 - 2.0 * t)
+
+
+def _dance_pose(f, n):
+    u = (f / float(n)) * len(DANCE_KEYS)
+    i = int(math.floor(u)) % len(DANCE_KEYS)
+    j = (i + 1) % len(DANCE_KEYS)
+    t = _smooth(u - math.floor(u))
+    a, b = DANCE_KEYS[i], DANCE_KEYS[j]
+    return {k: a[k] * (1.0 - t) + b[k] * t for k in a}
+
+
+def apply_dance(pb, f, n):
+    p = _dance_pose(f, n)
+    rad = math.radians
+    pb["hips"].location = (p["hx"], 0.0, p["hz"])
+    pb["hips"].rotation_euler = (0.0, rad(p["yh"]), rad(p["th"]))
+    pb["spine"].rotation_euler = (0.0, rad(p["ys"]), rad(p["ts"]))
+    pb["head"].rotation_euler = (0.0, rad(p["hy"]), rad(p["ht"]))
+    sl, sr = p["sl"], p["sr"]
+    pb["thigh_l"].location = (0.0, 0.0, 0.014 * sl)
+    pb["thigh_l"].rotation_euler = (rad(10.0 * sl), 0.0, rad(-13.5 * sl))
+    pb["shin_l"].rotation_euler = (rad(-18.0 * sl), 0.0, rad(24.0 * sl))
+    pb["thigh_r"].location = (0.0, 0.0, 0.014 * sr)
+    pb["thigh_r"].rotation_euler = (rad(10.0 * sr), 0.0, rad(13.5 * sr))
+    pb["shin_r"].rotation_euler = (rad(-18.0 * sr), 0.0, rad(-24.0 * sr))
+    set_arm(pb, "l", p["aL"], p["fL"])
+    set_arm(pb, "r", p["aR"], p["fR"])
+
+
+def apply_arms_for(pb, anim_name, phase, s1, c1, s2):
+    """Arm motion for the non-dance animations."""
+    if anim_name == "idle":
+        set_arm(pb, "l", 5.0 + 2.5 * s1, 5.0 + 3.0 * c1)
+        set_arm(pb, "r", 5.0 - 2.5 * s1, 5.0 - 3.0 * c1)
+    elif anim_name == "walk":
+        set_arm(pb, "l", 9.0 + 7.0 * max(0.0, s1) - 3.0 * max(0.0, -s1), 18.0 + 10.0 * max(0.0, s1))
+        set_arm(pb, "r", 9.0 + 7.0 * max(0.0, -s1) - 3.0 * max(0.0, s1), 18.0 + 10.0 * max(0.0, -s1))
+    elif anim_name == "jump":
+        up = max(0.0, math.sin(phase * 0.5))
+        set_arm(pb, "l", 6.0 + 10.0 * up, 6.0 + 12.0 * up)
+        set_arm(pb, "r", 6.0 + 10.0 * up, 6.0 + 12.0 * up)
+    elif anim_name == "action":
+        pump_l = 0.5 + 0.5 * s1
+        pump_r = 0.5 - 0.5 * s1
+        set_arm(pb, "l", 8.0 + 10.0 * pump_l, 6.0 + 12.0 * pump_l)
+        set_arm(pb, "r", 8.0 + 10.0 * pump_r, 6.0 + 12.0 * pump_r)
 
 
 def animate_and_render_sequence(arm_obj, anim_name, num_frames, out_dir):
@@ -253,50 +390,7 @@ def animate_and_render_sequence(arm_obj, anim_name, num_frames, out_dir):
             pb["shin_r"].rotation_euler = (0.0, 0.0, math.radians(-3.2 * max(0.0, -s1)))
 
         elif anim_name == "dance":
-            # Cute Anime Idol Dance:
-            # Alternating side-step + cute inward idol knee-pop in the screen plane (local Z)
-            step_l = max(0.0, s1)
-            step_r = max(0.0, -s1)
-            pb["hips"].location = (0.026 * s1, 0.0, 0.020 * abs(s2) - 0.006)
-            pb["hips"].rotation_euler = (
-                math.radians(2.0 * c2),
-                math.radians(6.5 * s1),
-                math.radians(4.0 * s1),
-            )
-            pb["spine"].rotation_euler = (
-                math.radians(2.5 * s2),
-                math.radians(-4.0 * s1),
-                math.radians(-3.5 * s1),
-            )
-            pb["head"].rotation_euler = (
-                math.radians(3.0 * c2),
-                math.radians(4.0 * c1),
-                math.radians(4.5 * s1),
-            )
-            # Left leg: thigh swings outward (-Z), shin pops inward/upward (+Z) for cute '<' idol knee bend!
-            pb["thigh_l"].location = (0.0, 0.0, 0.014 * step_l)
-            pb["thigh_l"].rotation_euler = (
-                math.radians(10.0 * step_l),
-                0.0,
-                math.radians(-13.5 * step_l + 2.0 * step_r),
-            )
-            pb["shin_l"].rotation_euler = (
-                math.radians(-18.0 * step_l),
-                0.0,
-                math.radians(24.0 * step_l),
-            )
-            # Right leg: thigh swings outward (+Z), shin pops inward/upward (-Z) for cute '>' idol knee bend!
-            pb["thigh_r"].location = (0.0, 0.0, 0.014 * step_r)
-            pb["thigh_r"].rotation_euler = (
-                math.radians(10.0 * step_r),
-                0.0,
-                math.radians(13.5 * step_r - 2.0 * step_l),
-            )
-            pb["shin_r"].rotation_euler = (
-                math.radians(-18.0 * step_r),
-                0.0,
-                math.radians(-24.0 * step_r),
-            )
+            apply_dance(pb, f, num_frames)
 
         elif anim_name == "walk":
             step_l = max(0.0, s1)
@@ -374,9 +468,16 @@ def animate_and_render_sequence(arm_obj, anim_name, num_frames, out_dir):
                 math.radians(-28.0 * kick_r),
             )
 
+        if anim_name != "dance":
+            apply_arms_for(pb, anim_name, phase, s1, c1, s2)
+
         for bname in ["hips", "spine", "head", "thigh_l", "shin_l", "thigh_r", "shin_r"]:
             pb[bname].keyframe_insert(data_path="location", frame=f)
             pb[bname].keyframe_insert(data_path="rotation_euler", frame=f)
+        for bname in ARM_BONES:
+            if bname in pb:
+                pb[bname].keyframe_insert(data_path="location", frame=f)
+                pb[bname].keyframe_insert(data_path="rotation_quaternion", frame=f)
 
         os.makedirs(out_dir, exist_ok=True)
         frame_file = os.path.join(out_dir, f"{anim_name}_{f:02d}.webp")
@@ -426,7 +527,7 @@ def main():
         anims = [
             ("idle", 12),
             ("walk", 12),
-            ("dance", 12),
+            ("dance", 48),
             ("jump", 12),
             ("action", 12),
         ]

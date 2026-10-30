@@ -547,7 +547,8 @@ object DanteEngine {
             return load3dFrame(context, id, animName, frameIdx)
         }
         val outfitKey = resolve3dHdOutfitKey(id, pose)
-        val idxStr = String.format(java.util.Locale.US, "%02d", frameIdx.coerceIn(0, 11))
+        val maxIdx = if (animName == "dance") 47 else 11
+        val idxStr = String.format(java.util.Locale.US, "%02d", frameIdx.coerceIn(0, maxIdx))
         val assetPath = "doki3d_hd/$outfitKey/${animName}_$idxStr.webp"
         val cacheKey = "3d_hd:$assetPath"
         bitmapCache.get(cacheKey)?.let { if (!it.isRecycled) return it }
@@ -562,13 +563,13 @@ object DanteEngine {
                 } else null
             }
         } catch (_: Exception) {
-            load3dFrame(context, id, animName, frameIdx)
+            load3dFrame(context, id, animName, frameIdx % 12)
         }
     }
 
     fun load3dFrame(context: Context, dokiId: String, animName: String, frameIdx: Int): Bitmap? {
         val id = dokiId.lowercase()
-        val idxStr = String.format(java.util.Locale.US, "%02d", frameIdx.coerceIn(0, 11))
+        val idxStr = String.format(java.util.Locale.US, "%02d", (frameIdx % 12).coerceIn(0, 11))
         val assetPath = "doki3d/$id/${animName}_$idxStr.webp"
         val cacheKey = "3d:$assetPath"
         bitmapCache.get(cacheKey)?.let { if (!it.isRecycled) return it }
@@ -1507,8 +1508,10 @@ class DokiStageSpriteView(context: Context) : View(context) {
             }
             val speedMul = accumulatedSpeed.coerceIn(1.0f, 3.2f)
             val stepMs = (if (isMusicPlaying) (75f / speedMul) else (90f / speedMul)).toLong().coerceAtLeast(28L)
-            val fIdx = ((now / stepMs) % 12L).toInt()
-            DanteEngine.load3dFrame(context, activeDokiId, anim3d, fIdx)
+            val totalFrames = if (anim3d == "dance" && is3dHdMode) 48L else 12L
+            val fIdx = ((now / stepMs) % totalFrames).toInt()
+            (if (is3dHdMode) DanteEngine.load3dHdFrame(context, activeDokiId, activePose, anim3d, fIdx) else null)
+                ?: DanteEngine.load3dFrame(context, activeDokiId, anim3d, fIdx)
                 ?: DanteEngine.loadChibiFrame(context, skin.skinFolder, frameName)
         } else {
             DanteEngine.loadChibiFrame(context, skin.skinFolder, frameName)
@@ -1746,7 +1749,8 @@ class DokiStageSpriteView(context: Context) : View(context) {
             }
             val speedMul = accumulatedSpeed.coerceIn(1.0f, 3.2f)
             val stepMs = (if (isMusicPlaying) (72f / speedMul) else (88f / speedMul)).toLong().coerceAtLeast(28L)
-            val fIdx = ((now / stepMs) % 12L).toInt()
+            val totalFrames = if (anim3d == "dance") 48L else 12L
+            val fIdx = ((now / stepMs) % totalFrames).toInt()
             val bmp3d = DanteEngine.load3dHdFrame(context, activeDokiId, activePose, anim3d, fIdx)
             if (bmp3d != null) {
                 if (isMusicPlaying && now - lastMusicNoteMs > 1150L) {

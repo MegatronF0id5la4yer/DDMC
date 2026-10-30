@@ -8,6 +8,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 from scipy.ndimage import distance_transform_edt, gaussian_filter
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import doki_arms
 
 ROOT = str(Path(__file__).resolve().parents[1])
 BLENDER_EXE = r"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
@@ -404,7 +407,7 @@ def render_single_leg_layer(
     return bleed_rgb_into_transparent(out)
 
 
-def compute_part_weights(part_name: str, x: float, z_norm: float) -> dict:
+def compute_part_weights(part_name: str, x: float, z_norm: float, px: float = 0.0, py: float = 0.0, arm_ctx=None) -> dict:
     """
     Computes clean, non-distorting bone weights for each of the 3 separate mesh layers:
     - 'upper': weighted to head (z_norm >= 0.72), spine (0.48..0.72), and hips (< 0.48)
@@ -418,8 +421,10 @@ def compute_part_weights(part_name: str, x: float, z_norm: float) -> dict:
         "head": 0.0,
         "hair_l": 0.0,
         "hair_r": 0.0,
-        "arm_l": 0.0,
-        "arm_r": 0.0,
+        "uarm_l": 0.0,
+        "farm_l": 0.0,
+        "uarm_r": 0.0,
+        "farm_r": 0.0,
         "thigh_l": 0.0,
         "shin_l": 0.0,
         "thigh_r": 0.0,
@@ -433,6 +438,19 @@ def compute_part_weights(part_name: str, x: float, z_norm: float) -> dict:
         w["head"] = is_head
         w["spine"] = is_spine
         w["hips"] = is_hips
+        if arm_ctx is not None:
+            cfg_arm = arm_ctx["cfg"]
+            hair = arm_ctx.get("hair_soft")
+            arm_total = 0.0
+            for side, direction, ukey, fkey in (("left", -1, "uarm_l", "farm_l"), ("right", 1, "uarm_r", "farm_r")):
+                hs = hair if (hair is not None and cfg_arm.get("hair_excl_" + side)) else None
+                wu, wl = doki_arms.arm_weights(cfg_arm[side], direction, px, py, hs)
+                w[ukey] = wu
+                w[fkey] = wl
+                arm_total += wu + wl
+            arm_total = min(1.0, arm_total)
+            for k in ("head", "spine", "hips"):
+                w[k] *= (1.0 - arm_total)
     elif part_name == "leg_l":
         is_thigh = smoothstep_scalar(0.195, 0.245, z_norm)
         w["thigh_l"] = is_thigh
@@ -459,6 +477,7 @@ def build_single_part_mesh_data(
     y_plane_offset: float,
     grid_w: int = 96,
     grid_h: int = 140,
+    arm_ctx=None,
 ) -> dict:
     """
     Builds a smooth 3D mesh for a single RGBA layer ('upper', 'leg_l', 'leg_r')
@@ -519,7 +538,7 @@ def build_single_part_mesh_data(
         u = px / float(rgba.shape[1])
         v = 1.0 - (py / float(rgba.shape[0]))
 
-        w = compute_part_weights(part_name, world_x, z_norm)
+        w = compute_part_weights(part_name, world_x, z_norm, px, py, arm_ctx)
         idx = len(vertices)
         vertices.append([round(world_x, 5), round(world_y, 5), round(world_z, 5)])
         uvs.append([round(u, 5), round(v, 5)])
@@ -555,6 +574,34 @@ def build_single_part_mesh_data(
     }
 
 
+def split_arm_faces(part: dict, new_name: str, threshold: float = 0.5):
+    """
+    Moves every triangle whose mean arm-weight exceeds `threshold` out of `part`
+    into a new part (same texture / same skin weights, re-indexed vertices) so the
+    arms render as their own object in front of the torso.
+    """
+    keys = ("uarm_l", "farm_l", "uarm_r", "farm_r")
+    arm_w = [sum(w.get(k, 0.0) for k in keys) for w in part["weights"]]
+    torso_faces, arm_faces = [], []
+    for f in part["faces"]:
+        m = (arm_w[f[0]] + arm_w[f[1]] + arm_w[f[2]]) / 3.0
+        (arm_faces if m > threshold else torso_faces).append(f)
+
+    def pack(faces, name):
+        used = sorted({i for f in faces for i in f})
+        remap = {old: new for new, old in enumerate(used)}
+        return {
+            "part_name": name,
+            "texture_path": part["texture_path"],
+            "vertices": [part["vertices"][i] for i in used],
+            "uvs": [part["uvs"][i] for i in used],
+            "faces": [[remap[a], remap[b], remap[c]] for a, b, c in faces],
+            "weights": [part["weights"][i] for i in used],
+        }
+
+    return pack(torso_faces, part["part_name"]), pack(arm_faces, new_name)
+
+
 def build_hd_character_3d_mesh_json(char_cfg: dict) -> str:
     char_id = char_cfg["char_id"]
     src_path = os.path.join(
@@ -583,7 +630,13 @@ def build_hd_character_3d_mesh_json(char_cfg: dict) -> str:
     bbox = (x0, y0, x1, y1, float(char_cfg["center_x_px"]))
 
     # Build the 3 layered meshes: UpperBody at Y=0.00, LeftLeg at Y=+0.032, RightLeg at Y=+0.032
-    part_upper = build_single_part_mesh_data("upper", upper_rgba, upper_tex, bbox, y_plane_offset=0.000, grid_w=96, grid_h=140)
+    arm_ctx = None
+    if doki_arms.has_arms(char_id):
+        arm_ctx = {
+            "cfg": doki_arms.ARM_CFG[char_id],
+            "hair_soft": doki_arms.hair_soft_mask(upper_rgba) if char_cfg["doki_id"] == "monika" else None,
+        }
+    part_upper = build_single_part_mesh_data("upper", upper_rgba, upper_tex, bbox, y_plane_offset=0.000, grid_w=96, grid_h=140, arm_ctx=arm_ctx)
     part_leg_l = build_single_part_mesh_data("leg_l", leg_l_rgba, leg_l_tex, bbox, y_plane_offset=0.032, grid_w=64, grid_h=110)
     part_leg_r = build_single_part_mesh_data("leg_r", leg_r_rgba, leg_r_tex, bbox, y_plane_offset=0.032, grid_w=64, grid_h=110)
 
@@ -594,6 +647,10 @@ def build_hd_character_3d_mesh_json(char_cfg: dict) -> str:
         "color_hex": char_cfg["color_hex"],
         "parts": [part_leg_l, part_leg_r, part_upper],
     }
+    if arm_ctx is not None:
+        part_torso, part_arms = split_arm_faces(part_upper, "arms")
+        payload["parts"] = [part_leg_l, part_leg_r, part_torso, part_arms]
+        payload["arm_joints"] = doki_arms.arm_joints_world(char_id, bbox)
     with open(mesh_json_path, "w", encoding="utf-8") as f:
         json.dump(payload, f)
 
@@ -612,7 +669,7 @@ def create_hd_showcase_gifs_and_posters():
         cid = cfg["char_id"]
         char_dir = os.path.join(assets_root, cid)
         dance_frames = []
-        for i in range(12):
+        for i in range(48):
             fp = os.path.join(char_dir, f"dance_{i:02d}.webp")
             if os.path.exists(fp):
                 dance_frames.append(Image.open(fp).convert("RGBA"))

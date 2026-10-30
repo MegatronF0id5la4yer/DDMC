@@ -356,7 +356,9 @@ class CavifaxWidgetProvider : AppWidgetProvider() {
             val dokiExpr = dokiSp.getString("doki_expr", "3d_hd") ?: "3d_hd"
             val playing = PlayerHolder.peek()?.isPlaying == true
             val animName = if (playing) "dance" else "idle"
-            val fIdx = if (playing) ((System.currentTimeMillis() / 180L + widgetDokiFrameStep) % 12L).toInt() else (widgetDokiFrameStep % 12)
+            val is3dHd = dokiExpr != "3d" && dokiId != "bocchi" && dokiId != "konata"
+            val totalFrames = if (animName == "dance" && is3dHd) 48L else 12L
+            val fIdx = if (playing) ((System.currentTimeMillis() / 180L + widgetDokiFrameStep) % totalFrames).toInt() else (widgetDokiFrameStep % totalFrames).toInt()
             return (if (dokiExpr == "3d" || dokiId == "bocchi" || dokiId == "konata") {
                 DdscEngine.load3dFrame(context, dokiId, animName, fIdx)
             } else {
@@ -445,7 +447,9 @@ class CavifaxWidgetProvider : AppWidgetProvider() {
                     views.setImageViewBitmap(R.id.widget_doki_avatar, dokiAvatarBmp)
                 }
                 val animName = if (playing) "dance" else "idle"
-                val fIdx = if (playing) ((System.currentTimeMillis() / 180L + widgetDokiFrameStep) % 12L).toInt() else (widgetDokiFrameStep % 12)
+                val is3dHd = dokiExpr != "3d" && dokiId != "bocchi" && dokiId != "konata"
+                val totalFrames = if (animName == "dance" && is3dHd) 48L else 12L
+                val fIdx = if (playing) ((System.currentTimeMillis() / 180L + widgetDokiFrameStep) % totalFrames).toInt() else (widgetDokiFrameStep % totalFrames).toInt()
                 val companion3dBmp = if (dokiExpr == "3d" || dokiId == "bocchi" || dokiId == "konata") {
                     DdscEngine.load3dFrame(context, dokiId, animName, fIdx)
                 } else {
