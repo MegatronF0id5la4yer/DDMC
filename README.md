@@ -8,7 +8,7 @@ A high-fidelity, zero-telemetry Android music player and desktop audio suite pow
 
 | Edition | Application ID | Target | Description | Download Link |
 |---|---|---|---|---|
-| **DDMC (v2.1.1)** | `com.cavifax.bagresuko` | Android 8.0+ | Official release with stage video player rendering in stage card, Kalcifer engine with multi-source companion .LRC/.txt discovery and LRCLIB integration, permanent RSA signing keystore for seamless version updates, and persistent WebView cookie management. | [Download DDMC.apk](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.1.1/DDMC.apk) |
+| **DDMC (v2.1.2)** | `com.cavifax.bagresuko` | Android 8.0+ | Official release with zero black bars adaptive video stage (without cropping), true edge-to-edge immersive fullscreen (hidden notification bar & gesture navigation bar), Kalcifer LRC engine + LRCLIB, permanent keystore, and expressive 3D companions. | [Download DDMC.apk](https://github.com/MegatronF0id5la4yer/DDMC/releases/download/v2.1.2/DDMC.apk) |
 | **DDMC C/C++ Desktop Engine** | CLI Executable | Windows / Linux / macOS | Standalone zero-GC command-line player with miniaudio, Cooley-Tukey Radix-2 FFT, and ANSI TrueColor visualizer. | [Source in `ddmc_cpp/`](./ddmc_cpp) |
 
 All official releases, changelogs, and binary assets are published on [GitHub Releases](https://github.com/MegatronF0id5la4yer/DDMC/releases).

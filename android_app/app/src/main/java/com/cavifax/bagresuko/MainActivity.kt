@@ -46,6 +46,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -1168,6 +1170,9 @@ class MainActivity : AppCompatActivity(), RowHost {
     private lateinit var visualizerStripView: VisualizerView
     private lateinit var visualizerModeBadge: TextView
     private lateinit var playerView: PlayerView
+    private var videoIntrinsicWidth = 0
+    private var videoIntrinsicHeight = 0
+    private var videoRotationDegrees = 0
     private lateinit var coverImage: ImageView
     private lateinit var ambientGlowImage: ImageView
     private lateinit var stageContainer: FrameLayout
@@ -1306,6 +1311,17 @@ class MainActivity : AppCompatActivity(), RowHost {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             updatePlayState()
             if (!isPlaying) saveQueueState()
+        }
+
+        override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+            if (videoSize.width > 0 && videoSize.height > 0) {
+                videoIntrinsicWidth = videoSize.width
+                videoIntrinsicHeight = videoSize.height
+                videoRotationDegrees = videoSize.unappliedRotationDegrees
+                runOnUiThread {
+                    applyAdaptiveVideoSize()
+                }
+            }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -1576,6 +1592,83 @@ class MainActivity : AppCompatActivity(), RowHost {
     }
 
     // ==========================================================
+    // IMMERSIVE FULLSCREEN & ADAPTIVE ZERO-BAR VIDEO
+    // ==========================================================
+    fun applyImmersiveFullscreen() {
+        try {
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                window.setDecorFitsSystemWindows(false)
+            }
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_FULLSCREEN
+            )
+        } catch (_: Exception) {}
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            applyImmersiveFullscreen()
+        }
+    }
+
+    private fun applyAdaptiveVideoSize() {
+        if (!isVideoMode || !::stageVideoCard.isInitialized || !::playerView.isInitialized) return
+        val (effW, effH) = if (videoRotationDegrees == 90 || videoRotationDegrees == 270) {
+            Pair(videoIntrinsicHeight, videoIntrinsicWidth)
+        } else {
+            Pair(videoIntrinsicWidth, videoIntrinsicHeight)
+        }
+        val ratio = if (effW > 0 && effH > 0) effW.toFloat() / effH.toFloat() else (16f / 9f)
+
+        val dMetrics = resources.displayMetrics
+        val screenW = dMetrics.widthPixels
+        val screenH = dMetrics.heightPixels
+
+        val maxW = if (isLandscapeMode) {
+            (screenW * 0.65f).toInt()
+        } else {
+            screenW - dp(16)
+        }
+
+        val maxH = if (fullscreenWindowId == "cover") {
+            screenH
+        } else if (isLandscapeMode) {
+            screenH - dp(60)
+        } else if (showStageLyrics) {
+            dp(270)
+        } else {
+            (screenH * 0.58f).toInt()
+        }
+
+        var targetW = maxW
+        var targetH = (maxW / ratio).toInt()
+
+        if (targetH > maxH) {
+            targetH = maxH
+            targetW = (maxH * ratio).toInt()
+        }
+
+        stageVideoCard.layoutParams = FrameLayout.LayoutParams(targetW, targetH, Gravity.CENTER)
+        playerView.layoutParams = FrameLayout.LayoutParams(targetW, targetH, Gravity.CENTER)
+        if (::coverWindowFrame.isInitialized) {
+            coverWindowFrame.layoutParams = FrameLayout.LayoutParams(
+                targetW, targetH,
+                if (isLandscapeMode) Gravity.CENTER else Gravity.CENTER_HORIZONTAL
+            )
+        }
+    }
+
+    // ==========================================================
     // LIFECYCLE
     // ==========================================================
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -1594,6 +1687,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         GifImageSupport.ensure(this)
         ThemeEngine.apply(this)
         CookieBackupEngine.restore(this)
+        applyImmersiveFullscreen()
         // Manual updates only from settings/panel to prevent constant background toasts
         Haptics.enabled = CavifaxStore.getBool(this, "haptics", true)
         sortKey = CavifaxStore.getString(this, "lib_sort", "title")
@@ -1710,6 +1804,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         if (queueRestored) { refreshLibrary(); refreshPlaylists() }
         keepScreenOnIfNeeded()
         scheduleAutoHide()
+        applyImmersiveFullscreen()
     }
 
     override fun onPause() {
@@ -2866,14 +2961,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         )
         if (isVideoMode) {
-            stageVideoCard.layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER
-            )
-            coverWindowFrame.layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                if (!isLandscapeMode && showStageLyrics) dp(250) else ViewGroup.LayoutParams.MATCH_PARENT,
-                Gravity.CENTER
-            )
+            applyAdaptiveVideoSize()
         } else {
             coverWindowFrame.layoutParams = FrameLayout.LayoutParams(coverSidePx, coverSidePx, Gravity.CENTER)
         }
@@ -2907,17 +2995,12 @@ class MainActivity : AppCompatActivity(), RowHost {
         } else {
             coverHolder.layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                if (showStageLyrics && !isVideoMode) ViewGroup.LayoutParams.WRAP_CONTENT else if (showStageLyrics && isVideoMode) dp(250) else ViewGroup.LayoutParams.MATCH_PARENT,
-                if (showStageLyrics && isVideoMode) 0f else 0f
-            ).apply { topMargin = dp(8); bottomMargin = dp(6) }
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(4); bottomMargin = dp(4) }
             if (showStageLyrics && showStageCover && !isVideoMode) {
                 coverWindowFrame.layoutParams = FrameLayout.LayoutParams(coverSidePx, coverSidePx, Gravity.CENTER_HORIZONTAL)
             } else if (isVideoMode) {
-                coverWindowFrame.layoutParams = FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    if (showStageLyrics) dp(250) else ViewGroup.LayoutParams.MATCH_PARENT,
-                    Gravity.CENTER
-                )
+                applyAdaptiveVideoSize()
             }
             lyricsLp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply {
                 marginStart = dp(16); marginEnd = dp(16)
@@ -5821,10 +5904,10 @@ class MainActivity : AppCompatActivity(), RowHost {
         // ---- DEDICATED FULL-STAGE-WIDTH VIDEO CONTAINER (Responsive - Zero Franjas) ----
         stageVideoCard = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER
             )
             background = GradientDrawable().apply {
-                setColor(Color.BLACK)
+                setColor(Color.TRANSPARENT)
                 cornerRadius = dpf(20f)
             }
             clipToOutline = true
@@ -5835,7 +5918,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             player = exoPlayer
             useController = false
             resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-            setShutterBackgroundColor(Color.BLACK)
+            setShutterBackgroundColor(Color.TRANSPARENT)
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,

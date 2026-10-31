@@ -43,3 +43,6 @@ local.properties
 /TestMusicoletDecrypt.java
 /build_3d_hd_tmp/
 /apks/
+
+*.idsig
+*.tar
