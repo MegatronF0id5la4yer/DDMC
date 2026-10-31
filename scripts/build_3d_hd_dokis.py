@@ -577,29 +577,62 @@ def build_single_part_mesh_data(
 def split_arm_faces(part: dict, new_name: str, threshold: float = 0.5):
     """
     Moves every triangle whose mean arm-weight exceeds `threshold` out of `part`
-    into a new part (same texture / same skin weights, re-indexed vertices) so the
-    arms render as their own object in front of the torso.
+    into a new part (same texture, clean normalized weights, re-indexed vertices) so the
+    arms render as their own object in front of the torso without tearing.
     """
-    keys = ("uarm_l", "farm_l", "uarm_r", "farm_r")
-    arm_w = [sum(w.get(k, 0.0) for k in keys) for w in part["weights"]]
+    arm_keys = ("uarm_l", "farm_l", "uarm_r", "farm_r")
+    torso_keys = ("root", "hips", "spine", "head", "hair_l", "hair_r", "thigh_l", "shin_l", "thigh_r", "shin_r")
+
+    arm_w = [sum(w.get(k, 0.0) for k in arm_keys) for w in part["weights"]]
     torso_faces, arm_faces = [], []
     for f in part["faces"]:
         m = (arm_w[f[0]] + arm_w[f[1]] + arm_w[f[2]]) / 3.0
         (arm_faces if m > threshold else torso_faces).append(f)
 
-    def pack(faces, name):
+    def pack(faces, name, is_arms: bool):
         used = sorted({i for f in faces for i in f})
         remap = {old: new for new, old in enumerate(used)}
+
+        verts = []
+        for i in used:
+            v = list(part["vertices"][i])
+            if is_arms:
+                v[1] = round(v[1] - 0.016, 5)  # Bring arms forward in front of torso
+            verts.append(v)
+
+        weights = []
+        for i in used:
+            w = dict(part["weights"][i])
+            if is_arms:
+                for k in torso_keys:
+                    w[k] = 0.0
+                tot = sum(w.get(k, 0.0) for k in arm_keys)
+                if tot > 1e-6:
+                    for k in arm_keys:
+                        w[k] = round(w.get(k, 0.0) / tot, 4)
+                else:
+                    w["uarm_l" if verts[-1][0] < 0 else "uarm_r"] = 1.0
+            else:
+                for k in arm_keys:
+                    w[k] = 0.0
+                tot = sum(w.get(k, 0.0) for k in torso_keys)
+                if tot > 1e-6:
+                    for k in torso_keys:
+                        w[k] = round(w.get(k, 0.0) / tot, 4)
+                else:
+                    w["spine"] = 1.0
+            weights.append(w)
+
         return {
             "part_name": name,
             "texture_path": part["texture_path"],
-            "vertices": [part["vertices"][i] for i in used],
+            "vertices": verts,
             "uvs": [part["uvs"][i] for i in used],
             "faces": [[remap[a], remap[b], remap[c]] for a, b, c in faces],
-            "weights": [part["weights"][i] for i in used],
+            "weights": weights,
         }
 
-    return pack(torso_faces, part["part_name"]), pack(arm_faces, new_name)
+    return pack(torso_faces, part["part_name"], is_arms=False), pack(arm_faces, new_name, is_arms=True)
 
 
 def build_hd_character_3d_mesh_json(char_cfg: dict) -> str:
@@ -634,7 +667,7 @@ def build_hd_character_3d_mesh_json(char_cfg: dict) -> str:
     if doki_arms.has_arms(char_id):
         arm_ctx = {
             "cfg": doki_arms.ARM_CFG[char_id],
-            "hair_soft": doki_arms.hair_soft_mask(upper_rgba) if char_cfg["doki_id"] == "monika" else None,
+            "hair_soft": doki_arms.hair_soft_mask(upper_rgba, doki_id=char_cfg["doki_id"]) if char_cfg["doki_id"] in ("monika", "yuri") else None,
         }
     part_upper = build_single_part_mesh_data("upper", upper_rgba, upper_tex, bbox, y_plane_offset=0.000, grid_w=96, grid_h=140, arm_ctx=arm_ctx)
     part_leg_l = build_single_part_mesh_data("leg_l", leg_l_rgba, leg_l_tex, bbox, y_plane_offset=0.032, grid_w=64, grid_h=110)

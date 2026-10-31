@@ -927,7 +927,50 @@ class DokiStageSpriteView(context: Context) : View(context) {
     // Dynamic accumulative velocity for Dokis
     var accumulatedSpeed: Float = 1.0f
     private val minAccumulatedSpeed: Float = 1.0f
-    private val maxAccumulatedSpeed: Float = 4.2f
+    private val maxAccumulatedSpeed: Float = 2.6f
+
+    /** User speed multiplier for Doki animation + movement (0.25x - 2.0x). */
+    var dokiSpeed: Float = CavifaxStore.getFloat(context, "doki_speed", 0.75f)
+        set(value) {
+            field = value.coerceIn(0.25f, 2.0f)
+            CavifaxStore.putFloat(context, "doki_speed", field)
+            postInvalidateOnAnimation()
+        }
+
+    /** true = flat 2D sprites with a procedural dance, false = Blender 3D frames. */
+    var spriteMode: Boolean = CavifaxStore.getBool(context, "doki_sprite_mode", false)
+        set(value) {
+            field = value
+            CavifaxStore.putBool(context, "doki_sprite_mode", value)
+            postInvalidateOnAnimation()
+        }
+
+    /** Applies the user-chosen character offset (dp, saved in layout_doki_tx / layout_doki_ty). */
+    fun applyUserPosition() {
+        val d = resources.displayMetrics.density
+        translationX = CavifaxStore.getFloat(context, "layout_doki_tx", 0f) * d
+        translationY = CavifaxStore.getFloat(context, "layout_doki_ty", 0f) * d
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        applyUserPosition()
+    }
+
+    // Frame-rate independent animation clock (scaled by the speed setting)
+    private var animClockMs: Double = 0.0
+    private var lastClockNow: Long = 0L
+    private var clockDeltaMs: Float = 0f
+    private var physAccumMs: Float = 0f
+
+    private fun advanceAnimClock(now: Long) {
+        val dt = if (lastClockNow == 0L) 0L else (now - lastClockNow).coerceIn(0L, 100L)
+        lastClockNow = now
+        val rate = dokiSpeed * (1f + (accumulatedSpeed - 1f) * 0.30f)
+        clockDeltaMs = dt * rate
+        animClockMs += clockDeltaMs.toDouble()
+        physAccumMs = (physAccumMs + dt * dokiSpeed).coerceAtMost(50f)
+    }
 
     fun addVelocityImpulse(amount: Float) {
         accumulatedSpeed = (accumulatedSpeed + amount).coerceIn(minAccumulatedSpeed, maxAccumulatedSpeed)
@@ -1288,6 +1331,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
 
         val now = System.currentTimeMillis()
         lastDrawMs = now
+        advanceAnimClock(now)
 
         if (isChibiMode && customLockedPath == null) {
             drawPinkChanShimeji(canvas, w, h, now)
@@ -1322,6 +1366,8 @@ class DokiStageSpriteView(context: Context) : View(context) {
             posY = floorY
         }
 
+        while (physAccumMs >= 16.667f) {
+        physAccumMs -= 16.667f
         animTick++
         stateTicks--
 
@@ -1495,6 +1541,8 @@ class DokiStageSpriteView(context: Context) : View(context) {
             }
         }
 
+        } // end fixed-timestep physics
+
         // Select the exact PinkChan frame for the current state
         val frameName = selectChibiFrameName(skin)
         val bmp = if (is3dMode) {
@@ -1506,10 +1554,14 @@ class DokiStageSpriteView(context: Context) : View(context) {
                 shimejiState in listOf(ShimejiState.WALK, ShimejiState.RUN, ShimejiState.CLIMB_LEFT, ShimejiState.CLIMB_RIGHT, ShimejiState.CEILING) -> "walk"
                 else -> "idle"
             }
-            val speedMul = accumulatedSpeed.coerceIn(1.0f, 3.2f)
-            val stepMs = (if (isMusicPlaying) (75f / speedMul) else (90f / speedMul)).toLong().coerceAtLeast(28L)
+            val beatMsC = 60000.0 / currentSongBpm.coerceIn(70f, 170f).toDouble()
+            val stepMs = when {
+                anim3d == "dance" -> beatMsC / 3.0
+                isMusicPlaying -> 75.0
+                else -> 90.0
+            }
             val totalFrames = if (anim3d == "dance" && is3dHdMode) 48L else 12L
-            val fIdx = ((now / stepMs) % totalFrames).toInt()
+            val fIdx = ((animClockMs / stepMs).toLong() % totalFrames).toInt()
             (if (is3dHdMode) DanteEngine.load3dHdFrame(context, activeDokiId, activePose, anim3d, fIdx) else null)
                 ?: DanteEngine.load3dFrame(context, activeDokiId, anim3d, fIdx)
                 ?: DanteEngine.loadChibiFrame(context, skin.skinFolder, frameName)
@@ -1732,25 +1784,23 @@ class DokiStageSpriteView(context: Context) : View(context) {
     private fun drawHdDdscSprite(canvas: Canvas, w: Float, h: Float, now: Long) {
         val reducedMotion = MotionTokens.isReducedMotion(context)
 
-        if (is3dHdMode && customLockedPath == null) {
+        if (is3dHdMode && !spriteMode && customLockedPath == null) {
             val anim3d = when {
                 forced3dAnim != null && now < forced3dUntilMs -> forced3dAnim!!
                 now - lastPokeMs < 1500L -> "jump"
                 isDraggingHd -> "walk"
-                isMusicPlaying -> {
-                    val cycle = (now / 6200L) % 5L
-                    when {
-                        audioEnergy > 0.58f -> "action"
-                        cycle == 4L -> "walk"
-                        else -> "dance"
-                    }
-                }
+                isMusicPlaying -> "dance"
                 else -> "idle"
             }
-            val speedMul = accumulatedSpeed.coerceIn(1.0f, 3.2f)
-            val stepMs = (if (isMusicPlaying) (72f / speedMul) else (88f / speedMul)).toLong().coerceAtLeast(28L)
+            // 48 dance frames = 12 poses x 4 frames, one pose per beat
+            val beatMs = 60000.0 / currentSongBpm.coerceIn(70f, 170f).toDouble()
+            val stepMs = when {
+                anim3d == "dance" -> beatMs / 4.0
+                isMusicPlaying -> 80.0
+                else -> 95.0
+            }
             val totalFrames = if (anim3d == "dance") 48L else 12L
-            val fIdx = ((now / stepMs) % totalFrames).toInt()
+            val fIdx = ((animClockMs / stepMs).toLong() % totalFrames).toInt()
             val bmp3d = DanteEngine.load3dHdFrame(context, activeDokiId, activePose, anim3d, fIdx)
             if (bmp3d != null) {
                 if (isMusicPlaying && now - lastMusicNoteMs > 1150L) {
@@ -1778,7 +1828,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
                 val drawW3 = bw3 * scale3
                 val drawH3 = bh3 * scale3
                 val walkStrideX = if (anim3d == "walk" && !isDraggingHd) {
-                    sin(now.toDouble() * 0.0022).toFloat() * (w - drawW3).coerceAtLeast(0f) * 0.35f
+                    sin(animClockMs * 0.0022).toFloat() * (w - drawW3).coerceAtLeast(0f) * 0.35f
                 } else 0f
                 val baseLeft = if (isFullScreen) {
                     hdDragOffsetX.coerceIn(context.dpf(8f), (w - drawW3 - context.dpf(8f)).coerceAtLeast(0f))
@@ -1826,7 +1876,7 @@ class DokiStageSpriteView(context: Context) : View(context) {
         val shadowBmp = DanteEngine.getOrBuildShadow(bmp, currentPath)
 
         if (!reducedMotion) {
-            breathPhase += (if (isMusicPlaying) 0.045f else 0.018f) * accumulatedSpeed
+            breathPhase += clockDeltaMs * (if (isMusicPlaying) 0.0027f else 0.0011f)
         }
 
         val bw = bmp.width.toFloat().coerceAtLeast(1f)
@@ -1856,16 +1906,31 @@ class DokiStageSpriteView(context: Context) : View(context) {
         posX = left + drawW / 2f
         posY = top + drawH * 0.22f
 
-        val swayDeg = if (reducedMotion) 0f else sin(breathPhase) * 0.58f
-        val beatBounce = if (reducedMotion || !isMusicPlaying) 0f else (audioEnergy * context.dpf(10f)).coerceIn(0f, context.dpf(15f))
-        val bounceScaleY = if (reducedMotion) 1.0f else {
-            1.0f + sin(breathPhase * 1.4f) * 0.007f + (if (isMusicPlaying) audioEnergy * 0.035f else 0f)
+        val spriteDancing = !reducedMotion && isMusicPlaying && customLockedPath == null
+        var shiftX = 0f
+        var swayDeg = if (reducedMotion) 0f else sin(breathPhase) * 0.58f
+        var beatBounce = 0f
+        var bounceScaleY = if (reducedMotion) 1.0f else 1.0f + sin(breathPhase * 1.4f) * 0.007f
+        if (spriteDancing) {
+            // Procedural sprite dance, locked to the beat: hop on every beat, side sway every
+            // two beats, and a double-time + wider lean every other bar.
+            val beatMs = 60000.0 / currentSongBpm.coerceIn(70f, 170f).toDouble()
+            val beatPos = animClockMs / beatMs
+            val beatPh = (beatPos * 2.0 * Math.PI).toFloat()
+            val bar = (beatPos.toLong() / 4L) % 2L
+            val energy = (0.6f + audioEnergy).coerceIn(0.6f, 1.3f)
+            val hop = if (bar == 1L) abs(sin(beatPh)) else abs(sin(beatPh * 0.5f))
+            val sway = sin(beatPh * 0.5f)
+            beatBounce = hop * context.dpf(10f) * energy
+            swayDeg = sway * (if (bar == 1L) 8.5f else 5.5f) * energy
+            shiftX = sway * context.dpf(if (bar == 1L) 3f else 7f)
+            bounceScaleY = 1f - (1f - hop) * 0.055f * energy + hop * 0.02f
         }
-        val bounceScaleX = 1.0f - (bounceScaleY - 1.0f) * 0.35f
+        val bounceScaleX = 1.0f - (bounceScaleY - 1.0f) * (if (spriteDancing) 0.6f else 0.35f)
 
         canvas.save()
         if (!reducedMotion) {
-            canvas.translate(0f, -beatBounce)
+            canvas.translate(shiftX, -beatBounce)
             canvas.rotate(swayDeg, w / 2f, h)
             canvas.scale(bounceScaleX, bounceScaleY, w / 2f, h)
         }

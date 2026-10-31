@@ -11,8 +11,6 @@ describe:
   boundary  polyline [(y, x), ...] = the torso's side silhouette; vertices that
             are farther "outward" than this line (screen-left for the left arm,
             screen-right for the right arm) belong to the arm.
-
-Yuri has both hands behind her back in her sprites, so she has no arm rig.
 """
 import numpy as np
 
@@ -82,7 +80,6 @@ ARM_CFG = {
             "boundary": [(430, 590), (520, 586), (590, 590), (650, 598), (710, 614),
                          (770, 632), (810, 640), (860, 642), (910, 646), (960, 650)],
         },
-        # Ponytail overlaps the right arm region: keep the hair out of the arm weights.
         "hair_excl_right": True,
     },
 }
@@ -92,14 +89,19 @@ def has_arms(char_id: str) -> bool:
     return char_id in ARM_CFG
 
 
-def hair_soft_mask(rgba: np.ndarray) -> np.ndarray:
-    """Soft 0..1 mask of orange/brown hair pixels (Monika ponytail)."""
+def hair_soft_mask(rgba: np.ndarray, doki_id: str = "monika") -> np.ndarray:
+    """Soft 0..1 mask of hair pixels to exclude from arm skinning."""
     from scipy.ndimage import gaussian_filter
     rgb = rgba[:, :, :3].astype(np.int32)
     a = rgba[:, :, 3] > 40
     r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
-    hair = a & ((r - b) > 52) & ((r - g) > 34) & (r < 232)
-    hair[860:, :] = False  # fists / hands live below here
+    if doki_id == "yuri":
+        # Yuri: dark purple hair (blue > green + 10 and blue > 45)
+        hair = a & (b > g + 10) & (b > 45)
+    else:
+        # Monika: orange/brown hair
+        hair = a & ((r - b) > 52) & ((r - g) > 34) & (r < 232)
+        hair[860:, :] = False  # fists / hands live below here
     return np.clip(gaussian_filter(hair.astype(np.float32), 4.0) * 1.6, 0.0, 1.0)
 
 

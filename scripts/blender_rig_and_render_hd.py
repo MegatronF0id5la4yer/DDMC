@@ -275,25 +275,24 @@ def _K(**kw):
     return base
 
 
-# 12 key poses, one every 4 frames (48-frame loop). Modelled on the reference
-# TikTok-style idol dance: twisting side-to-side, crossed-arm pointing, both arms
-# overhead, hip sway with hands near the face.
+# 12 key poses, one every 4 frames (48-frame loop). Rhythmic idol dance with
+# expressive arm swings, dynamic leg pops, deep hip bounces, and body twists.
 DANCE_KEYS = [
-    # --- A: twist + cute rhythmic gesture ---------------------------------
-    _K(hx=-0.012, yh=-8, ys=-14, ts=3, hy=10, ht=-5, aL=14, fL=12, aR=2, fR=6, sl=0.7),
-    _K(hx=0.012, yh=8, ys=14, ts=-3, hy=-10, ht=5, aL=2, fL=6, aR=14, fR=12, sr=0.7),
-    _K(hx=-0.012, hz=-0.012, yh=-8, ys=-14, ts=3, hy=10, ht=-5, aL=16, fL=15, aR=4, fR=8, sl=0.6),
-    _K(hx=0.012, hz=-0.012, yh=8, ys=14, ts=-3, hy=-10, ht=5, aL=4, fL=8, aR=16, fR=15, sr=0.6),
-    # --- B: rhythmic hip bounce & arm sway -------------------------------
-    _K(hz=-0.022, aL=14, fL=16, aR=14, fR=16, sl=0.3, sr=0.3, ht=-4),
-    _K(hz=0.012, yh=6, ys=8, aL=8, fL=10, aR=16, fR=18, sl=0.0, sr=0.0, ht=4, hy=-6),
-    _K(hz=-0.022, yh=-6, ys=-8, aL=16, fL=18, aR=8, fR=10, sl=0.3, sr=0.3, ht=-4, hy=6),
-    _K(hz=0.008, aL=10, fL=8, aR=10, fR=8, ht=0),
-    # --- C: cute hip sway & head tilt ------------------------------------
-    _K(hx=0.014, yh=10, ys=16, ts=-5, th=3, hy=-8, aL=6, fL=8, aR=15, fR=14, sr=0.8),
-    _K(hx=-0.014, yh=-10, ys=-16, ts=5, th=-3, hy=8, aL=15, fL=14, aR=6, fR=8, sl=0.8),
-    _K(hx=0.010, hz=-0.010, yh=8, ys=12, ts=-4, hy=-6, aL=4, fL=6, aR=16, fR=16, sr=0.5),
-    _K(hx=-0.010, hz=-0.010, yh=-8, ys=-12, ts=4, hy=6, aL=16, fL=16, aR=4, fR=6, sl=0.5),
+    # --- Phrase A: rhythmic cross-and-open with shoulder sway (keys 0..3) ---
+    _K(hx=-0.024, yh=-12, ys=-18, ts=4, hy=10, ht=-5, aL=38, fL=26, aR=-12, fR=-16, sl=0.85),
+    _K(hx=0.024, yh=12, ys=18, ts=-4, hy=-10, ht=5, aL=-12, fL=-16, aR=38, fR=26, sr=0.85),
+    _K(hx=-0.026, hz=-0.020, yh=-12, ys=-16, ts=3, hy=8, ht=-4, aL=44, fL=32, aR=-16, fR=18, sl=0.75),
+    _K(hx=0.026, hz=-0.020, yh=12, ys=16, ts=-3, hy=-8, ht=4, aL=-16, fL=18, aR=44, fR=32, sr=0.75),
+    # --- Phrase B: deep groove bounce & sync arm pump (keys 4..7) -----------
+    _K(hz=-0.028, yh=0, ys=0, aL=28, fL=22, aR=28, fR=22, sl=0.4, sr=0.4, ht=-5),
+    _K(hz=0.016, yh=10, ys=14, aL=42, fL=28, aR=8, fR=10, sl=0.0, sr=0.0, ht=5, hy=-8),
+    _K(hz=-0.028, yh=-10, ys=-14, aL=-10, fL=-12, aR=-10, fR=-12, sl=0.4, sr=0.4, ht=-5, hy=8),
+    _K(hz=0.016, yh=0, ys=0, aL=8, fL=10, aR=42, fR=28, ht=4),
+    # --- Phrase C: cute idol hip sways with gestures (keys 8..11) -----------
+    _K(hx=0.026, yh=14, ys=20, ts=-7, th=5, hy=-8, aL=12, fL=10, aR=36, fR=28, sr=0.9),
+    _K(hx=-0.026, yh=-14, ys=-20, ts=7, th=-5, hy=8, aL=36, fL=28, aR=12, fR=10, sl=0.9),
+    _K(hx=0.020, hz=-0.018, yh=10, ys=15, ts=-5, hy=-6, aL=32, fL=24, aR=40, fR=30, sr=0.65),
+    _K(hx=-0.020, hz=-0.018, yh=-10, ys=-15, ts=5, hy=6, aL=40, fL=30, aR=32, fR=24, sl=0.65),
 ]
 
 
@@ -310,7 +309,7 @@ def _dance_pose(f, n):
     return {k: a[k] * (1.0 - t) + b[k] * t for k in a}
 
 
-def apply_dance(pb, f, n):
+def apply_dance(pb, f, n, arm_scale=1.0):
     p = _dance_pose(f, n)
     rad = math.radians
     pb["hips"].location = (p["hx"], 0.0, p["hz"])
@@ -318,14 +317,14 @@ def apply_dance(pb, f, n):
     pb["spine"].rotation_euler = (0.0, rad(p["ys"]), rad(p["ts"]))
     pb["head"].rotation_euler = (0.0, rad(p["hy"]), rad(p["ht"]))
     sl, sr = p["sl"], p["sr"]
-    pb["thigh_l"].location = (0.0, 0.0, 0.014 * sl)
-    pb["thigh_l"].rotation_euler = (rad(10.0 * sl), 0.0, rad(-13.5 * sl))
-    pb["shin_l"].rotation_euler = (rad(-18.0 * sl), 0.0, rad(24.0 * sl))
-    pb["thigh_r"].location = (0.0, 0.0, 0.014 * sr)
-    pb["thigh_r"].rotation_euler = (rad(10.0 * sr), 0.0, rad(13.5 * sr))
-    pb["shin_r"].rotation_euler = (rad(-18.0 * sr), 0.0, rad(-24.0 * sr))
-    set_arm(pb, "l", p["aL"], p["fL"])
-    set_arm(pb, "r", p["aR"], p["fR"])
+    pb["thigh_l"].location = (0.0, 0.0, 0.022 * sl)
+    pb["thigh_l"].rotation_euler = (rad(14.0 * sl), 0.0, rad(-22.0 * sl))
+    pb["shin_l"].rotation_euler = (rad(-22.0 * sl), 0.0, rad(35.0 * sl))
+    pb["thigh_r"].location = (0.0, 0.0, 0.022 * sr)
+    pb["thigh_r"].rotation_euler = (rad(14.0 * sr), 0.0, rad(22.0 * sr))
+    pb["shin_r"].rotation_euler = (rad(-22.0 * sr), 0.0, rad(-35.0 * sr))
+    set_arm(pb, "l", p["aL"] * arm_scale, p["fL"] * arm_scale)
+    set_arm(pb, "r", p["aR"] * arm_scale, p["fR"] * arm_scale)
 
 
 def apply_arms_for(pb, anim_name, phase, s1, c1, s2):
@@ -347,7 +346,7 @@ def apply_arms_for(pb, anim_name, phase, s1, c1, s2):
         set_arm(pb, "r", 8.0 + 10.0 * pump_r, 6.0 + 12.0 * pump_r)
 
 
-def animate_and_render_sequence(arm_obj, anim_name, num_frames, out_dir):
+def animate_and_render_sequence(arm_obj, anim_name, num_frames, out_dir, char_id=""):
     scene = bpy.context.scene
     os.makedirs(out_dir, exist_ok=True)
     pb = arm_obj.pose.bones
@@ -390,7 +389,8 @@ def animate_and_render_sequence(arm_obj, anim_name, num_frames, out_dir):
             pb["shin_r"].rotation_euler = (0.0, 0.0, math.radians(-3.2 * max(0.0, -s1)))
 
         elif anim_name == "dance":
-            apply_dance(pb, f, num_frames)
+            arm_scale = 0.65 if "yuri" in char_id.lower() else 1.0
+            apply_dance(pb, f, num_frames, arm_scale=arm_scale)
 
         elif anim_name == "walk":
             step_l = max(0.0, s1)
@@ -532,7 +532,7 @@ def main():
             ("action", 12),
         ]
         for anim_name, frames in anims:
-            animate_and_render_sequence(arm_obj, anim_name, frames, out_dir)
+            animate_and_render_sequence(arm_obj, anim_name, frames, out_dir, char_id=char_id)
 
         glb_path = char_entry.get("glb_out_path")
         if glb_path:

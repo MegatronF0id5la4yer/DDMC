@@ -271,6 +271,15 @@ class VisualizerView(context: Context) : View(context) {
             }
             postInvalidateOnAnimation()
         }
+    /** Animation / response speed of the visualizer (0.2x - 2.0x). */
+    var animSpeed: Float = CavifaxStore.getFloat(context, "viz_anim_speed", 0.8f)
+        set(value) {
+            val clamped = value.coerceIn(0.2f, 2.0f)
+            field = clamped
+            CavifaxStore.putFloat(context, "viz_anim_speed", clamped)
+            postInvalidateOnAnimation()
+        }
+    private var frameScale = 1f
     var visualMode = 0
 
     companion object {
@@ -462,16 +471,18 @@ class VisualizerView(context: Context) : View(context) {
         val now = System.currentTimeMillis()
         val dtSec = if (lastFrameMs > 0L) ((now - lastFrameMs) / 1000f).coerceIn(0.005f, 0.05f) else 0.016f
         lastFrameMs = now
+        val animDt = dtSec * animSpeed
+        frameScale = (dtSec / 0.01667f) * animSpeed
 
         if (isPlaying && !reducedMotion) {
             val bpm = songBpm.coerceIn(60f, 200f)
             val bpmSpeed = (bpm / 120f) * 2.8f
-            phase += dtSec * bpmSpeed
+            phase += animDt * bpmSpeed
         }
 
         usedNativeEngine = false
         if (DdmcNative.isAvailable && isPlaying) {
-            val processed = DdmcNative.processSpectrum(dtSec, nativeMags, nativeCaps, nativeWave)
+            val processed = DdmcNative.processSpectrum(animDt, nativeMags, nativeCaps, nativeWave)
             if (processed) {
                 var maxEnergy = 0f
                 val count = minOf(bands, nativeMags.size)
@@ -740,7 +751,7 @@ class VisualizerView(context: Context) : View(context) {
 
         for (s in 0 until starCount) {
             val prevZ = starZ[s]
-            starZ[s] -= starSpeed[s] * speedMult
+            starZ[s] -= starSpeed[s] * speedMult * frameScale
             if (starZ[s] <= 0.04f) {
                 starZ[s] = 1.0f
                 starX[s] = (Math.random().toFloat() - 0.5f) * 2f
@@ -1208,6 +1219,7 @@ class MainActivity : AppCompatActivity(), RowHost {
     // ---- library ----
     private enum class LibMode(val label: String, val icon: Int) {
         SONGS("Canciones", R.drawable.ic_music),
+        VIDEOS("Vídeos", R.drawable.ic_video),
         ALBUMS("Álbumes", R.drawable.ic_album),
         ARTISTS("Artistas", R.drawable.ic_user),
         FOLDERS("Carpetas", R.drawable.ic_folder),
@@ -1625,6 +1637,28 @@ class MainActivity : AppCompatActivity(), RowHost {
         showEmptyPlayer()
         switchTab(0)
         checkAndRequestPermissions()
+        handleIncomingIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        val dataUri = intent.data
+        if (action == Intent.ACTION_VIEW && dataUri != null) {
+            try {
+                contentResolver.takePersistableUriPermission(
+                    dataUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
+            loadLocalAudioFromUri(dataUri)
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -1805,6 +1839,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         val perms = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             perms.add(Manifest.permission.READ_MEDIA_AUDIO)
+            perms.add(Manifest.permission.READ_MEDIA_VIDEO)
             perms.add(Manifest.permission.POST_NOTIFICATIONS)
         } else {
             perms.add(Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -1817,6 +1852,12 @@ class MainActivity : AppCompatActivity(), RowHost {
 
     private fun hasAudioPermission(): Boolean {
         val p = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.READ_MEDIA_AUDIO
+        else Manifest.permission.READ_EXTERNAL_STORAGE
+        return ContextCompat.checkSelfPermission(this, p) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasVideoPermission(): Boolean {
+        val p = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.READ_MEDIA_VIDEO
         else Manifest.permission.READ_EXTERNAL_STORAGE
         return ContextCompat.checkSelfPermission(this, p) == PackageManager.PERMISSION_GRANTED
     }
@@ -3864,6 +3905,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                 layoutPresetsRow.addView(pBtn)
             }
             root.addView(layoutPresetsRow)
+            addVizSpeedControl(root)
 
             val videoModeRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -3975,6 +4017,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                 }
             }
             root.addView(dokiSb)
+            addDokiMotionControls(root)
 
             val resetBtn = Pill(this, "Restablecer Dimensiones", R.drawable.ic_trash, 38).apply {
                 setOnClickListener {
@@ -3982,11 +4025,12 @@ class MainActivity : AppCompatActivity(), RowHost {
                     CavifaxStore.putInt(this@MainActivity, "player_viz_height_dp", 0)
                     CavifaxStore.putInt(this@MainActivity, "player_doki_scale_pct", 100)
                     CavifaxStore.putFloat(this@MainActivity, "layout_doki_tx", 0f)
+                    CavifaxStore.putFloat(this@MainActivity, "layout_doki_ty", 0f)
                     CavifaxStore.putInt(this@MainActivity, "bg_mode", 1)
                     CavifaxStore.putInt(this@MainActivity, "bg_blur", 60)
                     CavifaxStore.putInt(this@MainActivity, "bg_opacity", 55)
                     dokiSpriteView.dokiScale = 1.0f
-                    dokiSpriteView.translationX = 0f
+                    dokiSpriteView.applyUserPosition()
                     reorderStageContainers(instant = true)
                     updateStageBackground()
                     Toast.makeText(this@MainActivity, "Tamaños restablecidos", Toast.LENGTH_SHORT).show()
@@ -4715,6 +4759,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                 presetsRow.addView(pBtn)
             }
             root.addView(presetsRow)
+            addVizSpeedControl(root)
 
             val modesTitle = TextView(this).apply {
                 text = "Modo Visual (10 Estilos)"
@@ -6397,7 +6442,7 @@ class MainActivity : AppCompatActivity(), RowHost {
     }
 
     private fun performStorageScan(showToast: Boolean = false) {
-        if (!hasAudioPermission()) {
+        if (!hasAudioPermission() && !hasVideoPermission()) {
             refreshLibrary()
             return
         }
@@ -6485,6 +6530,78 @@ class MainActivity : AppCompatActivity(), RowHost {
                 }
             } catch (_: Exception) {}
 
+            // Query MediaStore for video files from storage
+            val videoProjection = arrayOf(
+                MediaStore.Video.Media._ID,
+                MediaStore.Video.Media.TITLE,
+                MediaStore.Video.Media.ARTIST,
+                MediaStore.Video.Media.DURATION,
+                MediaStore.Video.Media.MIME_TYPE,
+                MediaStore.Video.Media.DATE_ADDED,
+                MediaStore.Video.Media.SIZE,
+                MediaStore.Video.Media.DATA
+            )
+            try {
+                contentResolver.query(
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    videoProjection,
+                    null,
+                    null,
+                    "${MediaStore.Video.Media.TITLE} ASC"
+                )?.use { cursor ->
+                    val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                    val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.TITLE)
+                    val artistCol = cursor.getColumnIndex(MediaStore.Video.Media.ARTIST)
+                    val durCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+                    val mimeCol = cursor.getColumnIndex(MediaStore.Video.Media.MIME_TYPE)
+                    val dateCol = cursor.getColumnIndex(MediaStore.Video.Media.DATE_ADDED)
+                    val sizeCol = cursor.getColumnIndex(MediaStore.Video.Media.SIZE)
+                    val dataCol = cursor.getColumnIndex(MediaStore.Video.Media.DATA)
+
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idCol)
+                        val rawTitle = cursor.getString(titleCol) ?: "Vídeo sin título"
+                        val rawArtist = if (artistCol >= 0) cursor.getString(artistCol) ?: "Vídeo Local" else "Vídeo Local"
+                        val dur = cursor.getLong(durCol)
+                        if (dur in 1..2500L) continue // skip tiny video clips / animations
+                        val mime = if (mimeCol >= 0) cursor.getString(mimeCol) ?: "video/mp4" else "video/mp4"
+                        val dateAdded = if (dateCol >= 0) cursor.getLong(dateCol) else 0L
+                        val sizeBytes = if (sizeCol >= 0) cursor.getLong(sizeCol) else 0L
+                        val path = if (dataCol >= 0) (cursor.getString(dataCol) ?: "") else ""
+                        val folder = if (path.isNotEmpty()) File(path).parentFile?.name ?: "Vídeos" else "Vídeos"
+
+                        val contentUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
+
+                        val ext = when {
+                            mime.contains("mkv", true) || path.endsWith(".mkv", true) -> "VIDEO \u2022 MKV"
+                            mime.contains("webm", true) || path.endsWith(".webm", true) -> "VIDEO \u2022 WEBM"
+                            mime.contains("avi", true) || path.endsWith(".avi", true) -> "VIDEO \u2022 AVI"
+                            mime.contains("mov", true) || path.endsWith(".mov", true) -> "VIDEO \u2022 MOV"
+                            else -> "VIDEO \u2022 MP4"
+                        }
+
+                        scanned.add(
+                            TrackItem(
+                                title = rawTitle,
+                                artist = if (rawArtist == "<unknown>" || rawArtist.isBlank()) "Vídeo Local" else rawArtist,
+                                album = folder,
+                                coverUrl = contentUri.toString(),
+                                audioUri = contentUri,
+                                videoUrl = contentUri.toString(),
+                                quality = ext,
+                                provider = folder,
+                                durationMs = dur,
+                                isLocal = true,
+                                dateAdded = dateAdded,
+                                folder = folder,
+                                path = path,
+                                sizeBytes = sizeBytes
+                            )
+                        )
+                    }
+                }
+            } catch (_: Exception) {}
+
             CavifaxStore.hydrateAll(this, scanned)
 
             runOnUiThread {
@@ -6554,7 +6671,8 @@ class MainActivity : AppCompatActivity(), RowHost {
 
         when (libMode) {
             LibMode.SONGS -> {
-                val sorted = sortTracks(base)
+                val songsOnly = base.filter { !it.quality.contains("VIDEO", true) }
+                val sorted = sortTracks(if (songsOnly.isNotEmpty()) songsOnly else base)
                 if (sorted.isEmpty()) {
                     rows.add(
                         Row.Empty(
@@ -6568,6 +6686,26 @@ class MainActivity : AppCompatActivity(), RowHost {
                     rows.add(Row.Title("Canciones", "${sorted.size} pistas en tu dispositivo"))
                     rows.add(Row.Actions(sorted))
                     sorted.forEachIndexed { i, t -> rows.add(Row.Song(t, sorted, i)) }
+                }
+            }
+            LibMode.VIDEOS -> {
+                val videoList = sortTracks(base.filter {
+                    it.videoUrl.isNotEmpty() || it.quality.contains("VIDEO", true)
+                })
+                if (videoList.isEmpty()) {
+                    rows.add(
+                        Row.Empty(
+                            if (localTracksList.none { it.quality.contains("VIDEO", true) || it.videoUrl.isNotEmpty() })
+                                "No hay vídeos en tu almacenamiento"
+                            else "Sin resultados",
+                            "Abre archivos de vídeo desde tu dispositivo o escanea el almacenamiento.",
+                            localTracksList.none { it.quality.contains("VIDEO", true) || it.videoUrl.isNotEmpty() }
+                        )
+                    )
+                } else {
+                    rows.add(Row.Title("Vídeos", "${videoList.size} vídeos en tu almacenamiento"))
+                    rows.add(Row.Actions(videoList))
+                    videoList.forEachIndexed { i, t -> rows.add(Row.Song(t, videoList, i)) }
                 }
             }
             LibMode.ALBUMS -> {
@@ -9098,6 +9236,28 @@ class MainActivity : AppCompatActivity(), RowHost {
         tracks.addAll(list)
         currentTrackIndex = idx
         val target = tracks[idx]
+
+        val isTargetVideo = target.videoUrl.isNotEmpty() &&
+            (target.quality.contains("VIDEO", true) ||
+             target.videoUrl.startsWith("content://media/external/video") ||
+             target.videoUrl.endsWith(".mp4", true) ||
+             target.videoUrl.endsWith(".mkv", true) ||
+             target.videoUrl.endsWith(".webm", true))
+        if (isTargetVideo && !isVideoMode) {
+            isVideoMode = true
+            playerView.visibility = View.VISIBLE
+            coverImage.visibility = View.GONE
+            visualizerView.visibility = View.GONE
+            toggleVideoBtn.setLabel("Solo Escuchar")
+            toggleVideoBtn.setActive(true)
+        } else if (!isTargetVideo && target.videoUrl.isEmpty() && !target.provider.contains("YouTube", true) && isVideoMode) {
+            isVideoMode = false
+            playerView.visibility = View.GONE
+            coverImage.visibility = View.VISIBLE
+            visualizerView.visibility = View.VISIBLE
+            toggleVideoBtn.setLabel("Ver Video")
+            toggleVideoBtn.setActive(false)
+        }
         ensureTrackArtwork(target)
         val initPos = if (startPosMs >= 0L) startPosMs else target.trimStartMs
 
@@ -9800,7 +9960,14 @@ class MainActivity : AppCompatActivity(), RowHost {
         var album = "Memoria interna"
         var durationMs = 0L
         var coverBmp: Bitmap? = null
-        val isVideo = fileName.endsWith(".mp4", true) || fileName.endsWith(".webm", true)
+        val mimeType = try { contentResolver.getType(uri) } catch (_: Exception) { null } ?: ""
+        val isVideo = mimeType.startsWith("video/") ||
+            fileName.endsWith(".mp4", true) ||
+            fileName.endsWith(".mkv", true) ||
+            fileName.endsWith(".webm", true) ||
+            fileName.endsWith(".avi", true) ||
+            fileName.endsWith(".mov", true) ||
+            fileName.endsWith(".3gp", true)
 
         val retriever = MediaMetadataRetriever()
         try {
@@ -9817,7 +9984,8 @@ class MainActivity : AppCompatActivity(), RowHost {
             try { retriever.release() } catch (_: Exception) {}
         }
 
-        val ext = fileName.substringAfterLast('.', "AUDIO").uppercase()
+        val ext = fileName.substringAfterLast('.', if (isVideo) "MP4" else "AUDIO").uppercase()
+        val qualityTag = if (isVideo) "VIDEO \u2022 $ext" else "$ext \u2022 Local"
         val newTrack = CavifaxStore.hydrate(
             this,
             TrackItem(
@@ -9827,8 +9995,8 @@ class MainActivity : AppCompatActivity(), RowHost {
                 coverBitmap = coverBmp,
                 videoUrl = if (isVideo) uri.toString() else "",
                 audioUri = uri,
-                quality = "$ext \u2022 Local",
-                provider = "Archivo directo",
+                quality = qualityTag,
+                provider = if (isVideo) "Vídeo directo" else "Archivo directo",
                 durationMs = durationMs,
                 isLocal = true
             )
@@ -10024,6 +10192,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         if (::dokiSpriteView.isInitialized) {
             dokiSpriteView.dokiScale = dokiScalePref
             dokiSpriteView.isVoiceMuted = dokiVoiceMuted
+            dokiSpriteView.applyUserPosition()
 
             val customSprite = prefs.getString("doki_custom_asset", "") ?: ""
             if (customSprite.isNotBlank()) {
@@ -10068,6 +10237,135 @@ class MainActivity : AppCompatActivity(), RowHost {
         reorderStageContainers()
         updateStageLayout()
         CavifaxWidgetProvider.updateAllWidgets(this, CavifaxWidgetProvider.activeCoverBitmap)
+    }
+
+    private fun addLabeledSlider(
+        root: ViewGroup,
+        title: String,
+        min: Int,
+        maxValue: Int,
+        cur: Int,
+        fmt: (Int) -> String,
+        onChange: (Int) -> Unit
+    ) {
+        val label = TextView(this).apply {
+            text = "$title: ${fmt(cur)}"
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+            setPadding(0, dp(6), 0, dp(2))
+        }
+        root.addView(label)
+        root.addView(SeekBar(this).apply {
+            this.max = maxValue - min
+            progress = (cur - min).coerceIn(0, maxValue - min)
+            progressTintList = ColorStateList.valueOf(Color.parseColor(Pal.ACCENT))
+            thumbTintList = ColorStateList.valueOf(Color.WHITE)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                    val v = p + min
+                    label.text = "$title: ${fmt(v)}"
+                    if (fromUser) onChange(v)
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(8) }
+        })
+    }
+
+    /** Speed of the visualizer animation / response (20% - 200%). */
+    private fun addVizSpeedControl(root: ViewGroup) {
+        val cur = (CavifaxStore.getFloat(this, "viz_anim_speed", 0.8f) * 100f).roundToInt()
+        addLabeledSlider(root, "Velocidad del Visualizador", 20, 200, cur, { "$it%" }) { v ->
+            val f = v / 100f
+            visualizerView.animSpeed = f
+            visualizerStripView.animSpeed = f
+        }
+    }
+
+    /** Doki speed, 3D / sprite render mode and on-screen position controls. */
+    private fun addDokiMotionControls(root: ViewGroup) {
+        if (!::dokiSpriteView.isInitialized) return
+        val acc = try { Color.parseColor(Pal.ACCENT) } catch (_: Exception) { Color.parseColor("#38BDF8") }
+        val onAcc = Pal.contrastOn(acc)
+
+        root.addView(TextView(this).apply {
+            text = "Movimiento y Baile de la Doki"
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD))
+            setPadding(0, dp(14), 0, dp(2))
+        })
+
+        val speedCur = (dokiSpriteView.dokiSpeed * 100f).roundToInt()
+        addLabeledSlider(root, "Velocidad de la Doki", 25, 200, speedCur, { "$it%" }) { v ->
+            dokiSpriteView.dokiSpeed = v / 100f
+        }
+
+        // Render mode: 3D frames vs flat sprites
+        val modeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(4); bottomMargin = dp(10) }
+        }
+        val btn3d = TextView(this)
+        val btnSprite = TextView(this)
+        fun styleModeBtns() {
+            val sprite = dokiSpriteView.spriteMode
+            for ((b, label, on) in listOf(
+                Triple(btn3d, "Baile 3D", !sprite),
+                Triple(btnSprite, "Baile Sprites 2D", sprite)
+            )) {
+                b.text = label
+                b.textSize = 12f
+                b.gravity = Gravity.CENTER
+                b.setTypeface(null, Typeface.BOLD)
+                b.setTextColor(if (on) onAcc else Color.parseColor("#CBD5E1"))
+                b.background = GradientDrawable().apply {
+                    cornerRadius = dpf(12f)
+                    setColor(if (on) acc else Color.parseColor("#161926"))
+                    setStroke(dp(1), if (on) acc else Color.parseColor("#24FFFFFF"))
+                }
+                b.setPadding(dp(10), dp(9), dp(10), dp(9))
+            }
+        }
+        btn3d.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
+        btnSprite.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        fun setRenderMode(sprite: Boolean) {
+            dokiSpriteView.spriteMode = sprite
+            val chibiOnly = selectedDokiId == "bocchi" || selectedDokiId == "konata"
+            if (!chibiOnly) {
+                if (sprite && selectedDokiExpr == "3d") selectedDokiExpr = "shimeji"
+                if (!sprite && selectedDokiExpr == "shimeji") selectedDokiExpr = "3d"
+                getSharedPreferences("cavifax_prefs", Context.MODE_PRIVATE).edit()
+                    .putString("doki_expr", selectedDokiExpr)
+                    .apply()
+            }
+            dokiSpriteView.setDoki(selectedDokiId, selectedDokiPose, selectedDokiExpr)
+            styleModeBtns()
+        }
+        btn3d.setOnClickListener { setRenderMode(false) }
+        btnSprite.setOnClickListener { setRenderMode(true) }
+        styleModeBtns()
+        modeRow.addView(btn3d)
+        modeRow.addView(btnSprite)
+        root.addView(modeRow)
+
+        // Position of the character on the stage
+        val curX = CavifaxStore.getFloat(this, "layout_doki_tx", 0f).roundToInt().coerceIn(-240, 240)
+        val curY = CavifaxStore.getFloat(this, "layout_doki_ty", 0f).roundToInt().coerceIn(-200, 200)
+        addLabeledSlider(root, "Posición horizontal", -240, 240, curX, { "$it dp" }) { v ->
+            CavifaxStore.putFloat(this, "layout_doki_tx", v.toFloat())
+            dokiSpriteView.applyUserPosition()
+        }
+        addLabeledSlider(root, "Posición vertical", -200, 200, curY, { "$it dp" }) { v ->
+            CavifaxStore.putFloat(this, "layout_doki_ty", v.toFloat())
+            dokiSpriteView.applyUserPosition()
+        }
     }
 
     private fun showDokiAvatarPicker() {
@@ -10260,6 +10558,7 @@ class MainActivity : AppCompatActivity(), RowHost {
                 })
             }
             root.addView(scaleRow)
+            addDokiMotionControls(root)
         }
     }
 
