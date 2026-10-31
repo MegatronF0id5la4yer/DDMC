@@ -430,6 +430,10 @@ object SkisoEngine {
                     doOutput = true
                     setRequestProperty("Content-Type", "application/json")
                     setRequestProperty("User-Agent", ua)
+                    val cookies = CookieBackupEngine.getYouTubeCookies()
+                    if (cookies.isNotBlank()) {
+                        setRequestProperty("Cookie", cookies)
+                    }
                 }
                 val payload = """
                     {
@@ -622,14 +626,14 @@ class YouTubeStageWebView(context: Context) : FrameLayout(context) {
             </head>
             <body>
               <iframe id="ytplayer"
-                src="https://www.youtube-nocookie.com/embed/$videoId?autoplay=${if (autoPlay) 1 else 0}&playsinline=1&controls=1&rel=0&modestbranding=1&enablejsapi=1"
+                src="https://www.youtube.com/embed/$videoId?autoplay=${if (autoPlay) 1 else 0}&playsinline=1&controls=1&rel=0&modestbranding=1&enablejsapi=1"
                 allow="autoplay; encrypted-media; picture-in-picture"
                 allowfullscreen>
               </iframe>
             </body>
             </html>
         """.trimIndent()
-        webView.loadDataWithBaseURL("https://www.youtube-nocookie.com", html, "text/html", "UTF-8", null)
+        webView.loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "UTF-8", null)
     }
 
     fun stopPlayback() {

@@ -11,8 +11,8 @@ android {
         applicationId = "com.cavifax.bagresuko"
         minSdk = 24
         targetSdk = 34
-        versionCode = 10
-        versionName = "2.1.0"
+        versionCode = 11
+        versionName = "2.1.1"
         manifestPlaceholders["appName"] = "DDMC"
 
         ndk {
@@ -45,12 +45,23 @@ android {
         }
     }
 
+    signingConfigs {
+        create("ddmc") {
+            storeFile = file("keystore/ddmc.keystore")
+            storePassword = "ddmc_keystore_pass"
+            keyAlias = "ddmc_key"
+            keyPassword = "ddmc_keystore_pass"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("ddmc")
         }
         debug {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("ddmc")
         }
     }
 

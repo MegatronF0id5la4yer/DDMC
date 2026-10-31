@@ -1326,6 +1326,22 @@ class MainActivity : AppCompatActivity(), RowHost {
                 if (t.trimStartMs > 0 && exoPlayer.currentPosition < t.trimStartMs &&
                     reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
                 ) exoPlayer.seekTo(t.trimStartMs)
+                val isTargetVideo = t.videoUrl.isNotEmpty() &&
+                    (t.quality.contains("VIDEO", true) ||
+                     t.videoUrl.startsWith("content://media/external/video") ||
+                     t.videoUrl.endsWith(".mp4", true) ||
+                     t.videoUrl.endsWith(".mkv", true) ||
+                     t.videoUrl.endsWith(".webm", true))
+                if (isTargetVideo != isVideoMode) {
+                    isVideoMode = isTargetVideo
+                    if (::toggleVideoBtn.isInitialized) {
+                        toggleVideoBtn.setLabel(if (isVideoMode) "Solo Escuchar" else "Ver Video")
+                        toggleVideoBtn.setActive(isVideoMode)
+                    }
+                    reorderStageContainers()
+                    updateStageLayout()
+                }
+
                 bindNowPlaying()
                 saveQueueState()
 
@@ -1577,6 +1593,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         PerformanceEngine.init(this)
         GifImageSupport.ensure(this)
         ThemeEngine.apply(this)
+        CookieBackupEngine.restore(this)
         // Manual updates only from settings/panel to prevent constant background toasts
         Haptics.enabled = CavifaxStore.getBool(this, "haptics", true)
         sortKey = CavifaxStore.getString(this, "lib_sort", "title")
@@ -1678,6 +1695,9 @@ class MainActivity : AppCompatActivity(), RowHost {
         }
         progressHandler.removeCallbacks(progressRunnable)
         progressHandler.post(progressRunnable)
+        if (::playerView.isInitialized && isVideoMode && playerView.player == null) {
+            playerView.player = exoPlayer
+        }
         SleepTimer.onTick = { rem -> runOnUiThread { refreshSleepLabel(rem) } }
         refreshSleepLabel(if (SleepTimer.active) SleepTimer.endAt - System.currentTimeMillis() else 0)
         // favourites may have been toggled from the widget
@@ -1698,6 +1718,12 @@ class MainActivity : AppCompatActivity(), RowHost {
         SleepTimer.onTick = null
         saveQueueState()
         inactivityHandler.removeCallbacks(autoHideControlsRunnable)
+        CookieBackupEngine.backup(this)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        CookieBackupEngine.backup(this)
     }
 
     override fun onDestroy() {
@@ -2839,7 +2865,18 @@ class MainActivity : AppCompatActivity(), RowHost {
         stageMediaBox.layoutParams = FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         )
-        coverWindowFrame.layoutParams = FrameLayout.LayoutParams(coverSidePx, coverSidePx, Gravity.CENTER)
+        if (isVideoMode) {
+            stageVideoCard.layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER
+            )
+            coverWindowFrame.layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                if (!isLandscapeMode && showStageLyrics) dp(250) else ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER
+            )
+        } else {
+            coverWindowFrame.layoutParams = FrameLayout.LayoutParams(coverSidePx, coverSidePx, Gravity.CENTER)
+        }
 
         val content = LinearLayout(this).apply {
             orientation = if (isLandscapeMode) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
@@ -2854,7 +2891,7 @@ class MainActivity : AppCompatActivity(), RowHost {
             clipChildren = false
             clipToPadding = false
         }
-        if (showStageCover) {
+        if (showStageCover || isVideoMode) {
             coverHolder.addView(coverWindowFrame)
         }
 
@@ -2870,11 +2907,17 @@ class MainActivity : AppCompatActivity(), RowHost {
         } else {
             coverHolder.layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                if (showStageLyrics) ViewGroup.LayoutParams.WRAP_CONTENT else ViewGroup.LayoutParams.MATCH_PARENT,
-                0f
+                if (showStageLyrics && !isVideoMode) ViewGroup.LayoutParams.WRAP_CONTENT else if (showStageLyrics && isVideoMode) dp(250) else ViewGroup.LayoutParams.MATCH_PARENT,
+                if (showStageLyrics && isVideoMode) 0f else 0f
             ).apply { topMargin = dp(8); bottomMargin = dp(6) }
-            if (showStageLyrics && showStageCover) {
+            if (showStageLyrics && showStageCover && !isVideoMode) {
                 coverWindowFrame.layoutParams = FrameLayout.LayoutParams(coverSidePx, coverSidePx, Gravity.CENTER_HORIZONTAL)
+            } else if (isVideoMode) {
+                coverWindowFrame.layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    if (showStageLyrics) dp(250) else ViewGroup.LayoutParams.MATCH_PARENT,
+                    Gravity.CENTER
+                )
             }
             lyricsLp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply {
                 marginStart = dp(16); marginEnd = dp(16)
@@ -5392,25 +5435,18 @@ class MainActivity : AppCompatActivity(), RowHost {
             if (isVideoMode) {
                 stageVideoCard.visibility = View.VISIBLE
                 stageVideoCard.alpha = 1f
-                val videoFillAll = !showStageLyrics && !showStageDoki && !showStageViz
-                val targetVideoHeightDp = when {
-                    isLandscapeMode -> if (stageMediaXL) 215 else 170
-                    stageMediaXL -> 335
-                    else -> 240
+                if (::playerView.isInitialized) {
+                    playerView.visibility = View.VISIBLE
+                    if (playerView.player == null) playerView.player = exoPlayer
                 }
-                stageVideoCard.layoutParams = if (videoFillAll) {
-                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply {
-                        topMargin = dp(2)
-                        bottomMargin = dp(6)
-                    }
-                } else {
-                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(targetVideoHeightDp)).apply {
-                        topMargin = dp(2)
-                        bottomMargin = dp(6)
-                    }
-                }
+                stageVideoCard.layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER
+                )
             } else {
                 stageVideoCard.visibility = View.GONE
+                if (::playerView.isInitialized) {
+                    playerView.visibility = View.GONE
+                }
             }
         }
 
@@ -5785,21 +5821,36 @@ class MainActivity : AppCompatActivity(), RowHost {
         // ---- DEDICATED FULL-STAGE-WIDTH VIDEO CONTAINER (Responsive - Zero Franjas) ----
         stageVideoCard = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER
             )
-            background = null
+            background = GradientDrawable().apply {
+                setColor(Color.BLACK)
+                cornerRadius = dpf(20f)
+            }
+            clipToOutline = true
+            outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
             visibility = View.GONE
         }
         playerView = PlayerView(this).apply {
             player = exoPlayer
-            useController = true
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            useController = false
+            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            setShutterBackgroundColor(Color.BLACK)
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER
             )
             visibility = View.GONE
+            setOnClickListener {
+                if (areControlsHidden) {
+                    showPlayerControls()
+                } else {
+                    hidePlayerControls()
+                }
+            }
         }
+        attachPlayerGestures(playerView)
         youtubeStageWebView = YouTubeStageWebView(this)
         stageVideoCard.addView(playerView)
 
@@ -9223,7 +9274,8 @@ class MainActivity : AppCompatActivity(), RowHost {
         list: List<TrackItem>,
         startIndex: Int,
         autoPlay: Boolean = true,
-        startPosMs: Long = -1L
+        startPosMs: Long = -1L,
+        forceVideoMode: Boolean? = null
     ) {
         if (list.isEmpty()) {
             showEmptyPlayer()
@@ -9243,20 +9295,43 @@ class MainActivity : AppCompatActivity(), RowHost {
              target.videoUrl.endsWith(".mp4", true) ||
              target.videoUrl.endsWith(".mkv", true) ||
              target.videoUrl.endsWith(".webm", true))
-        if (isTargetVideo && !isVideoMode) {
+        val modeChanged = (forceVideoMode != null && forceVideoMode != isVideoMode) ||
+            (forceVideoMode == null && isTargetVideo != isVideoMode)
+        if (forceVideoMode != null) {
+            isVideoMode = forceVideoMode
+        } else if (isTargetVideo) {
             isVideoMode = true
-            playerView.visibility = View.VISIBLE
-            coverImage.visibility = View.GONE
-            visualizerView.visibility = View.GONE
-            toggleVideoBtn.setLabel("Solo Escuchar")
-            toggleVideoBtn.setActive(true)
-        } else if (!isTargetVideo && target.videoUrl.isEmpty() && !target.provider.contains("YouTube", true) && isVideoMode) {
+        } else if (target.videoUrl.isEmpty() && !target.provider.contains("YouTube", true)) {
             isVideoMode = false
-            playerView.visibility = View.GONE
-            coverImage.visibility = View.VISIBLE
-            visualizerView.visibility = View.VISIBLE
-            toggleVideoBtn.setLabel("Ver Video")
-            toggleVideoBtn.setActive(false)
+        }
+
+        if (isVideoMode) {
+            if (::playerView.isInitialized) {
+                playerView.visibility = View.VISIBLE
+                if (playerView.player == null) playerView.player = exoPlayer
+            }
+            if (::stageVideoCard.isInitialized) stageVideoCard.visibility = View.VISIBLE
+            if (::stageExpandedCoverCard.isInitialized) stageExpandedCoverCard.visibility = View.GONE
+            if (::coverImage.isInitialized) coverImage.visibility = View.GONE
+            if (::visualizerView.isInitialized) visualizerView.visibility = View.GONE
+            if (::toggleVideoBtn.isInitialized) {
+                toggleVideoBtn.setLabel("Solo Escuchar")
+                toggleVideoBtn.setActive(true)
+            }
+        } else {
+            if (::playerView.isInitialized) playerView.visibility = View.GONE
+            if (::stageVideoCard.isInitialized) stageVideoCard.visibility = View.GONE
+            if (::stageExpandedCoverCard.isInitialized) stageExpandedCoverCard.visibility = View.VISIBLE
+            if (::coverImage.isInitialized) coverImage.visibility = View.VISIBLE
+            if (::visualizerView.isInitialized) visualizerView.visibility = if (showStageViz) View.VISIBLE else View.INVISIBLE
+            if (::toggleVideoBtn.isInitialized) {
+                toggleVideoBtn.setLabel("Ver Video")
+                toggleVideoBtn.setActive(false)
+            }
+        }
+        if (modeChanged) {
+            reorderStageContainers()
+            updateStageLayout()
         }
         ensureTrackArtwork(target)
         val initPos = if (startPosMs >= 0L) startPosMs else target.trimStartMs
@@ -9290,6 +9365,15 @@ class MainActivity : AppCompatActivity(), RowHost {
         if (::landscapeTitleText.isInitialized) landscapeTitleText.text = t.title
         if (::landscapeArtistText.isInitialized) landscapeArtistText.text = "${t.artist} \u2022 ${t.album}"
 
+        if (isVideoMode) {
+            updateStageCoverVideo(null)
+            if (::stageVideoCard.isInitialized) stageVideoCard.visibility = View.VISIBLE
+            if (::playerView.isInitialized) {
+                playerView.visibility = View.VISIBLE
+                if (playerView.player == null) playerView.player = exoPlayer
+            }
+            if (::stageExpandedCoverCard.isInitialized) stageExpandedCoverCard.visibility = View.GONE
+        }
         val isGifCover = t.coverUrl?.lowercase()?.let { it.endsWith(".gif") || it.contains(".gif?") } == true
         val trimTag = if (t.trimStartMs > 0 || t.trimEndMs > 0) " \u2022 CORTADO" else ""
         val gifTag = if (isGifCover) " \u2022 GIF" else ""
@@ -9656,10 +9740,23 @@ class MainActivity : AppCompatActivity(), RowHost {
         lyricsKey = track.key
         lastStageActiveLyricIdx = -1
 
-        val res = Lyrics.fetch(this, track)
+        val res = Lyrics.fetch(this, track, allowOnline = true) { asyncRes ->
+            if (lyricsKey == track.key && asyncRes.lines.isNotEmpty()) {
+                lyricsLines = asyncRes.lines
+                lyricsSynced = asyncRes.synced
+                updateLyricsTick(exoPlayer.currentPosition.coerceAtLeast(0L))
+            }
+        }
         lyricsLines = res.lines
         lyricsSynced = res.synced
-        updateLyricsTick(exoPlayer.currentPosition.coerceAtLeast(0L))
+        if (lyricsLines.isEmpty()) {
+            val centerSlot = if (stageLyricViews.size >= 11) 3 else 2
+            stageLyricViews.forEach { it.text = "" }
+            stageLyricViews.getOrNull(centerSlot)?.text = "Sin letra disponible"
+            stageLyricViews.getOrNull(centerSlot + 1)?.text = "Toca para importar .LRC o buscar en LRCLIB"
+        } else {
+            updateLyricsTick(exoPlayer.currentPosition.coerceAtLeast(0L))
+        }
     }
 
     private var lastBgColors: IntArray? = null
@@ -9815,7 +9912,16 @@ class MainActivity : AppCompatActivity(), RowHost {
         if (::youtubeStageWebView.isInitialized) {
             youtubeStageWebView.visibility = View.GONE
         }
-        playerView.visibility = if (isVideoMode) View.VISIBLE else View.GONE
+        if (::playerView.isInitialized) {
+            playerView.visibility = if (isVideoMode) View.VISIBLE else View.GONE
+            if (isVideoMode && playerView.player == null) playerView.player = exoPlayer
+        }
+        if (::stageVideoCard.isInitialized) {
+            stageVideoCard.visibility = if (isVideoMode) View.VISIBLE else View.GONE
+        }
+        if (::stageExpandedCoverCard.isInitialized) {
+            stageExpandedCoverCard.visibility = if (isVideoMode) View.GONE else View.VISIBLE
+        }
         coverImage.visibility = if (isVideoMode) View.GONE else View.VISIBLE
         visualizerView.visibility = if (isVideoMode) View.GONE else View.VISIBLE
         toggleVideoBtn.setLabel(if (isVideoMode) "Solo Escuchar" else "Ver Video")
@@ -9823,7 +9929,7 @@ class MainActivity : AppCompatActivity(), RowHost {
         val pos = exoPlayer.currentPosition
         val wasPlaying = exoPlayer.isPlaying
         loadedSig = 0
-        if (tracks.isNotEmpty()) playList(tracks.toList(), currentTrackIndex, autoPlay = wasPlaying, startPosMs = pos)
+        if (tracks.isNotEmpty()) playList(tracks.toList(), currentTrackIndex, autoPlay = wasPlaying, startPosMs = pos, forceVideoMode = isVideoMode)
         reorderStageContainers()
         updateStageLayout()
     }
